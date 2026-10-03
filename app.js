@@ -9,7 +9,7 @@ import * as shareUi from './ui-share.js';
 import * as modes from './modes.js';
 import { noteTitle, noteSnippet, sharedFileCheck } from './share.js';
 
-export const APP_VERSION = '0.9.0';
+export const APP_VERSION = '0.10.0';
 
 const $ = (id) => document.getElementById(id);
 const el = {
@@ -48,7 +48,7 @@ const snippetOf = (n) => noteSnippet(n);
 // ---- Preferences (per device) ------------------------------------------
 const PREFS_KEY = 'reiimei.prefs';
 const VIEW_DEFAULT = { sort: 'updated', dir: 'desc', hidden: [] };
-const PREF_DEFAULTS = { mode: 'notes', format: 'markdown', style: 'apa', headFont: 'reiimei', noteFont: 'newsreader', view: VIEW_DEFAULT };
+const PREF_DEFAULTS = { mode: 'notes', lastProject: '', format: 'markdown', style: 'apa', headFont: 'reiimei', noteFont: 'newsreader', view: VIEW_DEFAULT };
 function prefs() {
   try { return { ...PREF_DEFAULTS, ...JSON.parse(localStorage.getItem(PREFS_KEY) || '{}') }; }
   catch { return { ...PREF_DEFAULTS }; }
@@ -138,7 +138,23 @@ const activeNotes = () => state.notes.filter((n) => !n.deleted);
 // A permanently deleted note is a blank deleted stub (kept only so other devices wipe it too).
 const isPurged = (n) => n.deleted && !n.locked && !(n.body || '').trim() && !(n.tags || []).length;
 const trashNotes = () => state.notes.filter((n) => n.deleted && !isPurged(n));
-const liveFolders = () => state.folders.filter((f) => !f.deleted).sort((a, b) => a.name.localeCompare(b.name));
+const anyFolders = () => state.folders.filter((f) => !f.deleted);
+const liveFolders = () => anyFolders().filter((f) => !modes.isProject(f)).sort((a, b) => a.name.localeCompare(b.name));
+const liveProjects = () => anyFolders().filter(modes.isProject).sort((a, b) => modes.projectName(a).localeCompare(modes.projectName(b)));
+const folderById = (id) => anyFolders().find((f) => f.id === id);
+// A Research note's project gives it a tag automatically. It is worked out, not stored, so
+// renaming the project renames the tag, and it cannot be removed from the note.
+function projectTagOf(n) {
+  if (!n || n.deleted || modes.kindOf(n) !== 'research') return null;
+  const f = folderById(n.folder_id);
+  return f && modes.isProject(f) ? modes.slugTag(modes.projectName(f)) || null : null;
+}
+function tagsOf(n) {
+  const pt = projectTagOf(n);
+  const t = n.tags || [];
+  return pt && !t.includes(pt) ? [...t, pt] : t;
+}
+const projectTagSet = () => new Set(liveProjects().map((f) => modes.slugTag(modes.projectName(f))));
 const currentNote = () => state.notes.find((n) => n.id === state.currentId) || null;
 const normTag = (t) => t.trim().replace(/^#+/, '').toLowerCase().replace(/\s+/g, '-').replace(/[^\p{L}\p{N}_-]/gu, '').slice(0, 40);
 
@@ -173,7 +189,7 @@ function replaceFolder(updated) {
 
 function tagCounts() {
   const counts = new Map();
-  activeNotes().forEach((n) => (n.tags || []).forEach((t) => counts.set(t, (counts.get(t) || 0) + 1)));
+  activeNotes().forEach((n) => tagsOf(n).forEach((t) => counts.set(t, (counts.get(t) || 0) + 1)));
   return [...counts.entries()].sort((a, b) => a[0].localeCompare(b[0]));
 }
 
@@ -192,17 +208,17 @@ function filteredNotes() {
   if (f.type === 'folder') list = list.filter((n) => n.folder_id === f.id);
   if (f.type === 'device') list = list.filter((n) => originOf(n)?.id === device().id);
   // Several tags narrow the list: a note must carry every chosen tag (in any mode or folder).
-  if (f.type === 'tag') list = list.filter((n) => f.tags.every((t) => (n.tags || []).includes(t)));
+  if (f.type === 'tag') list = list.filter((n) => f.tags.every((t) => tagsOf(n).includes(t)));
   if (f.type === 'all' && v.hidden.length) list = list.filter((n) => !v.hidden.includes(deviceOf(n).id));
   const q = state.query.trim().toLowerCase();
   if (q) {
     const tagQ = q.replace(/^#/, '');
-    list = list.filter((n) => n.body.toLowerCase().includes(q) || (n.tags || []).some((t) => t.includes(tagQ)));
+    list = list.filter((n) => n.body.toLowerCase().includes(q) || tagsOf(n).some((t) => t.includes(tagQ)));
   }
   return sortNotes(list, v);
 }
 
-const firstTag = (n) => [...(n.tags || [])].sort((a, b) => a.localeCompare(b))[0] || '';
+const firstTag = (n) => [...tagsOf(n)].sort((a, b) => a.localeCompare(b))[0] || '';
 function sortKey(n, sort) {
   if (sort === 'tag') return firstTag(n);
   if (sort === 'device') return deviceOf(n).name || '';
@@ -287,7 +303,7 @@ async function toggleTagFilter(tag) {
   if (cur.includes(tag)) {
     const left = cur.filter((t) => t !== tag);
     state.filter = left.length ? { type: 'tag', tags: left } : { type: 'all' };
-  } else if (cur.length >= MAX_TAGS) {
+  } else if (!projectTagSet().has(tag) && cur.filter((t) => !projectTagSet().has(t)).length >= MAX_TAGS) {
     toast(`Five tags is the most. Remove one to add another.`);
     return;
   } else {
@@ -309,7 +325,7 @@ function renderTagFilter() {
   if (f.type !== 'tag') { box.hidden = true; return; }
   box.hidden = false;
   box.innerHTML = f.tags.map((t) => `<span class="tf-chip">#${esc(t)}<button data-untag="${esc(t)}" aria-label="Remove tag ${esc(t)} from the filter">×</button></span>`).join('') +
-    `<span class="tf-note">${f.tags.length > 1 ? 'Notes with all of these tags. ' : ''}${f.tags.length < MAX_TAGS ? `Pick up to ${MAX_TAGS - f.tags.length} more in Tags.` : 'Five tags is the most.'}</span>`;
+    `<span class="tf-note">${f.tags.length > 1 ? 'Notes with all of these tags. ' : ''}${(() => { const left = MAX_TAGS - f.tags.filter((t) => !projectTagSet().has(t)).length; return left > 0 ? `Pick up to ${left} more in Tags.` : 'Five tags is the most.'; })()}</span>`;
 }
 
 function isActive(f) {
@@ -332,8 +348,12 @@ function sideItem(filter, icon, name, count, withMore = false) {
 
 function renderSidebar() {
   const act = activeNotes().filter((n) => state.showAll || modes.kindOf(n) === state.mode);
-  const folders = liveFolders();
+  const research = state.mode === 'research';
+  const folders = research ? liveProjects() : liveFolders();
   renderModeSwitch();
+  $('folders-label').textContent = research ? 'Projects' : 'Folders';
+  $('btn-new-folder').textContent = 'New';
+  $('btn-new-folder').title = research ? 'New project' : 'New folder';
   const folderIds = new Set(folders.map((f) => f.id));
   el.smartList.replaceChildren(
     sideItem({ type: 'all' }, 'all', 'All Notes', act.length),
@@ -341,11 +361,11 @@ function renderSidebar() {
   );
 
   el.folderList.replaceChildren(...folders.map((f) => {
-    const li = sideItem({ type: 'folder', id: f.id }, 'folder', f.name, act.filter((n) => n.folder_id === f.id).length, true);
+    const li = sideItem({ type: 'folder', id: f.id }, 'folder', modes.projectName(f), act.filter((n) => n.folder_id === f.id).length, true);
     li.querySelector('.more').addEventListener('click', () => folderMenu(f));
     return li;
   }));
-  if (!folders.length) el.folderList.innerHTML = '<li class="side-empty">No folders yet</li>';
+  if (!folders.length) el.folderList.innerHTML = `<li class="side-empty">${research ? 'No projects yet' : 'No folders yet'}</li>`;
 
   const tags = tagCounts();
   el.tagList.replaceChildren(...tags.map(([t, c]) => {
@@ -410,7 +430,7 @@ async function setMode(id) {
   state.selected.clear();
   state.mode = id;
   state.showAll = false;
-  if (state.filter.type === 'tag' || state.filter.type === 'trash') state.filter = { type: 'all' };
+  if (state.filter.type === 'tag' || state.filter.type === 'trash' || state.filter.type === 'folder') state.filter = { type: 'all' };
   setPrefs({ mode: id });
   await afterListChange(state.currentId);
   log.info('modes', 'Mode changed', { mode: id });
@@ -428,7 +448,11 @@ async function toggleShowAll() {
 async function moveToMode(id) {
   const n = currentNote();
   if (!n || n.deleted || !modes.MODE_IDS.includes(id) || modes.kindOf(n) === id) return;
-  await updateCurrent({ meta: { ...(n.meta || {}), kind: id } });
+  const changes = { meta: { ...(n.meta || {}), kind: id } };
+  const inProject = modes.isProject(folderById(n.folder_id));
+  if (id === 'research' && !inProject) changes.folder_id = (await projectForNew()).id; // Research notes live in a project
+  if (id !== 'research' && inProject) changes.folder_id = null;                        // other modes have no projects
+  await updateCurrent(changes);
   log.info('modes', 'Note moved to mode', { id: n.id, mode: id });
   toast(`Moved to ${modes.modeName(id)}`);
   if (!state.showAll && id !== state.mode) {
@@ -440,7 +464,7 @@ async function moveToMode(id) {
 
 function listTitle() {
   const f = state.filter;
-  if (f.type === 'folder') return liveFolders().find((x) => x.id === f.id)?.name || 'Folder';
+  if (f.type === 'folder') { const x = folderById(f.id); return x ? modes.projectName(x) : 'Folder'; }
   if (f.type === 'tag') return f.tags.map((t) => `#${t}`).join(' + ');
   if (f.type === 'trash') return 'Recently Deleted';
   if (f.type === 'device') return 'This device';
@@ -470,7 +494,7 @@ function renderList() {
     <li class="note-item${n.id === state.currentId && !state.selecting ? ' active' : ''}${state.selected.has(n.id) ? ' selected' : ''}" data-id="${n.id}" role="option" aria-selected="${state.selected.has(n.id)}">
       <div class="title">${n.pinned ? ICONS.pin : ''}<span>${esc(titleOf(n))}</span></div>
       <div class="meta"><span class="date">${esc(formatDate(view().sort === 'created' ? (n.created_at || n.updated_at) : n.updated_at))}</span>${multi ? `<span class="dev">${esc(deviceOf(n).name)}</span>` : ''}${state.showAll ? `<span class="kind">${esc(modes.modeName(modes.kindOf(n)))}</span>` : ''}<span class="snippet">${esc(snippetOf(n))}</span></div>
-      ${(n.tags || []).length ? `<div class="tags">${n.tags.map((t) => `<span class="mini-tag">#${esc(t)}</span>`).join('')}</div>` : ''}
+      ${tagsOf(n).length ? `<div class="tags">${tagsOf(n).map((t) => `<span class="mini-tag">#${esc(t)}</span>`).join('')}</div>` : ''}
     </li>`;
   }).join('');
   const v = view();
@@ -497,10 +521,13 @@ function renderEditor() {
   el.tagInput.disabled = n.deleted;
   el.folderSel.disabled = n.deleted;
 
-  const folders = liveFolders();
-  el.folderSel.innerHTML = `<option value="">Notes (no folder)</option>` +
-    folders.map((f) => `<option value="${f.id}">${esc(f.name)}</option>`).join('');
-  el.folderSel.value = folders.some((f) => f.id === n.folder_id) ? n.folder_id : '';
+  const isResearch = modes.kindOf(n) === 'research';
+  const folders = isResearch ? liveProjects() : liveFolders();
+  el.folderSel.innerHTML = (isResearch ? '' : `<option value="">Notes (no folder)</option>`) +
+    folders.map((f) => `<option value="${f.id}">${esc(modes.projectName(f))}</option>`).join('');
+  el.folderSel.value = folders.some((f) => f.id === n.folder_id) ? n.folder_id : (isResearch ? folders[0]?.id || '' : '');
+  el.folderSel.setAttribute('aria-label', isResearch ? 'Project' : 'Folder');
+  el.folderSel.title = isResearch ? 'Project' : 'Folder';
 
   el.modeSel.innerHTML = modes.MODES.map((m) => `<option value="${m.id}">${esc(m.name)}</option>`).join('');
   el.modeSel.value = modes.kindOf(n);
@@ -510,8 +537,10 @@ function renderEditor() {
   el.del.title = n.deleted ? 'Already deleted' : 'Delete';
   el.del.disabled = n.deleted;
 
-  el.chips.innerHTML = (n.tags || []).map((t) =>
-    `<span class="chip">#${esc(t)}${n.deleted ? '' : `<button data-tag="${esc(t)}" aria-label="Remove tag ${esc(t)}">×</button>`}</span>`).join('');
+  const pt = projectTagOf(n);
+  el.chips.innerHTML = tagsOf(n).map((t) => t === pt
+    ? `<span class="chip project" title="Added by the project. It follows the project name.">#${esc(t)}</span>`
+    : `<span class="chip">#${esc(t)}${n.deleted ? '' : `<button data-tag="${esc(t)}" aria-label="Remove tag ${esc(t)}">×</button>`}</span>`).join('');
   writing.renderToolbar(n);
 }
 
@@ -629,7 +658,7 @@ async function newNote() {
   if (f.type === 'trash') state.filter = { type: 'all' };
   const p = prefs();
   const note = await db.createNote({
-    folder_id: f.type === 'folder' ? f.id : null,
+    folder_id: state.mode === 'research' ? (await projectForNew()).id : f.type === 'folder' && !modes.isProject(folderById(f.id)) ? f.id : null,
     tags: f.type === 'tag' ? [...f.tags] : [],
     format: p.format,
     meta: { ...writing.newNoteMeta(p), kind: state.mode, origin: { id: device().id, name: device().name } },
@@ -877,7 +906,7 @@ async function findConflictedCopies() {
 async function addTag(raw) {
   const n = currentNote();
   const tag = normTag(raw);
-  if (!n || !tag || (n.tags || []).includes(tag)) return;
+  if (!n || !tag || tagsOf(n).includes(tag)) return;
   await updateCurrent({ tags: [...(n.tags || []), tag] });
 }
 
@@ -893,27 +922,69 @@ async function removeTag(tag) {
 }
 
 async function newFolder() {
-  const r = await ask({ title: 'New folder', value: '', placeholder: 'Folder name', okText: 'Create' });
-  if (r.action !== 'ok' || !r.value) return;
-  const f = await db.createFolder(r.value.slice(0, 80));
+  const research = state.mode === 'research';
+  const r = await ask({ title: research ? 'New project' : 'New folder', value: '', placeholder: research ? 'Project name' : 'Folder name', okText: 'Create' });
+  if (r.action !== 'ok' || !r.value.trim()) return;
+  if (research && liveProjects().some((p) => modes.projectName(p).toLowerCase() === r.value.trim().toLowerCase())) { toast('A project with that name already exists.'); return; }
+  const f = await db.createFolder(research ? modes.projectStored(r.value) : r.value.slice(0, 80));
   replaceFolder(f);
   await selectFilter({ type: 'folder', id: f.id });
   scheduleSync();
 }
 
+// ---- Research projects -------------------------------------------------------
+async function ensureUnsorted() {
+  const found = liveProjects().find((p) => modes.projectName(p) === modes.UNSORTED);
+  if (found) return found;
+  const f = await db.createFolder(modes.projectStored(modes.UNSORTED));
+  replaceFolder(f);
+  log.info('projects', 'Unsorted project created');
+  return f;
+}
+
+// The project a new Research note goes into: the one you are looking at, else the last
+// one you used, else Unsorted.
+async function projectForNew() {
+  const f = state.filter;
+  if (f.type === 'folder' && modes.isProject(folderById(f.id))) return folderById(f.id);
+  const last = folderById(prefs().lastProject);
+  if (last && modes.isProject(last)) return last;
+  return ensureUnsorted();
+}
+
+// Every Research note must be in a project. Older notes that were sorted into Research
+// without one are put in Unsorted. Runs at start-up and after each sync.
+async function fixResearchNotes() {
+  const stray = activeNotes().filter((n) => !n.locked && modes.kindOf(n) === 'research' && !modes.isProject(folderById(n.folder_id)));
+  if (!stray.length) return;
+  const dest = await ensureUnsorted();
+  for (const n of stray) replaceNote(await db.saveNote(n, { folder_id: dest.id }));
+  log.info('projects', 'Research notes placed in a project', { count: stray.length });
+  scheduleSync();
+}
+
 async function folderMenu(folder) {
-  const r = await ask({ title: 'Folder', value: folder.name, okText: 'Rename', extra: 'Delete folder', extra2: 'Share folder' });
+  const proj = modes.isProject(folder);
+  const label = proj ? modes.projectName(folder) : folder.name;
+  const r = await ask({ title: proj ? 'Project' : 'Folder', value: label, okText: 'Rename', extra: proj ? 'Delete project' : 'Delete folder', extra2: proj ? 'Share project' : 'Share folder' });
   if (r.action === 'extra2') {
-    shareUi.open(activeNotes().filter((n) => n.folder_id === folder.id), { title: folder.name, single: false });
+    shareUi.open(activeNotes().filter((n) => n.folder_id === folder.id), { title: label, single: false });
     return;
   }
-  if (r.action === 'ok' && r.value && r.value !== folder.name) {
-    replaceFolder(await db.saveFolder(folder, { name: r.value.slice(0, 80) }));
+  if (r.action === 'ok' && r.value && r.value !== label) {
+    if (proj && liveProjects().some((p) => p.id !== folder.id && modes.projectName(p).toLowerCase() === r.value.trim().toLowerCase())) { toast('A project with that name already exists.'); return; }
+    replaceFolder(await db.saveFolder(folder, { name: proj ? modes.projectStored(r.value) : r.value.slice(0, 80) }));
     render();
     scheduleSync();
   } else if (r.action === 'extra') {
-    const c = await ask({ title: `Delete "${folder.name}"?`, text: 'Notes in this folder will move to Notes. They will not be deleted.', okText: 'Delete folder' });
+    const inside = activeNotes().filter((n) => n.folder_id === folder.id);
+    if (proj && label === modes.UNSORTED && inside.length) { toast('Move the notes in Unsorted to other projects first.'); return; }
+    const c = await ask({ title: `Delete "${label}"?`, text: proj ? 'Its notes will move to the Unsorted project. They will not be deleted.' : 'Notes in this folder will move to Notes. They will not be deleted.', okText: proj ? 'Delete project' : 'Delete folder' });
     if (c.action !== 'ok') return;
+    if (proj && inside.length) {
+      const dest = await ensureUnsorted();
+      for (const n of inside) replaceNote(await db.saveNote(n, { folder_id: dest.id }));
+    }
     await db.deleteFolder(folder);
     state.notes = await db.getAll('notes');
     state.folders = await db.getAll('folders');
@@ -949,7 +1020,8 @@ async function runSync(reason = 'auto') {
     // Reload from the database so the UI holds the post-sync records.
     await reloadFromDb();
     await refreshCache();
-    if (state.filter.type === 'folder' && !liveFolders().some((f) => f.id === state.filter.id)) state.filter = { type: 'all' };
+    await fixResearchNotes();
+    if (state.filter.type === 'folder' && !folderById(state.filter.id)) state.filter = { type: 'all' };
     render();
   }
   return r;
@@ -1340,7 +1412,7 @@ function bindEvents() {
     const m = modes.MODES.find((x) => x.key === e.key);
     if (m) { e.preventDefault(); setMode(m.id); }
   });
-  el.folderSel.addEventListener('change', () => updateCurrent({ folder_id: el.folderSel.value || null }));
+  el.folderSel.addEventListener('change', () => { if (modes.isProject(folderById(el.folderSel.value))) setPrefs({ lastProject: el.folderSel.value }); updateCurrent({ folder_id: el.folderSel.value || null }); });
   el.pin.addEventListener('click', () => { const n = currentNote(); if (n) updateCurrent({ pinned: !n.pinned }); });
   el.del.addEventListener('click', deleteCurrent);
   $('btn-paste-erased').addEventListener('click', pasteErased);
@@ -1357,7 +1429,7 @@ function bindEvents() {
       addTag(v);
     } else if (e.key === 'Backspace' && !el.tagInput.value) {
       const n = currentNote();
-      if (n?.tags?.length) removeTag(n.tags[n.tags.length - 1]);
+      if (n?.tags?.length) removeTag(n.tags[n.tags.length - 1]);  // own tags only; the project tag is not in n.tags
     }
   });
   el.tagInput.addEventListener('change', () => {
@@ -1444,7 +1516,8 @@ async function loadData() {
   for (const n of state.notes.filter((x) => !x.deleted && !x.locked && !x.body.trim())) await discardIfBlank(n.id);
   state.notes = await db.getAll('notes');
   await refreshCache();
-  if (state.filter.type === 'folder' && !liveFolders().some((f) => f.id === state.filter.id)) state.filter = { type: 'all' };
+  await fixResearchNotes();
+  if (state.filter.type === 'folder' && !folderById(state.filter.id)) state.filter = { type: 'all' };
   if (!state.notes.some((n) => n.id === state.currentId)) state.currentId = isPhone() ? null : filteredNotes()[0]?.id || null;
   render();
 }
@@ -1477,7 +1550,10 @@ const hooks = {
   closeSettings: () => closeSettings(),
   runSync: (reason) => runSync(reason),
   syncOn: () => sync.isConfigured(),
-  folders: () => state.folders,
+  projects: () => liveProjects().map((f) => ({ id: f.id, name: modes.projectName(f) })),
+  projectNotes: (folderId) => activeNotes().filter((n) => n.folder_id === folderId && !n.locked && modes.kindOf(n) === 'research'),
+  updateNote: async (n, changes) => { replaceNote(await db.saveNote(n, changes)); render(); scheduleSync(); },
+  folders: () => state.folders.map((f) => (modes.isProject(f) ? { ...f, name: modes.projectName(f) } : f)),
   encrypted: () => security.isEnabled(),
 };
 

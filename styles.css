@@ -172,7 +172,7 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 
 /* Editor */
 .editor-head { border-bottom: 1px solid var(--rule); }
-#note-folder {
+#note-folder, #note-mode {
   max-width: 50%; padding: 5px 8px; border: 1px solid var(--rule); border-radius: 8px;
   background: var(--paper); font-size: 13.5px;
 }
@@ -620,3 +620,20 @@ html[data-note-font="display"] #body { line-height: 1.7; letter-spacing: .01em; 
 .mode-all[aria-pressed="true"] { border-style: solid; opacity: 1; }
 .note-item .kind { font-size: 11px; opacity: .7; border: 1px solid currentColor; border-radius: 6px; padding: 0 5px; margin-right: 6px; }
 #note-mode { max-width: 120px; }
+
+/* ---- Research ---- */
+.chip.project { opacity: .85; padding-right: 10px; }
+.library { margin-top: 14px; border-top: 1px solid var(--rule); padding-top: 10px; }
+.library h4, #quote-dialog h4 { margin: 10px 0 6px; font-size: 14px; }
+.src-note { margin: 2px 0 4px; font-size: 13px; color: var(--ink-2); white-space: pre-wrap; }
+.src-status { font: inherit; font-size: 12px; padding: 2px 4px; border-radius: 6px; max-width: 110px; }
+.badge { font-size: 11px; border: 1px solid var(--rule); border-radius: 6px; padding: 0 6px; color: var(--ink-2); }
+#quote-dialog textarea { width: 100%; box-sizing: border-box; font: inherit; }
+.ref-preview { font-size: 13px; color: var(--ink-2); min-height: 1em; }
+.outline { max-height: 32%; overflow: auto; border-bottom: 1px solid var(--rule); padding: 6px 12px; background: var(--paper); }
+.ol-row { display: flex; align-items: center; gap: 4px; }
+.ol-title { flex: 1; text-align: left; font: inherit; font-size: 13px; background: none; border: 0; color: inherit; cursor: pointer; padding: 4px 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ol-title:hover { color: var(--accent); }
+.ol-move { font: inherit; background: none; border: 1px solid var(--rule); border-radius: 6px; color: inherit; cursor: pointer; width: 26px; height: 24px; padding: 0; }
+.ol-empty { margin: 4px 0; font-size: 13px; color: var(--ink-3); }
+.editor [hidden] { display: none !important; }

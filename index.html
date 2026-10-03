@@ -36,7 +36,7 @@
         <ul class="side-list" id="smart-list"></ul>
         <div class="side-section">
           <div class="side-label">
-            <span>Folders</span>
+            <span id="folders-label">Folders</span>
             <button class="text-btn" id="btn-new-folder">New</button>
           </div>
           <ul class="side-list" id="folder-list"></ul>
@@ -135,6 +135,8 @@
         <button class="tool" id="btn-fonts" title="Choose fonts">Aa</button>
         <button class="tool" id="btn-preview" aria-pressed="false" title="Preview">Preview</button>
         <button class="tool" id="btn-sources" title="Sources and citations">Sources</button>
+        <button class="tool research-only" id="btn-quote" title="Quote a source" hidden>Quote</button>
+        <button class="tool research-only" id="btn-outline" aria-pressed="false" title="Outline of headings" hidden>Outline</button>
         <button class="tool" id="btn-paper" title="Format as an MLA or APA paper">Paper</button>
         <button class="tool" id="btn-copy" title="Copy for Populi or as Markdown">Copy</button>
       </div>
@@ -147,6 +149,7 @@
         Text you erased from another note is waiting.
         <button class="text-btn" id="btn-paste-erased">Paste erased text</button>
       </div>
+      <div class="outline" id="outline" hidden aria-label="Outline"></div>
       <div class="editor-area" id="editor-area">
         <div class="gutter" id="gutter" hidden aria-hidden="true"></div>
         <pre class="code-layer" id="code-layer" hidden aria-hidden="true"><code id="code-hl"></code></pre>
@@ -514,6 +517,35 @@
       <button class="btn" id="btn-copy-refs">Copy reference list</button>
     </div>
     <p class="msg" id="sources-msg" role="status"></p>
+    <section class="library" id="library" hidden>
+      <h4>Project library</h4>
+      <label>Show sources from
+        <select id="lib-from"></select>
+      </label>
+      <p class="hint tiny" id="lib-hint"></p>
+      <ul class="source-list" id="lib-list"></ul>
+    </section>
+  </dialog>
+
+  <!-- Quote -->
+  <dialog id="quote-dialog" class="dialog wide">
+    <div class="settings-head">
+      <h3>Quote</h3>
+      <button class="icon-btn" id="btn-close-quote" aria-label="Close">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <label>Quote<textarea id="q-text" rows="4" placeholder="Select text in the note first, or type or paste the quote here"></textarea></label>
+    <label>Source<select id="q-source"></select></label>
+    <label>Page or location<input id="q-loc" placeholder="p. 12" autocomplete="off"></label>
+    <p class="ref-preview" id="q-prev"></p>
+    <div class="row">
+      <button class="btn primary" id="q-insert">Insert in note</button>
+      <button class="btn" id="q-save">Save for later</button>
+    </div>
+    <p class="msg" id="q-msg" role="status"></p>
+    <h4>Saved quotes in this project</h4>
+    <ul class="source-list" id="q-saved"></ul>
   </dialog>
 
   <!-- Source form -->
@@ -563,6 +595,15 @@
       <label data-for="book chapter article">DOI<input id="sf-doi" placeholder="10.1000/xyz123" autocomplete="off" autocapitalize="off"></label>
       <label>URL<input id="sf-url" type="url" placeholder="https://" autocomplete="off" autocapitalize="off"></label>
       <label data-for="webpage">Date you accessed it<input id="sf-accessed" type="date"></label>
+      <label data-research>Reading status
+        <select id="sf-status">
+          <option value="">Not set</option>
+          <option value="toread">To read</option>
+          <option value="reading">Reading</option>
+          <option value="done">Done</option>
+        </select>
+      </label>
+      <label data-research>Your notes on this source<textarea id="sf-note" rows="3" placeholder="What it argues, why it matters, where to look again"></textarea></label>
       <label>Citation key<input id="sf-key" autocomplete="off" autocapitalize="off" pattern="[A-Za-z][A-Za-z0-9_:-]*"></label>
       <div class="sf-preview" aria-live="polite">
         <p class="tiny-label">APA 7</p><p class="ref-preview" id="sf-prev-apa"></p>

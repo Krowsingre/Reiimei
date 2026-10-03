@@ -1,8 +1,20 @@
-# Reiimei v0.9.0
+# Reiimei v0.10.0
 
 *reiimei* (REE-h-may), n. The cold, luminous stillness peculiar to a clear winter night; especially the effect of moonlight upon frost, illuminating the night without dispelling it.
 
 An offline-first notes app for Windows and iPhone, built as a Progressive Web App (PWA). No Mac, no App Store, no developer fee.
+
+## What changed in v0.10.0 (Research mode)
+
+- **Projects.** In Research mode the sidebar shows **Projects** instead of Folders. Every Research note lives in exactly one project. A new Research note goes into the project you are viewing (or the last one you used). The other modes keep their ordinary folders.
+- **Automatic project tag.** Each Research note carries its project's name as a tag. You cannot remove it, it follows the project if you rename it, it works as a tag filter across all modes, and it does not count toward the five-tag limit.
+- **Unsorted.** Research notes that had no project (older notes with sources, or any note you move into Research) go into a project called **Unsorted**. Deleting a project moves its notes to Unsorted. Moving a note out of Research takes it out of its project.
+- **Project library.** In a Research note, **Sources** has a **Project library** section listing the sources used by other notes in the same project. **Add to this note** copies one in. The picker above it can also show another project's sources, and **Import** copies one into this note. Each project keeps its own list, and importing never changes the other project.
+- **Reading status and notes on a source.** Each source can be marked To read, Reading, or Done, and carries your own notes. Change the status right in the Sources list.
+- **Quote.** Select text in a note, tap **Quote**, pick the source and page, and Reiimei inserts a block quote with the citation. **Save for later** keeps a quote for the whole project, and saved quotes can be inserted into any note in it.
+- **Outline.** **Outline** shows a note's headings. Tap one to jump to it, or use the arrows to move a section (with its sub-sections) up or down. Undo is offered after each move. Markdown notes only.
+- Quote and Outline appear only on Research notes.
+- No Supabase change is needed. A project is stored as a folder whose name starts with "[Project] ", so an older version of Reiimei would show that prefix.
 
 ## What changed in v0.9.0
 
@@ -130,9 +142,9 @@ Then open http://localhost:8000 in Edge or Chrome. Notes work immediately, saved
 
 The iPhone needs an HTTPS address. GitHub Pages hosts the app for free. Only the app's code goes to GitHub; your notes never do.
 
-1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.9.0` folder.
+1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.10.0` folder.
 2. **Create the repository.** In Safari, sign in at github.com, tap **+** › **New repository**. Name it `reiimei`, set it to **Public** (free Pages needs a public repository), and tap **Create repository**.
-3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.9.0` folder, tap **Select**, select all 31 files, and tap **Open**. Scroll down and tap **Commit changes**.
+3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.10.0` folder, tap **Select**, select all 32 files, and tap **Open**. Scroll down and tap **Commit changes**.
    - If you don't see the upload link, tap the **aA** button in Safari's address bar › **Request Desktop Website** and try again.
 4. **Turn on Pages.** In the repository, open **Settings** › **Pages**. Under **Build and deployment**, set Source to **Deploy from a branch**, Branch to **main** and **/ (root)**, then tap **Save**.
 5. **Wait a minute or two**, then reload the Pages screen. It shows your address, which looks like `https://yourname.github.io/reiimei/`.
@@ -232,7 +244,7 @@ The service worker caches the app files. When you change any file, bump `VERSION
 - **Settings › Log** › Download gives a text log of everything the app did, including sync results and errors.
 - **"Test connection"** in Settings › Sync confirms the URL, key, sign-in, and tables are all correct.
 
-## Known limits in v0.9.0
+## Known limits in v0.10.0
 
 - Images can be linked but not attached
 - Sources belong to one note; there is no shared library yet

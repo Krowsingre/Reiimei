@@ -556,6 +556,7 @@ export function blankSource(type = 'book') {
     editors: [], bookTitle: '', pages: '',
     journal: '', volume: '', issue: '',
     site: '', url: '', doi: '', accessed: '',
+    status: '', note: '',   // Research: reading status (toread | reading | done) and your notes on the source
   };
 }
 

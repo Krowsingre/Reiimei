@@ -8,6 +8,8 @@ import { uuid } from './db.js';
 import * as codeUi from './ui-code.js';
 import { isCode, LANGS } from './code.js';
 import * as S from './share.js';
+import * as research from './ui-research.js';
+import * as modes from './modes.js';
 
 const $ = (id) => document.getElementById(id);
 let app = null; // hooks supplied by app.js
@@ -43,6 +45,7 @@ export function renderToolbar(note) {
   $('code-tools').hidden = !code;
   $('code-tools').querySelectorAll('.tool').forEach((b) => { b.disabled = ro || previewOn; });
   $('btn-sources').hidden = code;
+  research.renderToolbar(note, code);
   $('btn-paper').hidden = code;
   const pl = code ? codeUi.previewLabel(note.format) : 'Preview';
   $('btn-preview').hidden = !pl;
@@ -228,13 +231,16 @@ function renderSources() {
     const s = byId.get(r.id);
     return `<li data-id="${r.id}">
       <p class="ref-text">${r.runs.map((x) => (x.italic ? `<em>${F.escapeHtml(x.text)}</em>` : F.escapeHtml(x.text))).join('')}</p>
+      ${s.note ? `<p class="src-note">${F.escapeHtml(s.note)}</p>` : ''}
       <div class="src-actions">
         <span class="src-key">@${F.escapeHtml(s.key)}${cited.has(s.key) ? '' : ' · not cited yet'}</span>
+        ${research.isResearchNote(note) ? `<select class="src-status" aria-label="Reading status">${research.statusOptions(s.status)}</select>` : ''}
         <button class="btn small" data-act="cite"${note.deleted ? ' disabled' : ''}>Cite</button>
         <button class="btn small" data-act="edit">Edit</button>
         <button class="btn small danger" data-act="delete">Delete</button>
       </div></li>`;
   }).join('') : '<li class="src-empty">No sources yet. Add the books, articles, and web pages you are citing.</li>';
+  research.renderLibrary(note);
 }
 
 function openSources() {
@@ -268,7 +274,7 @@ function personRow(p = {}, kind = 'author') {
   return div;
 }
 
-const SF = ['title', 'year', 'month', 'day', 'bookTitle', 'journal', 'volume', 'issue', 'edition', 'publisher', 'site', 'doi', 'url', 'accessed', 'key', 'org'];
+const SF = ['status', 'note', 'title', 'year', 'month', 'day', 'bookTitle', 'journal', 'volume', 'issue', 'edition', 'publisher', 'site', 'doi', 'url', 'accessed', 'key', 'org'];
 let editingId = null;
 
 function readSourceForm() {
@@ -316,6 +322,7 @@ function openSourceForm(source = null) {
   $('sf-key').placeholder = 'Filled in automatically';
   $('sf-msg').textContent = '';
   showFieldsFor(s.type);
+  $('source-form').querySelectorAll('[data-research]').forEach((x) => { x.hidden = !research.isResearchNote(app.note()); });
   updateSourcePreview();
   $('source-dialog').showModal();
 }
@@ -555,6 +562,7 @@ async function openPaperView() {
 export function init(hooks) {
   app = hooks;
   codeUi.init(hooks);
+  research.init(hooks, { renderSources, saveMeta, insertText: (t) => insertAtCaret(t), sourcesOf, styleOf, citerFor });
 
   $('tool-buttons').addEventListener('click', (e) => {
     const b = e.target.closest('[data-tool]');
@@ -620,6 +628,15 @@ export function init(hooks) {
   $('sources-dialog').querySelectorAll('.seg-btn').forEach((b) => b.addEventListener('click', () => setStyle(b.dataset.style)));
   $('btn-add-source').addEventListener('click', () => { $('sources-dialog').close(); openSourceForm(); });
   $('btn-copy-refs').addEventListener('click', copyReferences);
+  $('source-list').addEventListener('change', async (e) => {
+    const sel = e.target.closest('.src-status');
+    if (!sel) return;
+    const id = sel.closest('li').dataset.id;
+    const note = app.note();
+    await saveMeta({ sources: sourcesOf(note).map((x) => (x.id === id ? { ...x, status: sel.value } : x)) });
+    log.info('research', 'Reading status changed', { status: sel.value });
+    renderSources();
+  });
   $('source-list').addEventListener('click', (e) => {
     const btn = e.target.closest('[data-act]');
     if (!btn) return;
