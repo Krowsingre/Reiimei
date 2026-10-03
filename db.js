@@ -195,16 +195,17 @@ export async function createNote({ folder_id = null, tags = [], format = 'markdo
 
 // Apply changes on top of the record currently in the database (not a possibly
 // stale copy held by the UI).
-async function update(store, id, changes, fallback) {
+async function update(store, id, changes, fallback, touch = true) {
   return locked(async () => {
     const current = (await get(store, id)) || fallback;
-    const updated = { ...current, ...changes, updated_at: now(), dirty: true };
+    // touch:false changes a record (and syncs it) without moving its "last updated" date.
+    const updated = { ...current, ...changes, updated_at: touch ? now() : current.updated_at, dirty: true };
     await put(store, updated);
     return updated;
   });
 }
 
-export const saveNote = (note, changes) => update('notes', note.id, changes, note);
+export const saveNote = (note, changes, { touch = true } = {}) => update('notes', note.id, changes, note, touch);
 
 export const deleteNote = (note) => saveNote(note, { deleted: true });
 export const restoreNote = (note) => saveNote(note, { deleted: false });

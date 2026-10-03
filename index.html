@@ -59,6 +59,7 @@
         </button>
         <h2 class="pane-title" id="list-title">All Notes</h2>
         <button class="text-btn" id="btn-empty-trash" hidden>Empty</button>
+        <button class="icon-btn" id="btn-view" title="Sort and show" aria-label="Sort and show notes"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 12h4M12 12h8M4 17h12M20 17h0"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="17" r="2"/></svg><i class="view-dot" id="view-dot" hidden></i></button>
         <button class="text-btn" id="btn-select" title="Select several notes">Select</button>
         <button class="icon-btn" id="btn-share-list" title="Share notes in this list" aria-label="Share notes in this list"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M5 12v7h14v-7"/></svg></button>
         <button class="icon-btn accent" id="btn-new-note" title="New note" aria-label="New note">
@@ -168,6 +169,38 @@
         <button value="ok" class="btn primary" id="ask-ok">OK</button>
       </menu>
     </form>
+  </dialog>
+
+  <!-- Sort and show -->
+  <dialog id="view-dialog" class="dialog">
+    <div class="settings-head">
+      <h3>Sort and show</h3>
+      <button class="icon-btn" id="view-close" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+    </div>
+    <label>Sort notes by
+      <select id="view-sort">
+        <option value="updated">Last updated</option>
+        <option value="created">Date written</option>
+        <option value="tag">Tag</option>
+        <option value="device" id="view-sort-device">Where written</option>
+      </select>
+    </label>
+    <label>Order
+      <select id="view-dir"></select>
+    </label>
+    <div id="view-devices-wrap">
+      <h4 class="sec-head">Show notes written on</h4>
+      <ul class="device-checks" id="view-devices"></ul>
+      <p class="hint" id="view-devices-hint"></p>
+    </div>
+    <h4 class="sec-head">This device</h4>
+    <label>Name
+      <input id="device-name" maxlength="40" autocomplete="off" placeholder="iPhone, Windows laptop…">
+    </label>
+    <p class="hint">New notes remember the device they were written on. Renaming updates every note written here.</p>
+    <div class="row"><button class="btn" id="btn-mark-mine">Mark unlabeled notes as written here</button></div>
+    <p class="msg" id="view-msg" role="status"></p>
+    <div class="row"><button class="btn" id="view-reset">Reset view</button><span class="spacer"></span><button class="btn primary" id="view-done">Done</button></div>
   </dialog>
 
   <!-- Settings -->

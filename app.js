@@ -8,7 +8,7 @@ import * as security from './ui-security.js';
 import * as shareUi from './ui-share.js';
 import { noteTitle, noteSnippet, sharedFileCheck } from './share.js';
 
-export const APP_VERSION = '0.6.0';
+export const APP_VERSION = '0.7.0';
 
 const $ = (id) => document.getElementById(id);
 const el = {
@@ -41,7 +41,8 @@ const snippetOf = (n) => noteSnippet(n);
 
 // ---- Preferences (per device) ------------------------------------------
 const PREFS_KEY = 'reiimei.prefs';
-const PREF_DEFAULTS = { format: 'markdown', style: 'apa', headFont: 'reiimei', noteFont: 'newsreader' };
+const VIEW_DEFAULT = { sort: 'updated', dir: 'desc', hidden: [] };
+const PREF_DEFAULTS = { format: 'markdown', style: 'apa', headFont: 'reiimei', noteFont: 'newsreader', view: VIEW_DEFAULT };
 function prefs() {
   try { return { ...PREF_DEFAULTS, ...JSON.parse(localStorage.getItem(PREFS_KEY) || '{}') }; }
   catch { return { ...PREF_DEFAULTS }; }
@@ -73,6 +74,45 @@ function applyFonts(p = prefs()) {
 }
 function setPrefs(patch) {
   try { localStorage.setItem(PREFS_KEY, JSON.stringify({ ...prefs(), ...patch })); } catch { /* storage blocked */ }
+}
+
+const view = () => ({ ...VIEW_DEFAULT, ...(prefs().view || {}) });
+
+// ---- This device ---------------------------------------------------------
+// Each note remembers where it was written (meta.origin = { id, name }).
+const DEVICE_KEY = 'reiimei.device';
+function guessDeviceName() {
+  const ua = navigator.userAgent;
+  if (/iPhone/.test(ua)) return 'iPhone';
+  if (/iPad/.test(ua)) return 'iPad';
+  if (/Android/.test(ua)) return 'Android phone';
+  if (/Windows/.test(ua)) return 'Windows laptop';
+  if (/Mac/.test(ua)) return 'Mac';
+  return 'This browser';
+}
+function device() {
+  try {
+    const d = JSON.parse(localStorage.getItem(DEVICE_KEY) || 'null');
+    if (d?.id) return d;
+  } catch { /* fall through */ }
+  const d = { id: db.uuid(), name: guessDeviceName() };
+  try { localStorage.setItem(DEVICE_KEY, JSON.stringify(d)); } catch { /* storage blocked */ }
+  return d;
+}
+const originOf = (n) => (n.meta && n.meta.origin && n.meta.origin.id ? n.meta.origin : null);
+const UNKNOWN = { id: 'unknown', name: 'Unknown device' };
+const deviceOf = (n) => originOf(n) || UNKNOWN;
+// Every device that has written a note, with note counts (this device is always listed).
+function knownDevices() {
+  const me = device();
+  const map = new Map([[me.id, { id: me.id, name: me.name, count: 0, mine: true }]]);
+  for (const n of activeNotes()) {
+    const o = deviceOf(n);
+    if (!map.has(o.id)) map.set(o.id, { id: o.id, name: o.name || 'Device', count: 0, mine: false });
+    map.get(o.id).count++;
+  }
+  const list = [...map.values()];
+  return list.sort((a, b) => (b.mine - a.mine) || a.name.localeCompare(b.name));
 }
 
 // ---- Toast ---------------------------------------------------------------
@@ -123,15 +163,46 @@ function tagCounts() {
 function filteredNotes() {
   const f = state.filter;
   let list = f.type === 'trash' ? trashNotes() : activeNotes();
+  const v = view();
   if (f.type === 'folder') list = list.filter((n) => n.folder_id === f.id);
-  if (f.type === 'none') list = list.filter((n) => !n.folder_id || !liveFolders().some((x) => x.id === n.folder_id));
+  if (f.type === 'device') list = list.filter((n) => originOf(n)?.id === device().id);
   if (f.type === 'tag') list = list.filter((n) => (n.tags || []).includes(f.tag));
+  if (f.type === 'all' && v.hidden.length) list = list.filter((n) => !v.hidden.includes(deviceOf(n).id));
   const q = state.query.trim().toLowerCase();
   if (q) {
     const tagQ = q.replace(/^#/, '');
     list = list.filter((n) => n.body.toLowerCase().includes(q) || (n.tags || []).some((t) => t.includes(tagQ)));
   }
-  return list.sort((a, b) => (b.pinned - a.pinned) || b.updated_at.localeCompare(a.updated_at));
+  return sortNotes(list, v);
+}
+
+const firstTag = (n) => [...(n.tags || [])].sort((a, b) => a.localeCompare(b))[0] || '';
+function sortKey(n, sort) {
+  if (sort === 'tag') return firstTag(n);
+  if (sort === 'device') return deviceOf(n).name || '';
+  return '';
+}
+function sortNotes(list, v = view()) {
+  const sort = v.sort === 'device' && state.filter.type !== 'all' ? 'updated' : v.sort;
+  const sign = v.dir === 'asc' ? 1 : -1;
+  const when = (n) => (sort === 'created' ? (n.created_at || n.updated_at) : n.updated_at);
+  return [...list].sort((a, b) => {
+    if (sort === 'tag' || sort === 'device') {
+      const ka = sortKey(a, sort), kb = sortKey(b, sort);
+      // Notes with no tag go last whichever way the list runs.
+      if (sort === 'tag' && (!ka || !kb) && ka !== kb) return ka ? -1 : 1;
+      const c = ka.localeCompare(kb) * (v.dir === 'desc' ? -1 : 1);
+      return c || b.updated_at.localeCompare(a.updated_at);
+    }
+    return (b.pinned - a.pinned) || sign * when(a).localeCompare(when(b));
+  });
+}
+// Section headings shown while sorting by tag or by where a note was written.
+function groupLabel(n) {
+  const sort = view().sort;
+  if (sort === 'tag') return firstTag(n) ? `#${firstTag(n)}` : 'No tag';
+  if (sort === 'device' && state.filter.type === 'all') return deviceOf(n).name;
+  return null;
 }
 
 function setMobileView(view) { el.app.dataset.mobileView = view; }
@@ -174,6 +245,7 @@ function ask({ title, text = '', value = null, placeholder = '', okText = 'OK', 
 const ICONS = {
   all: '<svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h8M8 17h5"/></svg>',
   none: '<svg viewBox="0 0 24 24"><path d="M14 3H6v18h12V7z"/><path d="M14 3v4h4"/></svg>',
+  device: '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="12" rx="1.5"/><path d="M2 20h20"/></svg>',
   folder: '<svg viewBox="0 0 24 24"><path d="M3 6h6l2 2h10v11H3z"/></svg>',
   tag: '<svg viewBox="0 0 24 24"><path d="M20 12l-8 8-9-9V3h8z"/><circle cx="7.5" cy="7.5" r="1.2"/></svg>',
   trash: '<svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>',
@@ -205,7 +277,7 @@ function renderSidebar() {
   const folderIds = new Set(folders.map((f) => f.id));
   el.smartList.replaceChildren(
     sideItem({ type: 'all' }, 'all', 'All Notes', act.length),
-    sideItem({ type: 'none' }, 'none', 'Notes', act.filter((n) => !n.folder_id || !folderIds.has(n.folder_id)).length),
+    sideItem({ type: 'device' }, 'device', 'This device', act.filter((n) => originOf(n)?.id === device().id).length),
   );
 
   el.folderList.replaceChildren(...folders.map((f) => {
@@ -237,6 +309,7 @@ function listTitle() {
   if (f.type === 'folder') return liveFolders().find((x) => x.id === f.id)?.name || 'Folder';
   if (f.type === 'tag') return `#${f.tag}`;
   if (f.type === 'trash') return 'Recently Deleted';
+  if (f.type === 'device') return 'This device';
   if (f.type === 'none') return 'Notes';
   return 'All Notes';
 }
@@ -246,15 +319,26 @@ function renderList() {
   const notes = filteredNotes();
   renderSelectBar(notes);
   if (!notes.length) {
-    el.noteList.innerHTML = `<li class="list-empty">${state.query ? 'No matching notes' : state.filter.type === 'trash' ? 'Nothing deleted' : 'No notes here yet'}</li>`;
+    const hiddenNote = state.filter.type === 'all' && view().hidden.length && !state.query;
+    el.noteList.innerHTML = `<li class="list-empty">${state.query ? 'No matching notes' : state.filter.type === 'trash' ? 'Nothing deleted' : hiddenNote ? 'Some devices are hidden. Use the sort icon to show them.' : 'No notes here yet'}</li>`;
+    $('view-dot').hidden = !(view().sort !== 'updated' || view().dir !== 'desc' || view().hidden.length);
     return;
   }
-  el.noteList.innerHTML = notes.map((n) => `
+  const multi = knownDevices().length > 1 && state.filter.type !== 'device';
+  let lastGroup = null;
+  el.noteList.innerHTML = notes.map((n) => {
+    const g = groupLabel(n);
+    const head = g !== null && g !== lastGroup ? `<li class="list-group">${esc(g)}</li>` : '';
+    lastGroup = g;
+    return head + `
     <li class="note-item${n.id === state.currentId && !state.selecting ? ' active' : ''}${state.selected.has(n.id) ? ' selected' : ''}" data-id="${n.id}" role="option" aria-selected="${state.selected.has(n.id)}">
       <div class="title">${n.pinned ? ICONS.pin : ''}<span>${esc(titleOf(n))}</span></div>
-      <div class="meta"><span class="date">${esc(formatDate(n.updated_at))}</span><span class="snippet">${esc(snippetOf(n))}</span></div>
+      <div class="meta"><span class="date">${esc(formatDate(view().sort === 'created' ? (n.created_at || n.updated_at) : n.updated_at))}</span>${multi ? `<span class="dev">${esc(deviceOf(n).name)}</span>` : ''}<span class="snippet">${esc(snippetOf(n))}</span></div>
       ${(n.tags || []).length ? `<div class="tags">${n.tags.map((t) => `<span class="mini-tag">#${esc(t)}</span>`).join('')}</div>` : ''}
-    </li>`).join('');
+    </li>`;
+  }).join('');
+  const v = view();
+  $('view-dot').hidden = !(v.sort !== 'updated' || v.dir !== 'desc' || v.hidden.length);
 }
 
 function renderEditor() {
@@ -358,9 +442,10 @@ async function newNote() {
     folder_id: f.type === 'folder' ? f.id : null,
     tags: f.type === 'tag' ? [f.tag] : [],
     format: p.format,
-    meta: writing.newNoteMeta(p),
+    meta: { ...writing.newNoteMeta(p), origin: { id: device().id, name: device().name } },
   });
   writing.resetView();
+  if (view().hidden.includes(device().id)) setPrefs({ view: { ...view(), hidden: view().hidden.filter((x) => x !== device().id) } });
   replaceNote(note);
   state.query = '';
   el.search.value = '';
@@ -497,6 +582,79 @@ async function closeNote() {
   render();
   if (isPhone()) setMobileView('list');
   log.debug('editor', 'Note closed');
+}
+
+// ---- Sort and show dialog ------------------------------------------------
+function renderViewDialog() {
+  const v = view();
+  const all = state.filter.type === 'all';
+  $('view-sort-device').hidden = !all;
+  $('view-sort-device').disabled = !all;
+  const sort = v.sort === 'device' && !all ? 'updated' : v.sort;
+  $('view-sort').value = sort;
+  const byName = sort === 'tag' || sort === 'device';
+  $('view-dir').innerHTML = byName
+    ? '<option value="asc">A to Z</option><option value="desc">Z to A</option>'
+    : '<option value="desc">Newest first</option><option value="asc">Oldest first</option>';
+  $('view-dir').value = v.dir;
+  $('view-devices-wrap').hidden = !all;
+  const devs = knownDevices();
+  if (state.notes.some((n) => !n.deleted && !originOf(n)) && !devs.some((d) => d.id === UNKNOWN.id)) {
+    devs.push({ ...UNKNOWN, count: activeNotes().filter((n) => !originOf(n)).length, mine: false });
+  }
+  $('view-devices').innerHTML = devs.map((d) =>
+    `<li><label><input type="checkbox" data-dev="${esc(d.id)}" ${v.hidden.includes(d.id) ? '' : 'checked'}> ${esc(d.name)}${d.mine ? ' (this device)' : ''}<span class="n">${d.count}</span></label></li>`).join('');
+  $('view-devices-hint').textContent = devs.length < 2 ? 'Notes written on your other devices will appear here once they sync.' : '';
+  $('device-name').value = device().name;
+  const unlabeled = activeNotes().filter((n) => !originOf(n) && !n.locked).length;
+  $('btn-mark-mine').hidden = !unlabeled;
+  $('btn-mark-mine').textContent = `Mark ${unlabeled} unlabeled ${unlabeled === 1 ? 'note' : 'notes'} as written here`;
+}
+
+function setView(patch) {
+  setPrefs({ view: { ...view(), ...patch } });
+  renderList();
+}
+
+async function markUnlabeledMine() {
+  const me = device();
+  const todo = state.notes.filter((n) => !originOf(n) && !n.locked);
+  for (const n of todo) replaceNote(await db.saveNote(n, { meta: { ...(n.meta || {}), origin: { id: me.id, name: me.name } } }, { touch: false }));
+  log.info('device', 'Notes marked as written on this device', { count: todo.length, device: me.name });
+  scheduleSync();
+  return todo.length;
+}
+
+async function renameDevice(name) {
+  const me = device();
+  const clean = name.trim().slice(0, 40);
+  if (!clean || clean === me.name) return;
+  try { localStorage.setItem(DEVICE_KEY, JSON.stringify({ ...me, name: clean })); } catch { /* storage blocked */ }
+  for (const n of state.notes.filter((x) => originOf(x)?.id === me.id && !x.locked)) {
+    replaceNote(await db.saveNote(n, { meta: { ...n.meta, origin: { id: me.id, name: clean } } }, { touch: false }));
+  }
+  log.info('device', 'Device renamed', { name: clean });
+  render();
+  scheduleSync();
+}
+
+// First launch after upgrading: name this device and say whether existing notes were written here.
+async function offerDeviceSetup() {
+  const key = 'reiimei.deviceAsked';
+  try { if (localStorage.getItem(key)) return; } catch { return; }
+  const n = state.notes.filter((x) => !x.deleted && !x.locked && !originOf(x)).length;
+  if (!n) return;
+  const me = device();
+  const r = await ask({
+    title: 'Name this device',
+    text: `Notes now remember where they were written. Were your ${n} existing ${n === 1 ? 'note' : 'notes'} written on this device? Choose that only on the device where you wrote them; on your other devices choose Not sure.`,
+    value: me.name, okText: 'Not sure', extra: 'Yes, written here',
+  });
+  try { localStorage.setItem(key, '1'); } catch { /* storage blocked */ }
+  if (r.action === 'cancel') return;
+  if (r.value) await renameDevice(r.value);
+  if (r.action === 'extra') await markUnlabeledMine();
+  render();
 }
 
 // Notes that sync once left as "Conflicted copy" go to Recently Deleted, still restorable.
@@ -651,6 +809,7 @@ async function runDiagnostics() {
     add('Offline support', 'fail', 'Service workers not supported');
   }
 
+  add('This device', 'pass', `Named “${device().name}”; ${activeNotes().filter((n) => originOf(n)?.id === device().id).length} notes written here, ${activeNotes().filter((n) => !originOf(n)).length} unlabeled`);
   add('Encryption support', vault.isSupported() ? 'pass' : 'fail', vault.isSupported() ? 'Web Crypto available (AES-GCM, PBKDF2)' : 'Web Crypto missing: encryption cannot be used here');
   const sec = security.status();
   if (sec.enabled) {
@@ -892,6 +1051,25 @@ function bindEvents() {
   $('btn-close-note').addEventListener('click', closeNote);
   $('btn-fonts').addEventListener('click', () => openSettings('fonts'));
   $('btn-find-copies').addEventListener('click', findConflictedCopies);
+  $('btn-view').addEventListener('click', () => { renderViewDialog(); $('view-msg').textContent = ''; $('view-dialog').showModal(); });
+  for (const id of ['view-close', 'view-done']) $(id).addEventListener('click', () => $('view-dialog').close());
+  $('view-sort').addEventListener('change', (e) => {
+    const sort = e.target.value;
+    const byName = sort === 'tag' || sort === 'device';
+    setView({ sort, dir: byName ? 'asc' : 'desc' });
+    renderViewDialog();
+  });
+  $('view-dir').addEventListener('change', (e) => setView({ dir: e.target.value }));
+  $('view-devices').addEventListener('change', (e) => {
+    const id = e.target.dataset.dev;
+    if (!id) return;
+    const hidden = new Set(view().hidden);
+    if (e.target.checked) hidden.delete(id); else hidden.add(id);
+    setView({ hidden: [...hidden] });
+  });
+  $('device-name').addEventListener('change', async (e) => { await renameDevice(e.target.value); renderViewDialog(); $('view-msg').textContent = 'Saved.'; });
+  $('btn-mark-mine').addEventListener('click', async () => { const c = await markUnlabeledMine(); render(); renderViewDialog(); $('view-msg').textContent = `Marked ${c} ${c === 1 ? 'note' : 'notes'} as written on this device.`; });
+  $('view-reset').addEventListener('click', () => { setPrefs({ view: VIEW_DEFAULT }); renderViewDialog(); renderList(); });
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape' || document.querySelector('dialog[open]')) return;
     if (state.selecting) { setSelecting(false); return; }
@@ -1073,6 +1251,7 @@ async function boot() {
     }
     await loadData();
     setMobileView('list');
+    offerDeviceSetup();
     log.info('boot', `UI ready in ${Math.round(performance.now() - t0)} ms`, { notes: state.notes.length, folders: state.folders.length });
   } catch (e) {
     log.error('boot', 'Startup failed', e);
