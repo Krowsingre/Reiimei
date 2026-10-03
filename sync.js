@@ -133,7 +133,12 @@ async function rest(method, path, body, retried = false) {
     const text = await res.text().catch(() => '');
     throw new Error(`Server ${res.status}: ${text.slice(0, 200)}`);
   }
-  return res.status === 204 || res.status === 201 ? null : res.json();
+  // Some servers answer a successful write with 200 and an empty body. Treat an empty body as
+  // "nothing returned" instead of failing to read it.
+  if (res.status === 204 || res.status === 201) return null;
+  const text = await res.text();
+  if (!text.trim()) return method === 'GET' ? [] : null;
+  try { return JSON.parse(text); } catch (e) { throw new Error(`Server ${res.status} sent a reply Reiimei could not read (${method} ${path.split('?')[0]})`); }
 }
 
 // ---- Sync --------------------------------------------------------------
@@ -359,7 +364,7 @@ export async function syncNow(reason = 'manual') {
       return { locked: true };
     }
     log.error('sync', 'Sync failed', e);
-    const hint = /column|sealed|format|meta/i.test(e.message) ? ' (run the latest supabase-setup.sql)' : '';
+    const hint = /^Server \d+: /.test(e.message) && /column|sealed|format|meta/i.test(e.message) ? ' (run the latest supabase-setup.sql)' : '';
     setState({ status: 'error', message: `Sync failed: ${e.message}${hint}` });
     return { error: e.message + hint };
   } finally {

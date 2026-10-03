@@ -10,7 +10,7 @@ import * as modes from './modes.js';
 import * as story from './storyboard.js';
 import { noteTitle, noteSnippet, sharedFileCheck } from './share.js';
 
-export const APP_VERSION = '0.11.0';
+export const APP_VERSION = '0.11.1';
 
 const $ = (id) => document.getElementById(id);
 const el = {
