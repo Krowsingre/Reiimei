@@ -8,7 +8,7 @@ import * as security from './ui-security.js';
 import * as shareUi from './ui-share.js';
 import { noteTitle, noteSnippet, sharedFileCheck } from './share.js';
 
-export const APP_VERSION = '0.4.0';
+export const APP_VERSION = '0.4.1';
 
 const $ = (id) => document.getElementById(id);
 const el = {
@@ -530,14 +530,30 @@ function updateSettingsSync() {
     $('sync-email').textContent = sess.user?.email || '';
     const s = sync.getState();
     $('sync-detail').textContent = `${s.message}${s.lastSync ? ` · last sync ${new Date(s.lastSync).toLocaleString()}` : ''}`;
+    $('sync-project').textContent = projectHost(sync.getConfig()?.url);
   } else {
     const cfg = sync.getConfig();
     if (cfg && !$('cfg-url').value) { $('cfg-url').value = cfg.url; $('cfg-key').value = cfg.anonKey; }
+    $('cfg-summary').textContent = cfg?.url ? projectHost(cfg.url) : 'Not set up';
   }
+}
+
+// A function declaration (hoisted), because the sync listener can call this during startup.
+function projectHost(url) { try { return new URL(url).host; } catch { return url || ''; } }
+
+// Project URL and key stay folded away once they have worked; open them to change.
+function setProjectDetailsOpen(open) {
+  $('cfg-details').open = open;
+  log.debug('sync', `Project details ${open ? 'shown' : 'collapsed'}`);
+}
+function collapseProjectDetailsIfVerified() {
+  const cfg = sync.getConfig();
+  setProjectDetailsOpen(!(cfg?.verified && cfg.url && cfg.anonKey));
 }
 
 function openSettings(tab = 'sync') {
   updateSettingsSync();
+  collapseProjectDetailsIfVerified();
   security.renderSettings();
   $('pref-format').value = prefs().format;
   $('pref-style').value = prefs().style;
@@ -562,12 +578,19 @@ async function authAction(kind) {
   const key = $('cfg-key').value.trim();
   const email = $('cfg-email').value.trim();
   const pass = $('cfg-pass').value;
-  if (!/^https:\/\/.+/.test(url) || !key) return setMsg('sync-msg', 'Enter the project URL (https://…) and anon key.', 'error');
+  if (!/^https:\/\/.+/.test(url) || !key) {
+    setProjectDetailsOpen(true);
+    return setMsg('sync-msg', 'Enter the project URL (https://…) and publishable key.', 'error');
+  }
   if (!email || pass.length < 6) return setMsg('sync-msg', 'Enter your email and a password of at least 6 characters.', 'error');
   sync.saveConfig(url, key);
   setMsg('sync-msg', kind === 'up' ? 'Creating account…' : 'Signing in…');
   try {
     const r = kind === 'up' ? await sync.signUp(email, pass) : await sync.signIn(email, pass);
+    // The server accepted the URL and key, so fold them away.
+    sync.markVerified();
+    updateSettingsSync();
+    collapseProjectDetailsIfVerified();
     $('cfg-pass').value = '';
     if (r.needsConfirmation) {
       setMsg('sync-msg', 'Account created. Check your email for a confirmation link, then come back and sign in.', 'ok');
@@ -580,6 +603,12 @@ async function authAction(kind) {
     runDiagnostics();
   } catch (e) {
     log.error('sync', `${kind === 'up' ? 'Sign-up' : 'Sign-in'} failed`, e);
+    // Show the project details when the problem looks like the URL or key.
+    if (/fetch|network|load failed|api ?key|apikey|not found|\(40[14]\)|invalid url|cors/i.test(e.message)) {
+      setProjectDetailsOpen(true);
+      setMsg('sync-msg', `${e.message}. Check the project URL and key.`, 'error');
+      return;
+    }
     setMsg('sync-msg', e.message, 'error');
   }
 }
@@ -711,7 +740,7 @@ function bindEvents() {
   });
   $('btn-test').addEventListener('click', async () => {
     setMsg('sync-msg', 'Testing…');
-    try { await sync.testConnection(); setMsg('sync-msg', 'Connection and tables look good.', 'ok'); log.info('sync', 'Connection test passed'); }
+    try { await sync.testConnection(); sync.markVerified(); setMsg('sync-msg', 'Connection and tables look good.', 'ok'); log.info('sync', 'Connection test passed'); }
     catch (e) { log.error('sync', 'Connection test failed', e); setMsg('sync-msg', `${e.message}. If it mentions a missing table, run supabase-setup.sql.`, 'error'); }
   });
   $('btn-signout').addEventListener('click', async () => {
@@ -821,6 +850,8 @@ async function boot() {
     security.init(hooks);
     shareUi.init(hooks);
     await db.openDb();
+    // Devices already signed in before v0.4.1 have working project details.
+    if (sync.getSession() && sync.getConfig()) sync.markVerified();
     const cfg = await security.loadConfig();
     if (cfg.enabled) {
       log.info('boot', 'Encryption is on; waiting for passphrase');

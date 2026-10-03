@@ -174,9 +174,12 @@
 
     <section class="tab-panel" data-panel="sync">
       <div id="sync-signed-out">
-        <p class="hint">Create a free Supabase project, run <code>supabase-setup.sql</code> in its SQL editor, then paste the project URL and anon key here. See the README for step by step help.</p>
-        <label>Project URL<input id="cfg-url" placeholder="https://xxxx.supabase.co" autocomplete="off" autocapitalize="off"></label>
-        <label>Anon (public) key<input id="cfg-key" placeholder="eyJ…" autocomplete="off" autocapitalize="off"></label>
+        <details class="cfg-details" id="cfg-details" open>
+          <summary><span class="cfg-label">Supabase project</span><span class="cfg-summary" id="cfg-summary">Not set up</span><span class="cfg-change">Change</span></summary>
+          <p class="hint">Create a free Supabase project, run <code>supabase-setup.sql</code> in its SQL editor, then paste the project URL and publishable key here. See the README for step by step help.</p>
+          <label>Project URL<input id="cfg-url" placeholder="https://xxxx.supabase.co" autocomplete="off" autocapitalize="off"></label>
+          <label>Publishable (anon) key<input id="cfg-key" placeholder="sb_publishable_… or eyJ…" autocomplete="off" autocapitalize="off"></label>
+        </details>
         <label>Email<input id="cfg-email" type="email" autocomplete="username"></label>
         <label>Password<input id="cfg-pass" type="password" autocomplete="current-password"></label>
         <div class="row">
@@ -186,6 +189,7 @@
       </div>
       <div id="sync-signed-in" hidden>
         <p>Signed in as <strong id="sync-email"></strong></p>
+        <p class="hint">Project: <span id="sync-project"></span></p>
         <p class="hint" id="sync-detail"></p>
         <div class="row">
           <button class="btn primary" id="btn-sync-now">Sync now</button>

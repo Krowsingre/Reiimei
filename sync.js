@@ -28,8 +28,19 @@ export const getConfig = () => readJson(CFG_KEY);
 export const getSession = () => readJson(SESSION_KEY);
 export function saveConfig(url, anonKey) {
   const clean = { url: url.trim().replace(/\/+$/, ''), anonKey: anonKey.trim() };
+  // Keep "verified" only while the URL and key stay the same.
+  const prev = getConfig();
+  if (prev?.verified && prev.url === clean.url && prev.anonKey === clean.anonKey) clean.verified = true;
   localStorage.setItem(CFG_KEY, JSON.stringify(clean));
-  log.info('sync', 'Sync config saved', { url: clean.url });
+  log.info('sync', 'Sync config saved', { url: clean.url, verified: !!clean.verified });
+}
+
+// Called once the server has accepted this URL and key.
+export function markVerified() {
+  const cfg = getConfig();
+  if (!cfg || cfg.verified) return;
+  localStorage.setItem(CFG_KEY, JSON.stringify({ ...cfg, verified: true }));
+  log.info('sync', 'Project details confirmed');
 }
 function saveSession(s) {
   if (s) localStorage.setItem(SESSION_KEY, JSON.stringify(s));
