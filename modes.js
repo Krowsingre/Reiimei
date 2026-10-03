@@ -21,12 +21,12 @@ export function kindOf(note) {
   return 'notes';
 }
 
-// ---- Projects (Research and Storyboard) ------------------------------------
+// ---- Projects (Research, Coding and Storyboard) ------------------------------------
 // A project is a folder that belongs to a mode. Folders sync with only a name, so a project
 // is a folder whose name starts with a mark: "[Project] " for Research, "[Story] " for
-// Storyboard. (A device on an older version simply shows the mark as part of the name.)
+// Storyboard, "[Code] " for Coding. (A device on an older version simply shows the mark as part of the name.)
 // Every note in those modes lives in exactly one project of its own mode.
-export const PROJECT_MARKS = { research: '[Project] ', storyboard: '[Story] ' };
+export const PROJECT_MARKS = { research: '[Project] ', storyboard: '[Story] ', coding: '[Code] ' };
 export const PROJECT_MARK = PROJECT_MARKS.research;
 export const UNSORTED = 'Unsorted';
 export const hasProjects = (mode) => Object.prototype.hasOwnProperty.call(PROJECT_MARKS, mode);

@@ -8,9 +8,11 @@ import * as security from './ui-security.js';
 import * as shareUi from './ui-share.js';
 import * as modes from './modes.js';
 import * as story from './storyboard.js';
+import * as codeIntel from './codeintel.js';
+import { isCode } from './code.js';
 import { noteTitle, noteSnippet, sharedFileCheck } from './share.js';
 
-export const APP_VERSION = '0.11.1';
+export const APP_VERSION = '0.12.0';
 
 const $ = (id) => document.getElementById(id);
 const el = {
@@ -49,7 +51,7 @@ const snippetOf = (n) => noteSnippet(n);
 // ---- Preferences (per device) ------------------------------------------
 const PREFS_KEY = 'reiimei.prefs';
 const VIEW_DEFAULT = { sort: 'updated', dir: 'desc', hidden: [] };
-const PREF_DEFAULTS = { mode: 'notes', lastProject: '', format: 'markdown', style: 'apa', headFont: 'reiimei', noteFont: 'newsreader', view: VIEW_DEFAULT };
+const PREF_DEFAULTS = { mode: 'notes', lastProject: '', codeLang: 'python', format: 'markdown', style: 'apa', headFont: 'reiimei', noteFont: 'newsreader', view: VIEW_DEFAULT };
 function prefs() {
   try { return { ...PREF_DEFAULTS, ...JSON.parse(localStorage.getItem(PREFS_KEY) || '{}') }; }
   catch { return { ...PREF_DEFAULTS }; }
@@ -663,7 +665,7 @@ async function newNote() {
   const note = await db.createNote({
     folder_id: modes.hasProjects(state.mode) ? (await projectForNew(state.mode)).id : f.type === 'folder' && !modes.isProject(folderById(f.id)) ? f.id : null,
     tags: f.type === 'tag' ? [...f.tags] : [],
-    format: p.format,
+    format: state.mode === 'coding' && !isCode(p.format) ? (isCode(p.codeLang) ? p.codeLang : 'python') : p.format,
     meta: { ...writing.newNoteMeta(p), kind: state.mode, origin: { id: device().id, name: device().name } },
   });
   writing.resetView();
@@ -942,8 +944,10 @@ async function newFolder() {
 const registryNotes = (folderId) => state.notes.filter((n) => !n.deleted && !n.locked && isRegistry(n) && n.folder_id === folderId)
   .sort((a, b) => (b.updated_at || '').localeCompare(a.updated_at || ''));
 
+const isCodingFolder = (folderId) => modes.isProject(folderById(folderId), 'coding');
 function registryOf(folderId) {
-  return story.mergeRegistries(registryNotes(folderId).map((n) => n.meta));
+  const list = registryNotes(folderId).map((n) => n.meta);
+  return isCodingFolder(folderId) ? codeIntel.mergeProjectData(list) : story.mergeRegistries(list);
 }
 
 async function dropNote(n) {
@@ -957,11 +961,14 @@ async function dropNote(n) {
 
 async function saveRegistry(folderId, data) {
   const list = registryNotes(folderId);
-  const meta = { registry: true, kind: 'storyboard', origin: { id: device().id, name: device().name }, registers: data.registers || [], dismissed: data.dismissed || [] };
+  const origin = { id: device().id, name: device().name };
+  const meta = isCodingFolder(folderId)
+    ? { registry: true, kind: 'coding', origin, snippets: data.snippets || [], gone: data.gone || [], keep: data.keep || [] }
+    : { registry: true, kind: 'storyboard', origin, registers: data.registers || [], dismissed: data.dismissed || [] };
   let note = list[0];
   if (!note) {
     note = await db.createNote({ folder_id: folderId, format: 'markdown', meta });
-    note = await db.saveNote(note, { body: '[Registers. Kept by Reiimei, not shown in lists.]' });
+    note = await db.saveNote(note, { body: isCodingFolder(folderId) ? '[Project data (snippets). Kept by Reiimei, not shown in lists.]' : '[Registers. Kept by Reiimei, not shown in lists.]' });
     replaceNote(note);
     log.info('registers', 'Registry created', { folder: folderId });
   } else {
@@ -1036,7 +1043,7 @@ async function folderMenu(folder) {
   } else if (r.action === 'extra') {
     const inside = activeNotes().filter((n) => n.folder_id === folder.id);
     if (proj && label === modes.UNSORTED && inside.length) { toast('Move the notes in Unsorted to other projects first.'); return; }
-    const c = await ask({ title: `Delete "${label}"?`, text: proj ? `Its notes will move to the Unsorted project. They will not be deleted.${modes.projectKind(folder) === 'storyboard' ? ' Its registers (characters, locations and so on) will be deleted.' : ''}` : 'Notes in this folder will move to Notes. They will not be deleted.', okText: proj ? 'Delete project' : 'Delete folder' });
+    const c = await ask({ title: `Delete "${label}"?`, text: proj ? `Its notes will move to the Unsorted project. They will not be deleted.${modes.projectKind(folder) === 'storyboard' ? ' Its registers (characters, locations and so on) will be deleted.' : modes.projectKind(folder) === 'coding' ? ' Its snippets will be deleted.' : ''}` : 'Notes in this folder will move to Notes. They will not be deleted.', okText: proj ? 'Delete project' : 'Delete folder' });
     if (c.action !== 'ok') return;
     if (proj && inside.length) {
       const dest = await ensureUnsorted(modes.projectKind(folder));
@@ -1613,6 +1620,8 @@ const hooks = {
   runSync: (reason) => runSync(reason),
   syncOn: () => sync.isConfigured(),
   registry: (folderId) => registryOf(folderId),
+  inCodingProject: (folderId) => isCodingFolder(folderId),
+  projectLabel: (folderId) => { const f = folderById(folderId); return f ? modes.projectName(f) : 'this project'; },
   saveRegistry: (folderId, data) => saveRegistry(folderId, data),
   notesIn: (folderId, mode = 'storyboard') => activeNotes().filter((n) => n.folder_id === folderId && !n.locked && modes.kindOf(n) === mode),
   openNote: async (id) => {

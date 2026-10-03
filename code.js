@@ -6,9 +6,13 @@ export const LANGS = {
   python: { label: 'Python', ext: 'py', comment: ['# ', ''], indent: '    ', mime: 'text/x-python' },
   html: { label: 'HTML5', ext: 'html', comment: ['<!-- ', ' -->'], indent: '  ', mime: 'text/html' },
   xml: { label: 'XML', ext: 'xml', comment: ['<!-- ', ' -->'], indent: '  ', mime: 'application/xml' },
+  javascript: { label: 'JavaScript', ext: 'js', comment: ['// ', ''], indent: '  ', mime: 'text/javascript' },
+  css: { label: 'CSS', ext: 'css', comment: ['/* ', ' */'], indent: '  ', mime: 'text/css' },
+  json: { label: 'JSON', ext: 'json', comment: ['', ''], indent: '  ', mime: 'application/json' },
+  sql: { label: 'SQL', ext: 'sql', comment: ['-- ', ''], indent: '  ', mime: 'application/sql' },
 };
 export const isCode = (format) => Object.prototype.hasOwnProperty.call(LANGS, format);
-const ALIASES = { py: 'python', python3: 'python', htm: 'html', html5: 'html', xhtml: 'xml', svg: 'xml', js: 'javascript', javascript: 'javascript', css: 'css' };
+const ALIASES = { py: 'python', python3: 'python', htm: 'html', html5: 'html', xhtml: 'xml', svg: 'xml', js: 'javascript', mjs: 'javascript', node: 'javascript', jsonc: 'json', postgresql: 'sql', mysql: 'sql', sqlite: 'sql', tsql: 'sql' };
 export const langFromFence = (s) => { const k = String(s || '').trim().toLowerCase(); return LANGS[k] ? k : ALIASES[k] || null; };
 
 const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -40,9 +44,9 @@ function scan(src, rules, classify) {
 }
 
 // ---- Python --------------------------------------------------------------
-const PY_KW = new Set(('False None True and as assert async await break class continue def del elif else except finally for from ' +
+export const PY_KW = new Set(('False None True and as assert async await break class continue def del elif else except finally for from ' +
   'global if import in is lambda nonlocal not or pass raise return try while with yield match case').split(' '));
-const PY_BI = new Set(('abs all any ascii bin bool breakpoint bytearray bytes callable chr classmethod compile complex delattr dict dir ' +
+export const PY_BI = new Set(('abs all any ascii bin bool breakpoint bytearray bytes callable chr classmethod compile complex delattr dict dir ' +
   'divmod enumerate eval exec filter float format frozenset getattr globals hasattr hash help hex id input int isinstance ' +
   'issubclass iter len list locals map max memoryview min next object oct open ord pow print property range repr reversed ' +
   'round set setattr slice sorted staticmethod str sum super tuple type vars zip __import__ ' +
@@ -68,7 +72,7 @@ const PY_RULES = [
 export const highlightPython = (src) => scan(src, PY_RULES);
 
 // ---- JavaScript (inside HTML) --------------------------------------------
-const JS_KW = new Set(('break case catch class const continue debugger default delete do else export extends finally for function if ' +
+export const JS_KW = new Set(('break case catch class const continue debugger default delete do else export extends finally for function if ' +
   'import in instanceof let new return super switch this throw try typeof var void while with yield async await of static get set ' +
   'true false null undefined NaN Infinity').split(' '));
 const JS_RULES = [
@@ -115,6 +119,36 @@ export function highlightCss(src) {
   }
   return out;
 }
+
+// ---- JSON -------------------------------------------------------------------------
+const JSON_RULES = [
+  ['key', /"(?:\\.|[^"\\\n])*"(?=\s*:)/y],
+  ['str', /"(?:\\.|[^"\\\n])*"?/y],
+  ['num', /-?\d+\.?\d*(?:[eE][+-]?\d+)?/y],
+  ['kw', /\b(?:true|false|null)\b/y],
+  ['punct', /[{}\[\],:]/y],
+  ['', /\s+/y],
+];
+export const highlightJson = (src) => scan(src, JSON_RULES);
+
+// ---- SQL --------------------------------------------------------------------------
+export const SQL_KW = new Set(('select from where and or not in is null like between exists insert into values update set delete create alter drop table ' +
+  'index view database schema join inner left right full outer cross on as group by order having limit offset union all distinct case when then else end ' +
+  'primary key foreign references unique default check constraint add column asc desc with recursive returning begin commit rollback transaction ' +
+  'truncate grant revoke if replace temporary temp true false using natural except intersect over partition window explain pragma').split(' '));
+export const SQL_FN = new Set(('count sum avg min max coalesce nullif cast length lower upper trim substr substring concat round abs now date ' +
+  'datetime strftime extract ifnull row_number rank dense_rank lag lead').split(' '));
+const SQL_RULES = [
+  ['com', /--[^\n]*/y],
+  ['com', /\/\*[\s\S]*?(?:\*\/|$)/y],
+  ['str', /'(?:''|[^'])*'?/y],
+  ['str', /"(?:""|[^"])*"?/y],
+  ['num', /\d+\.?\d*(?![\w])/y],
+  [(w) => (SQL_KW.has(w.toLowerCase()) ? 'kw' : SQL_FN.has(w.toLowerCase()) ? 'bi' : ''), /[A-Za-z_][\w$]*/y],
+  ['op', /[+\-*/%=<>!|&^~]+/y],
+  ['', /\s+/y],
+];
+export const highlightSql = (src) => scan(src, SQL_RULES);
 
 // ---- XML and HTML -------------------------------------------------------------
 function highlightMarkup(src, html) {
@@ -189,6 +223,8 @@ export function highlight(src, lang) {
     case 'xml': return highlightXml(src);
     case 'javascript': return highlightJs(src);
     case 'css': return highlightCss(src);
+    case 'json': return highlightJson(src);
+    case 'sql': return highlightSql(src);
     default: return esc(src);
   }
 }
@@ -205,6 +241,11 @@ export function codeTitle(src, lang) {
   }
   const first = s.split('\n').map((l) => l.trim()).find(Boolean) || '';
   if (lang === 'python') return first.replace(/^#+\s*/, '').replace(/^("""|''')/, '').replace(/("""|''')$/, '').trim() || 'Python';
+  if (lang === 'javascript' || lang === 'css' || lang === 'sql') {
+    const t = first.replace(/^(\/\/+|\/\*+|--+)\s*/, '').replace(/\s*\*\/$/, '').trim();
+    return t || LANGS[lang].label;
+  }
+  if (lang === 'json') return /^[{\[]$/.test(first) || !first ? 'JSON' : first.slice(0, 80);
   if (lang === 'xml') {
     const c = /<!--\s*([\s\S]*?)\s*-->/.exec(s);
     if (c && c[1] && s.indexOf(c[0]) < (s.search(/<[A-Za-z]/) + 1 || Infinity)) return c[1].split('\n')[0].trim();
@@ -248,14 +289,17 @@ export function indentLines(value, start, end, unit, outdent = false) {
 
 export function toggleComment(value, start, end, lang) {
   const [open, close] = LANGS[lang].comment;
+  if (lang === 'json') return { value, start, end }; // JSON has no comments
   const [ls, le] = lineBounds(value, start, end);
   const block = value.slice(ls, le);
-  if (lang === 'python') {
+  if (lang === 'python' || lang === 'javascript' || lang === 'sql') {
+    const mark = open.trim();
+    const re = new RegExp(`^(\\s*)${mark.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}\\s?`);
     const lines = block.split('\n');
-    const all = lines.filter((l) => l.trim()).every((l) => /^\s*#/.test(l));
+    const all = lines.filter((l) => l.trim()).every((l) => re.test(l));
     const next = lines.map((l) => {
       if (!l.trim()) return l;
-      if (all) return l.replace(/^(\s*)#\s?/, '$1');
+      if (all) return l.replace(re, '$1');
       const ind = /^\s*/.exec(l)[0];
       return ind + open + l.slice(ind.length);
     }).join('\n');
@@ -263,7 +307,9 @@ export function toggleComment(value, start, end, lang) {
   }
   const trimmed = block.trim();
   let next;
-  if (trimmed.startsWith('<!--') && trimmed.endsWith('-->')) {
+  if (lang === 'css' && trimmed.startsWith('/*') && trimmed.endsWith('*/')) {
+    next = block.replace(/\/\*\s?/, '').replace(/\s?\*\/(?![\s\S]*\*\/)/, '');
+  } else if (trimmed.startsWith('<!--') && trimmed.endsWith('-->')) {
     next = block.replace(/<!--\s?/, '').replace(/\s?-->(?![\s\S]*-->)/, '');
   } else {
     const ind = /^\s*/.exec(block)[0];
@@ -284,6 +330,11 @@ export function newlineIndent(value, pos, lang) {
   if (lang === 'python') {
     if (/:\s*(#.*)?$/.test(t)) ind += unit;
     else if (/^\s*(return|pass|break|continue|raise)\b/.test(t)) ind = ind.slice(0, Math.max(0, ind.length - unit.length));
+  } else if (lang === 'javascript' || lang === 'css' || lang === 'json') {
+    const before = value.slice(pos);
+    if (/[{[(]\s*(\/\/.*|\/\*.*\*\/)?$/.test(t)) ind += unit;
+    else if (/^[\s]*[}\])]/.test(t) && /[{[(]/.test(t) === false) ind = ind.slice(0, Math.max(0, ind.length - unit.length));
+    void before;
   } else if (lang === 'html' || lang === 'xml') {
     const open = /<([A-Za-z][\w:.-]*)[^<>]*>[^<]*$/.exec(t);
     if (open && !/\/>$/.test(t) && !(lang === 'html' && VOID.has(open[1].toLowerCase())) && !new RegExp(`</${open[1]}>\\s*$`).test(t)) ind += unit;
@@ -340,9 +391,53 @@ export function tidyMarkup(src, lang) {
   return out.join('\n').replace(/\s*$/, '\n');
 }
 
+// JavaScript, CSS, SQL: tabs to the language's indent, no trailing spaces, one final newline.
+export function tidyBasic(src, lang) {
+  const unit = LANGS[lang].indent;
+  return src.replace(/\r\n?/g, '\n').split('\n')
+    .map((l) => l.replace(/^\t+/, (m) => unit.repeat(m.length)).replace(/[ \t]+$/, ''))
+    .join('\n').replace(/\n{3,}/g, '\n\n').replace(/\s*$/, '\n');
+}
+
+// JSON: pretty-printed with two spaces when valid; otherwise only whitespace is cleaned.
+export function tidyJson(src) {
+  try { return `${JSON.stringify(JSON.parse(src), null, 2)}\n`; } catch (e) { return tidyBasic(src, 'json'); }
+}
+
 export function tidy(src, lang) {
   if (lang === 'python') return tidyPython(src);
+  if (lang === 'json') return tidyJson(src);
+  if (lang === 'javascript' || lang === 'css' || lang === 'sql') return tidyBasic(src, lang);
   return tidyMarkup(src, lang);
+}
+
+// ---- JSON checking and JavaScript runner ------------------------------------------------
+// Returns {ok, error, line}. The line comes from the error text when the browser gives a position.
+export function checkJson(src) {
+  try { JSON.parse(src); return { ok: true }; } catch (e) {
+    const msg = String(e.message || e);
+    let line = null;
+    const lm = /line (\d+)/i.exec(msg);
+    if (lm) line = +lm[1];
+    else {
+      const pm = /position (\d+)/i.exec(msg);
+      if (pm) line = src.slice(0, +pm[1]).split('\n').length;
+    }
+    return { ok: false, error: msg, line };
+  }
+}
+
+// A page that runs the code and prints console output. It is shown in the same sealed frame
+// as HTML previews, which cannot reach your notes.
+export function jsRunnerHtml(src) {
+  const code = JSON.stringify(String(src)).replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{font:14px/1.5 ui-monospace,Menlo,Consolas,monospace;margin:12px;color:#222}` +
+    `.e{color:#b00020}.l{white-space:pre-wrap;border-bottom:1px solid #eee;padding:2px 0}.n{color:#777}</style></head><body><div id="o"></div>` +
+    `<script>(function(){var o=document.getElementById('o');function p(c,a){var d=document.createElement('div');d.className='l '+c;` +
+    `d.textContent=Array.prototype.map.call(a,function(x){if(typeof x==='string')return x;try{return typeof x==='object'?JSON.stringify(x,null,2):String(x)}catch(e){return String(x)}}).join(' ');o.appendChild(d)}` +
+    `console.log=function(){p('',arguments)};console.info=console.log;console.warn=function(){p('e',arguments)};console.error=function(){p('e',arguments)};` +
+    `window.onerror=function(m,u,l){p('e',['Error: '+m+(l?' (line '+l+')':'')]);return true};` +
+    `try{(0,eval)(${code});if(!o.firstChild)p('n',['Ran with no output. Use console.log to print.'])}catch(e){p('e',['Error: '+e.message])}})();</script></body></html>`;
 }
 
 // ---- XML checking and tree ----------------------------------------------------------

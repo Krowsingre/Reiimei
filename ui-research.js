@@ -244,6 +244,7 @@ export function moveSection(text, i, dir) {
 function renderOutline() {
   const box = $('outline');
   const note = app.note();
+  if (!isResearchNote(note)) return; // the outline box is shared with Coding mode
   box.hidden = !(outlineOn && isResearchNote(note) && note.format !== 'populi');
   if (box.hidden) return;
   const { heads } = headings($('body').value);

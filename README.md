@@ -1,8 +1,19 @@
-# Reiimei v0.11.1
+# Reiimei v0.12.0
 
 *reiimei* (REE-h-may), n. The cold, luminous stillness peculiar to a clear winter night; especially the effect of moonlight upon frost, illuminating the night without dispelling it.
 
 An offline-first notes app for Windows and iPhone, built as a Progressive Web App (PWA). No Mac, no App Store, no developer fee.
+
+## What changed in v0.12.0 (Coding mode)
+
+- **Coding Projects.** Like Research and Storyboard, Coding mode now shows **Projects** instead of Folders. Every coding note lives in a project and gets the project name as a locked tag. Code notes you already had are placed in a project called **Unsorted**. New notes in Coding mode start as code (Python, or the last language you chose).
+- **More languages:** JavaScript, CSS, JSON and SQL join Python, HTML5 and XML. Each has coloring, Tab and Enter indenting, comment toggling (JSON has no comments), and Tidy. **Run** (JavaScript) runs the code in the same sealed frame as HTML and prints `console.log` output. **Check** (JSON) reports whether it is valid, points to the problem, and shows it pretty printed.
+- **Name check.** A dotted underline appears under a name that is not defined anywhere you would expect but is very close to one that is, such as `calcuate_total` when `calculate_total` exists. Click the underlined name to see the suggestion, then tap it to fix the spelling, or choose **Keep my spelling**. Names that look like nothing you have defined are left alone, and so are comments and strings. Names that only differ by a number, a plural "s", or extra words at the end (`item1` and `item2`, `item` and `items`) are treated as different names on purpose. A name you are still typing is not underlined. **Where names come from:** the note itself, the other code notes in the same project, and the language's built-in names. **Languages checked:** Python, JavaScript, SQL, CSS (property names and `var(--x)`), and HTML (tag names, and the JavaScript and CSS inside it). **Keep my spelling** is remembered for the whole project and syncs.
+- **Autocomplete.** As you type a name, matching names from the note, the project and the language appear. **Tab** or **Enter** accepts the highlighted one (Up and Down choose another, or tap it). Anything else you type keeps what you typed, and **Escape** hides the list. Reiimei never replaces a name on its own.
+- **Snippets.** Each project has a shared snippet library: save the selected code (or the whole note) under a name, and insert it into any code note in that project. Inserted lines take on the indentation of the line you are on. The list shows snippets for the note's language, with a box to show all.
+- **Find and replace** in code notes (**Ctrl+F** or **Find**): matches are highlighted, with match case, whole word, replace one, and replace all (with Undo).
+- **Outline** in code notes: functions and classes (Python, JavaScript), headings, ids and scripts (HTML), rules (CSS), statements (SQL), keys (JSON), and elements (XML), each with its line number. Tap one to jump to it.
+- Snippets and kept spellings live in one hidden note per project, like Storyboard registers. Two devices that change them at the same time are merged, and a deleted snippet stays deleted. Deleting a project deletes its snippets.
 
 ## What changed in v0.11.1
 
@@ -126,7 +137,8 @@ Note: a device still on v0.7 would show the hidden cache record in Recently Dele
 | `app.js` | App logic, diagnostics, settings |
 | `ui-writing.js` | Toolbar, preview, conversion, copying, sources, papers |
 | `ui-security.js` | Lock screen and encryption settings |
-| `code.js`, `ui-code.js` | Code coloring, editing helpers, tidy, HTML and XML previews |
+| `code.js`, `ui-code.js` | Code coloring, editing helpers, tidy, HTML, XML and JSON previews, JavaScript runner |
+| `codeintel.js`, `ui-coding.js` | Coding mode: name check, autocomplete, find and replace, outline, snippets |
 | `render.html`, `render.js` | The sealed-off frame that renders HTML notes |
 | `Echolume-VF.woff2`, `Echolume-Italic-VF.woff2` | Echolume font (variable weight), © Krowsingre Publishing LLC |
 | `ReiimeiDisplay-Regular.woff` | Reiimei Display font, © Krowsingre Publishing LLC |
@@ -157,9 +169,9 @@ Then open http://localhost:8000 in Edge or Chrome. Notes work immediately, saved
 
 The iPhone needs an HTTPS address. GitHub Pages hosts the app for free. Only the app's code goes to GitHub; your notes never do.
 
-1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.11.1` folder.
+1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.12.0` folder.
 2. **Create the repository.** In Safari, sign in at github.com, tap **+** › **New repository**. Name it `reiimei`, set it to **Public** (free Pages needs a public repository), and tap **Create repository**.
-3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.11.1` folder, tap **Select**, select all 34 files, and tap **Open**. Scroll down and tap **Commit changes**.
+3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.12.0` folder, tap **Select**, select all 36 files, and tap **Open**. Scroll down and tap **Commit changes**.
    - If you don't see the upload link, tap the **aA** button in Safari's address bar › **Request Desktop Website** and try again.
 4. **Turn on Pages.** In the repository, open **Settings** › **Pages**. Under **Build and deployment**, set Source to **Deploy from a branch**, Branch to **main** and **/ (root)**, then tap **Save**.
 5. **Wait a minute or two**, then reload the Pages screen. It shows your address, which looks like `https://yourname.github.io/reiimei/`.
@@ -225,15 +237,18 @@ Titles are typed once. Reiimei applies title case for MLA and sentence case for 
 
 ## Code
 
-Choose **Python**, **HTML5**, or **XML** from the format menu in the toolbar (or make one the default in **Settings › Writing**). Switching between writing and code never changes the text; **Undo** appears right after.
+Choose **Python**, **HTML5**, **XML**, **JavaScript**, **CSS**, **JSON**, or **SQL** from the format menu in the toolbar (or make one the default in **Settings › Writing**). Switching between writing and code never changes the text; **Undo** appears right after.
 
 - **Tab** and **Shift+Tab** indent and outdent. **Enter** keeps the indentation, adds a level after a Python line ending in `:` or an opening HTML/XML tag, and drops a level after `return`, `pass`, `break`, `continue`, or `raise`.
 - **Ctrl+/** (or **Comment**) comments or uncomments the selected lines.
 - **Tidy** fixes indentation: Python tabs become 4 spaces and trailing spaces go; HTML and XML lines are re-indented by tag nesting. Text inside `<pre>`, `<script>`, `<style>`, and `<textarea>` is left alone. Undo is offered.
 - **Render** (HTML5) runs the page with its CSS and JavaScript. It runs in a sealed-off frame with its own origin, so the page cannot read your notes, Reiimei's storage, or the app. It works offline after the first online launch.
 - **Check** (XML) reports whether the XML is well formed, shows the line with the problem, or shows the document as a collapsible tree.
+- **Run** (JavaScript) runs the code in the sealed frame and shows `console.log` output.
+- **Check** (JSON) validates and pretty prints. CSS and SQL are colored and tidied; they have no preview.
 - Python is colored and indented but does not run; running Python in the browser needs a large add-on that could be added later.
-- The note list titles code notes by the HTML `<title>`, the first Python comment, or the first XML comment.
+- Coding mode adds Find, Snippets, Outline, the name check and autocomplete; see "What changed in v0.12.0".
+- The note list titles code notes by the HTML `<title>`, or the first comment line.
 - In Markdown notes, fenced code blocks such as ```` ```python ```` are colored in Preview.
 
 ## Sharing
@@ -259,12 +274,14 @@ The service worker caches the app files. When you change any file, bump `VERSION
 - **Settings › Log** › Download gives a text log of everything the app did, including sync results and errors.
 - **"Test connection"** in Settings › Sync confirms the URL, key, sign-in, and tables are all correct.
 
-## Known limits in v0.11.1
+## Known limits in v0.12.0
 
 - Images can be linked but not attached
 - Sources belong to one note; there is no shared library yet
 - Citation types: books, chapters, journal articles, and web pages
 - Python code is not run
+- The name check does not read other files outside Reiimei, so a name from a library you import can look undefined if it is close to one of yours; use **Keep my spelling**
+- The name check and autocomplete do not cover XML or JSON
 - Email and text-message links carry text only; to attach a file, use Share file… or Download
 - Folders are one level deep
 - Recently Deleted is never emptied automatically; empty it yourself when you like

@@ -50,7 +50,7 @@ export function render(note) {
     ta.spellcheck = false;
     ta.setAttribute('autocapitalize', 'off');
     ta.setAttribute('autocorrect', 'off');
-    ta.placeholder = next === 'python' ? '# Start with a comment that names this file' : next === 'html' ? '<!DOCTYPE html>' : '<?xml version="1.0" encoding="UTF-8"?>';
+    ta.placeholder = { python: '# Start with a comment that names this file', html: '<!DOCTYPE html>', xml: '<?xml version="1.0" encoding="UTF-8"?>', javascript: '// Start with a comment that names this file', css: '/* Start with a comment that names this file */', json: '{ }', sql: '-- Start with a comment that names this file' }[next];
   } else if (lang) {
     ta.removeAttribute('wrap');
     ta.spellcheck = true;
@@ -115,8 +115,9 @@ export function action(id) {
 // ---- Previews -------------------------------------------------------------------
 export function previewLabel(format) {
   if (format === 'html') return 'Render';
-  if (format === 'xml') return 'Check';
-  return null; // Python has no preview
+  if (format === 'xml' || format === 'json') return 'Check';
+  if (format === 'javascript') return 'Run';
+  return null; // Python, CSS and SQL have no preview
 }
 
 export function showPreview(note, on) {
@@ -130,10 +131,10 @@ export function showPreview(note, on) {
   $('body').hidden = true;
   $('code-layer').hidden = true;
   $('gutter').hidden = true;
-  if (note.format === 'html') {
+  if (note.format === 'html' || note.format === 'javascript') {
     pv.hidden = true;
     frame.hidden = false;
-    pendingHtml = note.body;
+    pendingHtml = note.format === 'javascript' ? K.jsRunnerHtml(note.body) : note.body;
     // Reload the frame each time so every render starts clean.
     frame.src = 'render.html';
     clearTimeout(frameTimer);
@@ -144,7 +145,26 @@ export function showPreview(note, on) {
       pv.innerHTML = '<p class="hint">The preview page did not load. Open Reiimei once while online so it can save the preview page for offline use.</p>';
       log.warn('code', 'HTML preview frame did not respond');
     }, 5000);
-    log.info('code', 'Rendering HTML', { chars: note.body.length });
+    log.info('code', note.format === 'javascript' ? 'Running JavaScript' : 'Rendering HTML', { chars: note.body.length });
+    return true;
+  }
+  if (note.format === 'json') {
+    frame.hidden = true;
+    pv.hidden = false;
+    const res = K.checkJson(note.body);
+    if (res.ok) {
+      const pretty = K.tidyJson(note.body);
+      pv.innerHTML = `<p class="xml-ok">Valid JSON.</p><pre class="code-block">${K.highlight(pretty, 'json')}</pre>`;
+    } else {
+      const lines = note.body.split('\n');
+      const at = res.line;
+      const near = at ? lines.slice(Math.max(0, at - 3), at + 2).map((l, k) => {
+        const n = Math.max(1, at - 2) + k;
+        return `<div class="xml-line${n === at ? ' bad' : ''}"><span class="ln">${n}</span>${K.highlight(l, 'json') || ' '}</div>`;
+      }).join('') : '';
+      pv.innerHTML = `<div class="xml-err"><strong>This JSON has a problem${at ? ` near line ${at}` : ''}.</strong><p>${res.error.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]))}</p>${near ? `<pre class="code-block">${near}</pre>` : ''}</div>`;
+    }
+    log.info('code', 'JSON checked', { ok: res.ok, line: res.line || null });
     return true;
   }
   if (note.format === 'xml') {

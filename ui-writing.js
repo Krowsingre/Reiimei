@@ -10,6 +10,7 @@ import { isCode, LANGS } from './code.js';
 import * as S from './share.js';
 import * as research from './ui-research.js';
 import * as storyUi from './ui-storyboard.js';
+import * as codingUi from './ui-coding.js';
 import * as modes from './modes.js';
 
 const $ = (id) => document.getElementById(id);
@@ -35,7 +36,7 @@ const LABELS = { b: 'B', i: 'I', u: 'U', s: 'S', mark: '<span>H</span>', sup: 'x
 export function renderToolbar(note) {
   const bar = $('toolbar');
   bar.hidden = !note;
-  if (!note) { storyUi.renderToolbar(null); return; }
+  if (!note) { storyUi.renderToolbar(null); codingUi.renderToolbar(null); return; }
   const code = isCodeNote(note);
   const format = fmtOf(note);
   $('note-format').value = code ? note.format : format;
@@ -64,6 +65,7 @@ export function renderToolbar(note) {
   $('btn-sources').textContent = sourcesOf(note).length ? `Sources (${sourcesOf(note).length})` : 'Sources';
   renderPreview(note);
   storyUi.renderToolbar(note, code, previewOn);
+  codingUi.renderToolbar(note);
 }
 
 let lastRendered = null;
@@ -158,6 +160,7 @@ async function changeFormat(to) {
     const before = current.format || 'markdown';
     previewOn = false;
     await app.update({ format: to });
+    if (isCode(to)) app.setPrefs({ codeLang: to });
     log.info('format', 'Note type changed', { from: before, to });
     app.toast(isCode(to) ? `This note is now ${LANGS[to].label} code` : `This note is now ${to === 'populi' ? 'Populi' : 'Markdown'}`, 'Undo', () => app.update({ format: before }));
     return;
@@ -565,6 +568,7 @@ export function init(hooks) {
   app = hooks;
   codeUi.init(hooks);
   storyUi.init(hooks);
+  codingUi.init(hooks);
   research.init(hooks, { renderSources, saveMeta, insertText: (t) => insertAtCaret(t), sourcesOf, styleOf, citerFor });
 
   $('tool-buttons').addEventListener('click', (e) => {

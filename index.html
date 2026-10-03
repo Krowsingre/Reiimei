@@ -122,6 +122,10 @@
             <option value="python">Python</option>
             <option value="html">HTML5</option>
             <option value="xml">XML</option>
+            <option value="javascript">JavaScript</option>
+            <option value="css">CSS</option>
+            <option value="json">JSON</option>
+            <option value="sql">SQL</option>
           </optgroup>
         </select>
         <div class="tool-group" id="tool-buttons"></div>
@@ -130,6 +134,9 @@
           <button class="tool" data-code="indent" title="Indent (Tab)">Indent</button>
           <button class="tool" data-code="outdent" title="Outdent (Shift+Tab)">Outdent</button>
           <button class="tool" data-code="comment" title="Comment or uncomment (Ctrl+/)">Comment</button>
+          <button class="tool" id="btn-find" aria-pressed="false" title="Find and replace (Ctrl+F)">Find</button>
+          <button class="tool" id="btn-snippets" title="Snippets saved in this project">Snippets</button>
+          <button class="tool" id="btn-code-outline" aria-pressed="false" title="Outline of functions, classes, headings">Outline</button>
         </div>
         <span class="tool-sep"></span>
         <button class="tool" id="btn-fonts" title="Choose fonts">Aa</button>
@@ -153,12 +160,31 @@
         <button class="text-btn" id="btn-paste-erased">Paste erased text</button>
       </div>
       <div class="outline" id="outline" hidden aria-label="Outline"></div>
+      <div class="findbar" id="findbar" hidden role="search">
+        <input id="f-find" placeholder="Find" aria-label="Find" autocomplete="off" autocapitalize="off" spellcheck="false">
+        <input id="f-repl" placeholder="Replace with" aria-label="Replace with" autocomplete="off" autocapitalize="off" spellcheck="false">
+        <button class="tool" id="f-prev" title="Previous match (Shift+Enter)" aria-label="Previous match">&#8593;</button>
+        <button class="tool" id="f-next" title="Next match (Enter)" aria-label="Next match">&#8595;</button>
+        <label class="f-opt" title="Match upper and lower case"><input type="checkbox" id="f-case"> Aa</label>
+        <label class="f-opt" title="Whole words only"><input type="checkbox" id="f-word"> Word</label>
+        <button class="tool" id="f-one">Replace</button>
+        <button class="tool" id="f-all">Replace all</button>
+        <span class="f-count" id="f-count" role="status"></span>
+        <button class="icon-btn" id="f-close" aria-label="Close find"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+      </div>
+      <div class="spellbar" id="spell-bar" hidden role="status">
+        <span id="spell-msg"></span>
+        <button class="tool" id="spell-fix"></button>
+        <button class="tool" id="spell-keep" title="Stop underlining this spelling in this project">Keep my spelling</button>
+      </div>
       <div class="editor-area" id="editor-area">
         <div class="gutter" id="gutter" hidden aria-hidden="true"></div>
         <pre class="code-layer" id="code-layer" hidden aria-hidden="true"><code id="code-hl"></code></pre>
+        <pre class="code-layer mark-layer" id="mark-layer" hidden aria-hidden="true"></pre>
         <textarea id="body" placeholder="Begin writing. The first line becomes the title." spellcheck="true"></textarea>
         <article class="preview" id="preview" hidden></article>
         <div class="board" id="board" hidden></div>
+        <ul class="ac" id="ac" role="listbox" aria-label="Name suggestions" hidden></ul>
         <iframe class="html-frame" id="html-frame" hidden title="Rendered HTML" sandbox="allow-scripts allow-modals allow-forms"></iframe>
       </div>
       <div class="empty-editor" id="empty-editor">
@@ -550,6 +576,35 @@
     <p class="msg" id="q-msg" role="status"></p>
     <h4>Saved quotes in this project</h4>
     <ul class="source-list" id="q-saved"></ul>
+  </dialog>
+
+  <!-- Snippets -->
+  <dialog id="snip-dialog" class="dialog wide">
+    <div class="settings-head">
+      <h3>Snippets</h3>
+      <button class="icon-btn" id="btn-close-snip" aria-label="Close">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <p class="hint" id="snip-project"></p>
+    <div id="snip-main">
+      <label class="check"><input type="checkbox" id="snip-only" checked> Only this note's language</label>
+      <ul class="source-list" id="snip-list"></ul>
+      <div class="row">
+        <button class="btn primary" id="snip-new">New snippet</button>
+        <button class="btn" id="snip-from-note">Save selection as snippet</button>
+      </div>
+    </div>
+    <form id="snip-form" hidden>
+      <label>Name<input id="sn-name" maxlength="80" autocomplete="off" required></label>
+      <label>Language<select id="sn-lang"></select></label>
+      <label>Code<textarea id="sn-body" rows="8" spellcheck="false" autocapitalize="off" class="mono"></textarea></label>
+      <div class="row">
+        <button class="btn primary" type="submit">Save snippet</button>
+        <button class="btn" type="button" id="sn-cancel">Cancel</button>
+      </div>
+    </form>
+    <p class="msg" id="snip-msg" role="status"></p>
   </dialog>
 
   <!-- Scene card -->

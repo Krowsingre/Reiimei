@@ -674,3 +674,23 @@ html[data-note-font="display"] #body { line-height: 1.7; letter-spacing: .01em; 
 .fact input { flex: 1; min-width: 0; }
 #cont-list mark { background: var(--gold-soft); color: inherit; padding: 0 2px; border-radius: 3px; }
 @media (max-width: 760px) { .board { padding: 12px 12px 40vh; } .bd-cards { grid-template-columns: 1fr; } }
+
+/* ---- v0.12.0: Coding mode ---- */
+.tk-key { color: var(--tk-attr); }
+.mark-layer { color: transparent; }
+.mark-layer u.sp { text-decoration: underline dotted; text-decoration-color: var(--danger, #c0392b); text-decoration-thickness: 2px; text-underline-offset: 3px; }
+.mark-layer mark.fm { background: rgba(240, 190, 60, .38); color: transparent; border-radius: 2px; }
+.mark-layer mark.fm.cur { background: rgba(240, 150, 40, .6); }
+.findbar, .spellbar { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; padding: 6px 12px; border-bottom: 1px solid var(--rule); background: var(--paper); }
+.findbar input[type=text], .findbar input:not([type]) { flex: 1 1 100px; min-width: 70px; max-width: 200px; font: inherit; font-size: 14px; padding: 5px 8px; border: 1px solid var(--rule); border-radius: 8px; background: var(--paper); color: inherit; }
+.f-opt { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; color: var(--ink-2); cursor: pointer; }
+.f-count { font-size: 12px; color: var(--ink-3); min-width: 60px; }
+.spellbar { font-size: 13px; color: var(--ink-2); }
+.ac { position: absolute; z-index: 5; margin: 0; padding: 4px; list-style: none; background: var(--paper); border: 1px solid var(--rule); border-radius: 10px; box-shadow: 0 6px 24px rgba(0,0,0,.18); font: 13px/1.4 var(--mono); max-width: 80%; }
+.ac li { padding: 4px 10px; border-radius: 6px; cursor: pointer; white-space: nowrap; display: flex; gap: 12px; justify-content: space-between; }
+.ac li[aria-selected="true"] { background: var(--accent-soft); }
+.ac .ac-src { color: var(--ink-3); font-size: 11px; }
+#snip-dialog textarea.mono, #snip-dialog pre { font-family: var(--mono); font-size: 13px; }
+#snip-dialog pre { margin: 4px 0 0; padding: 6px 8px; max-height: 120px; overflow: auto; background: var(--accent-soft); border-radius: 8px; white-space: pre; }
+#snip-dialog textarea, #snip-dialog input:not([type=checkbox]), #snip-dialog select { width: 100%; box-sizing: border-box; font: inherit; }
+@media (max-width: 760px) { #code-tools { flex-wrap: wrap; overflow-x: visible; } }
