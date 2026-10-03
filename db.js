@@ -1,6 +1,14 @@
 // Local storage layer (IndexedDB). Everything is saved here first, so the app
 // works fully offline. Records marked dirty are pushed by sync.js later.
+// When encryption is on, the private fields of each record are sealed before
+// they reach IndexedDB, and opened again when read.
 import { log } from './logger.js';
+import * as vault from './crypto.js';
+
+// Fields that are sealed when encryption is on. Everything else (ids, dates,
+// folder links, pinned, deleted) stays readable so sync can work while locked.
+export const SECRET = { notes: ['body', 'tags', 'format', 'meta'], folders: ['name'] };
+const BLANK = { body: '', tags: [], format: 'markdown', meta: {}, name: '' };
 
 const DB_NAME = 'reiimei';
 const DB_VERSION = 1;
@@ -62,26 +70,106 @@ function reqP(req) {
   });
 }
 
-export const getAll = (store) => tx(store, 'readonly', (s) => reqP(s.getAll()));
-export const get = (store, id) => tx(store, 'readonly', (s) => reqP(s.get(id)));
-export const put = (store, value) => tx(store, 'readwrite', (s) => reqP(s.put(value)));
-export const remove = (store, id) => tx(store, 'readwrite', (s) => reqP(s.delete(id)));
-export const putMany = (store, values) =>
+const rawGetAll = (store) => tx(store, 'readonly', (s) => reqP(s.getAll()));
+const rawGet = (store, id) => tx(store, 'readonly', (s) => reqP(s.get(id)));
+const rawPut = (store, value) => tx(store, 'readwrite', (s) => reqP(s.put(value)));
+export const rawPutMany = (store, values) =>
   tx(store, 'readwrite', (s) => Promise.all(values.map((v) => reqP(s.put(v)))));
+export const remove = (store, id) => tx(store, 'readwrite', (s) => reqP(s.delete(id)));
+
+// Seal private fields (when encryption is on) before storing.
+export async function encode(store, rec) {
+  const fields = SECRET[store];
+  if (!fields) return rec;
+  const out = { ...rec };
+  delete out.locked;
+  delete out.sealed;
+  if (!vault.isEnabled()) return out;
+  const secret = {};
+  for (const f of fields) { secret[f] = rec[f]; delete out[f]; }
+  out.sealed = await vault.seal(secret);
+  return out;
+}
+
+// Open sealed fields. If they cannot be opened (locked or wrong key), the
+// record comes back marked locked with blank private fields.
+export async function decode(store, raw) {
+  if (!raw || !raw.sealed || !SECRET[store]) return raw;
+  const out = { ...raw };
+  delete out.sealed;
+  try {
+    Object.assign(out, await vault.open(raw.sealed));
+  } catch (e) {
+    for (const f of SECRET[store]) out[f] = BLANK[f];
+    out.locked = true;
+    out.sealedRaw = raw.sealed;
+    if (!(e instanceof vault.LockedError)) log.warn('db', 'A record could not be opened', { id: raw.id, error: e.message });
+  }
+  return out;
+}
+
+export const getAll = async (store) => Promise.all((await rawGetAll(store)).map((r) => decode(store, r)));
+export const get = async (store, id) => decode(store, await rawGet(store, id));
+export async function put(store, value) {
+  if (value?.locked) throw new Error('Refusing to overwrite a record that is still locked');
+  return rawPut(store, await encode(store, value));
+}
+export async function putMany(store, values) {
+  if (values.some((v) => v?.locked)) throw new Error('Refusing to overwrite a record that is still locked');
+  return rawPutMany(store, await Promise.all(values.map((v) => encode(store, v))));
+}
+// How many stored records are sealed (used by diagnostics and by encryption on/off).
+export async function countSealed() {
+  const [n, f] = await Promise.all([rawGetAll('notes'), rawGetAll('folders')]);
+  return { sealed: [...n, ...f].filter((r) => r.sealed).length, total: n.length + f.length, sample: [...n, ...f].find((r) => r.sealed)?.sealed || null };
+}
+
+// Rewrite every record and queue them all to sync. Records are read first (with
+// the current key), then `between` runs (for example, switching keys), then
+// everything is written back in the new mode. Used to turn encryption on or
+// off and to change the passphrase.
+export async function rewriteAll(between = async () => {}) {
+  const data = {};
+  for (const store of ['folders', 'notes']) {
+    data[store] = await getAll(store);
+    if (data[store].some((r) => r.locked)) throw new Error('Some notes could not be opened with the current passphrase');
+  }
+  await between();
+  let count = 0;
+  for (const store of ['folders', 'notes']) {
+    await putMany(store, data[store].map((r) => ({ ...r, dirty: true })));
+    count += data[store].length;
+  }
+  log.info('db', 'Rewrote all records', { count, encrypted: vault.isEnabled() });
+  return count;
+}
+
+// Remove everything Reiimei stores on this device.
+export async function eraseDevice() {
+  try { (await openDb()).close(); } catch { /* not open */ }
+  dbPromise = null;
+  await new Promise((resolve) => {
+    const req = indexedDB.deleteDatabase(DB_NAME);
+    req.onsuccess = req.onerror = req.onblocked = () => resolve();
+  });
+  Object.keys(localStorage).filter((k) => k.startsWith('reiimei.')).forEach((k) => localStorage.removeItem(k));
+}
 
 export async function getMeta(key, fallback = null) {
-  const row = await get('meta', key);
+  const row = await rawGet('meta', key);
   return row ? row.value : fallback;
 }
-export const setMeta = (key, value) => put('meta', { key, value });
+export const setMeta = (key, value) => rawPut('meta', { key, value });
 
 const now = () => new Date().toISOString();
 
 // ---- Notes -------------------------------------------------------------
-export async function createNote({ folder_id = null, tags = [] } = {}) {
+export async function createNote({ folder_id = null, tags = [], format = 'markdown', meta = {} } = {}) {
   const note = {
     id: uuid(),
     body: '',
+    format,
+    meta,
     folder_id,
     tags,
     pinned: false,
@@ -96,14 +184,12 @@ export async function createNote({ folder_id = null, tags = [] } = {}) {
 }
 
 // Apply changes on top of the record currently in the database (not a possibly
-// stale copy held by the UI), inside a single transaction.
-function update(store, id, changes, fallback) {
-  return tx(store, 'readwrite', async (s) => {
-    const current = (await reqP(s.get(id))) || fallback;
-    const updated = { ...current, ...changes, updated_at: now(), dirty: true };
-    await reqP(s.put(updated));
-    return updated;
-  });
+// stale copy held by the UI).
+async function update(store, id, changes, fallback) {
+  const current = (await get(store, id)) || fallback;
+  const updated = { ...current, ...changes, updated_at: now(), dirty: true };
+  await put(store, updated);
+  return updated;
 }
 
 export const saveNote = (note, changes) => update('notes', note.id, changes, note);
@@ -114,7 +200,7 @@ export const deleteNote = (note) => saveNote(note, { deleted: true });
 export async function createFolder(name) {
   const folder = { id: uuid(), name, updated_at: now(), deleted: false, dirty: true };
   await put('folders', folder);
-  log.info('db', 'Folder created', { id: folder.id, name });
+  log.info('db', 'Folder created', { id: folder.id });
   return folder;
 }
 

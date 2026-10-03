@@ -1,6 +1,6 @@
 -- Reiimei: Supabase setup
 -- Paste this whole file into Supabase > SQL Editor > New query, then click Run.
--- It is safe to run more than once.
+-- It is safe to run more than once, and running it again upgrades an older setup.
 
 create table if not exists public.folders (
   id uuid primary key,
@@ -23,6 +23,13 @@ create table if not exists public.notes (
   deleted boolean not null default false,
   server_updated_at timestamptz not null default now()
 );
+
+-- v0.3.0: formatting, citations, and end-to-end encryption.
+-- "sealed" holds encrypted note data; when it is set, body/tags/name are blank.
+alter table public.notes add column if not exists format text;
+alter table public.notes add column if not exists meta jsonb;
+alter table public.notes add column if not exists sealed text;
+alter table public.folders add column if not exists sealed text;
 
 create index if not exists notes_user_server_updated on public.notes (user_id, server_updated_at);
 create index if not exists folders_user_server_updated on public.folders (user_id, server_updated_at);

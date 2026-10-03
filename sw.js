@@ -1,6 +1,6 @@
 // Reiimei service worker: caches the app shell so it opens with no connection.
 // Bump VERSION whenever any app file changes so devices pick up the update.
-const VERSION = 'reiimei-v0.2.1';
+const VERSION = 'reiimei-v0.4.0';
 const FONT_CACHE = 'reiimei-fonts';
 const SHELL = [
   './',
@@ -11,6 +11,19 @@ const SHELL = [
   './db.js',
   './sync.js',
   './logger.js',
+  './crypto.js',
+  './format.js',
+  './cite.js',
+  './paper.js',
+  './zip.js',
+  './ui-writing.js',
+  './ui-security.js',
+  './code.js',
+  './share.js',
+  './ui-code.js',
+  './ui-share.js',
+  './render.html',
+  './render.js',
   './icon-192.png',
   './icon-512.png',
   './apple-touch-icon.png',

@@ -3,8 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co https://*.supabase.in; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'">
+  <meta name="referrer" content="no-referrer">
   <title>Reiimei</title>
-  <meta name="description" content="Reiimei: offline-first notes with folders, tags and sync.">
+  <meta name="description" content="Reiimei: private, offline-first notes with folders, tags, sync, formatting, and MLA and APA citations.">
   <meta name="theme-color" content="#e5ebf1" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#0b1018" media="(prefers-color-scheme: dark)">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -56,6 +58,7 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
         </button>
         <h2 class="pane-title" id="list-title">All Notes</h2>
+        <button class="icon-btn" id="btn-share-list" title="Share notes in this list" aria-label="Share notes in this list"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M5 12v7h14v-7"/></svg></button>
         <button class="icon-btn accent" id="btn-new-note" title="New note" aria-label="New note">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
         </button>
@@ -75,6 +78,7 @@
         <select id="note-folder" aria-label="Folder"></select>
         <span class="spacer"></span>
         <span class="save-state" id="save-state"></span>
+        <button class="icon-btn" id="btn-share" title="Share" aria-label="Share note"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M5 12v7h14v-7"/></svg></button>
         <button class="icon-btn" id="btn-pin" title="Pin" aria-label="Pin note" aria-pressed="false">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17v5"/><path d="M9 10.8V4h6v6.8l3 3.2H6z"/></svg>
         </button>
@@ -87,11 +91,42 @@
         <input id="tag-input" placeholder="Add tag" autocomplete="off" autocapitalize="off" aria-label="Add tag" list="tag-suggest">
         <datalist id="tag-suggest"></datalist>
       </div>
+      <div class="toolbar" id="toolbar" role="toolbar" aria-label="Formatting">
+        <select id="note-format" aria-label="Note format or language" title="Note format or language">
+          <optgroup label="Writing">
+            <option value="markdown">Markdown</option>
+            <option value="populi">Populi</option>
+          </optgroup>
+          <optgroup label="Code">
+            <option value="python">Python</option>
+            <option value="html">HTML5</option>
+            <option value="xml">XML</option>
+          </optgroup>
+        </select>
+        <div class="tool-group" id="tool-buttons"></div>
+        <div class="tool-group" id="code-tools" hidden>
+          <button class="tool" data-code="tidy" title="Fix indentation and spacing">Tidy</button>
+          <button class="tool" data-code="indent" title="Indent (Tab)">Indent</button>
+          <button class="tool" data-code="outdent" title="Outdent (Shift+Tab)">Outdent</button>
+          <button class="tool" data-code="comment" title="Comment or uncomment (Ctrl+/)">Comment</button>
+        </div>
+        <span class="tool-sep"></span>
+        <button class="tool" id="btn-preview" aria-pressed="false" title="Preview">Preview</button>
+        <button class="tool" id="btn-sources" title="Sources and citations">Sources</button>
+        <button class="tool" id="btn-paper" title="Format as an MLA or APA paper">Paper</button>
+        <button class="tool" id="btn-copy" title="Copy for Populi or as Markdown">Copy</button>
+      </div>
       <div class="trash-bar" id="trash-bar" hidden>
         This note is in Recently Deleted.
         <button class="text-btn" id="btn-restore">Restore</button>
       </div>
-      <textarea id="body" placeholder="Begin writing. The first line becomes the title." spellcheck="true"></textarea>
+      <div class="editor-area" id="editor-area">
+        <div class="gutter" id="gutter" hidden aria-hidden="true"></div>
+        <pre class="code-layer" id="code-layer" hidden aria-hidden="true"><code id="code-hl"></code></pre>
+        <textarea id="body" placeholder="Begin writing. The first line becomes the title." spellcheck="true"></textarea>
+        <article class="preview" id="preview" hidden></article>
+        <iframe class="html-frame" id="html-frame" hidden title="Rendered HTML" sandbox="allow-scripts allow-modals allow-forms"></iframe>
+      </div>
       <div class="empty-editor" id="empty-editor">
         <div class="definition">
           <p class="word">reiimei</p>
@@ -112,6 +147,7 @@
       <input id="ask-input" autocomplete="off">
       <menu>
         <button value="extra" class="btn danger" id="ask-extra" hidden></button>
+        <button value="extra2" class="btn" id="ask-extra2" hidden></button>
         <span class="spacer"></span>
         <button value="cancel" class="btn">Cancel</button>
         <button value="ok" class="btn primary" id="ask-ok">OK</button>
@@ -129,6 +165,8 @@
     </div>
     <div class="tabs" role="tablist">
       <button class="tab active" data-tab="sync" role="tab">Sync</button>
+      <button class="tab" data-tab="security" role="tab">Security</button>
+      <button class="tab" data-tab="writing" role="tab">Writing</button>
       <button class="tab" data-tab="diag" role="tab">Diagnostics</button>
       <button class="tab" data-tab="log" role="tab">Log</button>
       <button class="tab" data-tab="data" role="tab">Backup</button>
@@ -158,6 +196,107 @@
       <p class="msg" id="sync-msg" role="status"></p>
     </section>
 
+    <section class="tab-panel" data-panel="security" hidden>
+      <div id="sec-off">
+        <p><strong>Encryption is off.</strong> Notes are protected by your device lock and your sync password, but they are stored as plain text.</p>
+        <p class="hint">Turn on encryption to seal every note with a passphrase before it is saved or synced. Supabase, and anyone who copies your device's data, sees only scrambled text.</p>
+        <label>New passphrase<input id="sec-new" type="password" autocomplete="new-password"></label>
+        <label>Type it again<input id="sec-new2" type="password" autocomplete="new-password"></label>
+        <label class="check"><input type="checkbox" id="sec-ack"> I understand that if I forget this passphrase, my notes cannot be recovered by anyone.</label>
+        <div class="row"><button class="btn primary" id="btn-enc-on">Turn on encryption</button></div>
+      </div>
+      <div id="sec-on" hidden>
+        <p><strong>Encryption is on.</strong> Notes are sealed with your passphrase on this device and before they sync.</p>
+        <label>Lock automatically
+          <select id="sec-autolock">
+            <option value="1">After 1 minute away</option>
+            <option value="5">After 5 minutes away</option>
+            <option value="15">After 15 minutes away</option>
+            <option value="60">After 1 hour away</option>
+            <option value="0">Only when I lock it</option>
+          </select>
+        </label>
+        <div class="row"><button class="btn" id="btn-lock-now">Lock now</button></div>
+        <details class="sec-more">
+          <summary>Change passphrase</summary>
+          <label>Current passphrase<input id="sec-cur" type="password" autocomplete="current-password"></label>
+          <label>New passphrase<input id="sec-chg" type="password" autocomplete="new-password"></label>
+          <label>Type it again<input id="sec-chg2" type="password" autocomplete="new-password"></label>
+          <div class="row"><button class="btn" id="btn-enc-change">Change passphrase</button></div>
+        </details>
+        <details class="sec-more">
+          <summary>Turn off encryption</summary>
+          <p class="hint">Notes will be stored and synced as plain text again.</p>
+          <label>Passphrase<input id="sec-off-pass" type="password" autocomplete="current-password"></label>
+          <div class="row"><button class="btn danger" id="btn-enc-off">Turn off encryption</button></div>
+        </details>
+      </div>
+      <p class="msg" id="sec-msg" role="status"></p>
+      <h4 class="sec-head">Security checklist</h4>
+      <ul class="checklist" id="sec-checklist">
+        <li>Turn on two-factor authentication for your GitHub account. Anyone who can change the app's code could read notes as you type them.</li>
+        <li>Turn on two-factor authentication for your Supabase account.</li>
+        <li>After creating your sync account, turn off new sign-ups in Supabase (Authentication, Sign In / Providers, Allow new users to sign up).</li>
+        <li>Use a different password for sync than for anything else.</li>
+        <li>Keep your iPhone and laptop locked with a passcode, and keep them updated.</li>
+      </ul>
+    </section>
+
+    <section class="tab-panel" data-panel="writing" hidden>
+      <label>New notes use
+        <select id="pref-format">
+          <option value="markdown">Markdown</option>
+          <option value="populi">Populi markup</option>
+          <option value="python">Python</option>
+          <option value="html">HTML5</option>
+          <option value="xml">XML</option>
+        </select>
+      </label>
+      <label>Citation style for new notes
+        <select id="pref-style">
+          <option value="apa">APA 7th edition</option>
+          <option value="mla">MLA 9th edition</option>
+        </select>
+      </label>
+      <div class="cheats">
+        <div>
+          <h4 class="sec-head">Markdown</h4>
+          <table class="cheat">
+            <tr><td><code>**bold**</code></td><td><strong>bold</strong></td></tr>
+            <tr><td><code>*italic*</code></td><td><em>italic</em></td></tr>
+            <tr><td><code>++underline++</code></td><td><u>underline</u></td></tr>
+            <tr><td><code>~~strike~~</code></td><td><s>strike</s></td></tr>
+            <tr><td><code>==highlight==</code></td><td><mark>highlight</mark></td></tr>
+            <tr><td><code>x^2^ &nbsp;H~2~O</code></td><td>x<sup>2</sup> H<sub>2</sub>O</td></tr>
+            <tr><td><code># Heading</code></td><td>Heading</td></tr>
+            <tr><td><code>- item</code> / <code>1. item</code></td><td>Lists</td></tr>
+            <tr><td><code>- [ ] task</code></td><td>Checklist</td></tr>
+            <tr><td><code>&gt; quote</code></td><td>Block quote</td></tr>
+            <tr><td><code>[text](https://…)</code></td><td>Link</td></tr>
+          </table>
+        </div>
+        <div>
+          <h4 class="sec-head">Populi</h4>
+          <table class="cheat">
+            <tr><td><code>*bold*</code></td><td><strong>bold</strong></td></tr>
+            <tr><td><code>_italic_</code></td><td><em>italic</em></td></tr>
+            <tr><td><code>#underline#</code></td><td><u>underline</u></td></tr>
+            <tr><td><code>^super^</code></td><td><sup>super</sup></td></tr>
+            <tr><td><code>~sub~</code></td><td><sub>sub</sub></td></tr>
+            <tr><td><code>+highlight+</code></td><td><mark>highlight</mark></td></tr>
+            <tr><td><code>:smile:</code></td><td>Emoji</td></tr>
+            <tr><td>A web address</td><td>Link or embed</td></tr>
+          </table>
+          <h4 class="sec-head">Citations (both formats)</h4>
+          <table class="cheat">
+            <tr><td><code>[@smith2020, 42]</code></td><td>(Smith 42) or (Smith, 2020, p. 42)</td></tr>
+            <tr><td><code>[@a; @b]</code></td><td>Two sources at once</td></tr>
+            <tr><td><code>@smith2020</code></td><td>Smith, or Smith (2020)</td></tr>
+          </table>
+        </div>
+      </div>
+    </section>
+
     <section class="tab-panel" data-panel="diag" hidden>
       <p class="hint">Checks run each time the app starts.</p>
       <table class="diag" id="diag-table"></table>
@@ -182,6 +321,242 @@
       <p class="msg" id="data-msg" role="status"></p>
     </section>
   </dialog>
+
+  <!-- Share -->
+  <dialog id="share-dialog" class="dialog wide">
+    <div class="settings-head">
+      <h3 id="share-title">Share</h3>
+      <button class="icon-btn" id="btn-close-share" aria-label="Close">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <p class="hint" id="share-enc-hint" hidden>Shared copies are not encrypted.</p>
+
+    <section id="share-text-wrap">
+      <h4 class="sec-head">Send as text</h4>
+      <label id="share-text-style-wrap">Text style
+        <select id="share-text-style">
+          <option value="plain">Plain text</option>
+          <option value="markdown">Markdown</option>
+          <option value="populi">Populi markup</option>
+        </select>
+      </label>
+      <div class="row">
+        <button class="btn" id="btn-share-text">Share…</button>
+        <button class="btn" id="btn-share-email">Email</button>
+        <button class="btn" id="btn-share-sms">Text message</button>
+        <button class="btn" id="btn-share-copy">Copy</button>
+      </div>
+    </section>
+
+    <section id="share-pick-wrap">
+      <div class="share-pick-head">
+        <span id="share-count"></span>
+        <span class="spacer"></span>
+        <button class="text-btn" id="btn-share-all">All</button>
+        <button class="text-btn" id="btn-share-none">None</button>
+      </div>
+      <ul class="share-list" id="share-list"></ul>
+    </section>
+
+    <section>
+      <h4 class="sec-head">Send as a file</h4>
+      <div class="seg" id="share-mode" role="radiogroup" aria-label="File type">
+        <button class="seg-btn" data-mode="combined" role="radio">One document</button>
+        <button class="seg-btn" data-mode="archive" role="radio">Separate files (.zip)</button>
+      </div>
+      <label id="share-combined-wrap">Format
+        <select id="share-format"></select>
+      </label>
+      <p class="hint" id="share-archive-hint" hidden>Each note becomes its own file, inside folders that match yours: Markdown notes as .md, Populi notes as .txt, and code as .py, .html, or .xml.</p>
+      <div class="row">
+        <button class="btn primary" id="btn-share-file">Share file…</button>
+        <button class="btn" id="btn-share-download">Download</button>
+      </div>
+      <p class="hint" id="share-file-hint"></p>
+    </section>
+    <p class="msg" id="share-msg" role="status"></p>
+  </dialog>
+
+  <!-- Copy menu -->
+  <dialog id="copy-dialog" class="dialog">
+    <h3>Copy note</h3>
+    <p class="hint">Citations are filled in and the reference list is added at the end.</p>
+    <div class="stack">
+      <button class="btn" id="btn-copy-populi">Copy for Populi</button>
+      <button class="btn" id="btn-copy-md">Copy as Markdown</button>
+      <button class="btn" id="btn-copy-plain">Copy as plain text</button>
+    </div>
+    <p class="msg" id="copy-msg" role="status"></p>
+    <menu><button class="btn" id="btn-copy-close">Done</button></menu>
+  </dialog>
+
+  <!-- Sources -->
+  <dialog id="sources-dialog" class="dialog wide">
+    <div class="settings-head">
+      <h3>Sources</h3>
+      <button class="icon-btn" id="btn-close-sources" aria-label="Close">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="seg" role="radiogroup" aria-label="Citation style">
+      <button class="seg-btn" data-style="apa" role="radio">APA 7</button>
+      <button class="seg-btn" data-style="mla" role="radio">MLA 9</button>
+    </div>
+    <p class="hint">Switching styles only changes how citations look. Nothing you entered is changed.</p>
+    <ul class="source-list" id="source-list"></ul>
+    <div class="row">
+      <button class="btn primary" id="btn-add-source">Add source</button>
+      <button class="btn" id="btn-copy-refs">Copy reference list</button>
+    </div>
+    <p class="msg" id="sources-msg" role="status"></p>
+  </dialog>
+
+  <!-- Source form -->
+  <dialog id="source-dialog" class="dialog wide">
+    <form id="source-form" method="dialog">
+      <h3 id="source-form-title">Add source</h3>
+      <label>Type
+        <select id="sf-type">
+          <option value="book">Book</option>
+          <option value="chapter">Chapter in an edited book</option>
+          <option value="article">Journal article</option>
+          <option value="webpage">Web page</option>
+        </select>
+      </label>
+      <fieldset class="authors">
+        <legend>Authors</legend>
+        <label class="check"><input type="checkbox" id="sf-is-org"> The author is an organization</label>
+        <div id="sf-people"></div>
+        <label id="sf-org-wrap" hidden>Organization<input id="sf-org" autocomplete="off"></label>
+        <button type="button" class="text-btn" id="sf-add-person">Add another author</button>
+      </fieldset>
+      <label>Title<input id="sf-title" autocomplete="off" required></label>
+      <p class="hint tiny">Type titles normally. Reiimei applies title case for MLA and sentence case for APA. Put names that must keep their capitals in braces, like {Texas} or {Erikson}.</p>
+      <div class="grid3">
+        <label>Year<input id="sf-year" inputmode="numeric" maxlength="4" autocomplete="off"></label>
+        <label data-for="webpage article">Month<input id="sf-month" inputmode="numeric" maxlength="2" placeholder="1-12" autocomplete="off"></label>
+        <label data-for="webpage">Day<input id="sf-day" inputmode="numeric" maxlength="2" autocomplete="off"></label>
+      </div>
+      <label data-for="chapter">Book title<input id="sf-bookTitle" autocomplete="off"></label>
+      <fieldset class="authors" data-for="chapter">
+        <legend>Editors</legend>
+        <div id="sf-editors"></div>
+        <button type="button" class="text-btn" id="sf-add-editor">Add an editor</button>
+      </fieldset>
+      <label data-for="article">Journal<input id="sf-journal" autocomplete="off"></label>
+      <div class="grid3" data-for="article">
+        <label>Volume<input id="sf-volume" autocomplete="off"></label>
+        <label>Issue<input id="sf-issue" autocomplete="off"></label>
+        <label>Pages<input id="sf-pages-a" placeholder="45-67" autocomplete="off"></label>
+      </div>
+      <div class="grid2" data-for="book chapter">
+        <label>Edition<input id="sf-edition" placeholder="2" autocomplete="off"></label>
+        <label data-for="chapter">Pages<input id="sf-pages-c" placeholder="12-34" autocomplete="off"></label>
+      </div>
+      <label data-for="book chapter webpage">Publisher<input id="sf-publisher" autocomplete="off"></label>
+      <label data-for="webpage">Website name<input id="sf-site" autocomplete="off"></label>
+      <label data-for="book chapter article">DOI<input id="sf-doi" placeholder="10.1000/xyz123" autocomplete="off" autocapitalize="off"></label>
+      <label>URL<input id="sf-url" type="url" placeholder="https://" autocomplete="off" autocapitalize="off"></label>
+      <label data-for="webpage">Date you accessed it<input id="sf-accessed" type="date"></label>
+      <label>Citation key<input id="sf-key" autocomplete="off" autocapitalize="off" pattern="[A-Za-z][A-Za-z0-9_:-]*"></label>
+      <div class="sf-preview" aria-live="polite">
+        <p class="tiny-label">APA 7</p><p class="ref-preview" id="sf-prev-apa"></p>
+        <p class="tiny-label">MLA 9</p><p class="ref-preview" id="sf-prev-mla"></p>
+      </div>
+      <p class="msg error" id="sf-msg" role="alert"></p>
+      <menu>
+        <span class="spacer"></span>
+        <button value="cancel" class="btn" formnovalidate>Cancel</button>
+        <button value="save" class="btn primary" id="sf-save">Save source</button>
+      </menu>
+    </form>
+  </dialog>
+
+  <!-- Insert citation -->
+  <dialog id="cite-dialog" class="dialog">
+    <form method="dialog">
+      <h3>Cite <span id="cite-name"></span></h3>
+      <div class="seg" role="radiogroup" aria-label="Citation type">
+        <button type="button" class="seg-btn" data-kind="paren" role="radio">In parentheses</button>
+        <button type="button" class="seg-btn" data-kind="narrative" role="radio">In the sentence</button>
+      </div>
+      <label id="cite-loc-wrap">Page or location (optional)<input id="cite-loc" placeholder="42, 42-45, or para. 3" autocomplete="off"></label>
+      <p class="ref-preview" id="cite-preview"></p>
+      <menu>
+        <span class="spacer"></span>
+        <button value="cancel" class="btn">Cancel</button>
+        <button value="ok" class="btn primary">Insert</button>
+      </menu>
+    </form>
+  </dialog>
+
+  <!-- Paper settings -->
+  <dialog id="paper-dialog" class="dialog wide">
+    <div class="settings-head">
+      <h3>Paper</h3>
+      <button class="icon-btn" id="btn-close-paper" aria-label="Close">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="seg" role="radiogroup" aria-label="Paper style">
+      <button class="seg-btn" data-style="apa" role="radio">APA 7 student paper</button>
+      <button class="seg-btn" data-style="mla" role="radio">MLA 9</button>
+    </div>
+    <p class="hint">Both sets of details are kept, so you can switch styles at any time.</p>
+    <label>Title<input id="pp-title" autocomplete="off"></label>
+    <label>Date<input id="pp-date" type="date"></label>
+    <div id="pp-mla">
+      <label>Your name<input id="pp-mla-name" autocomplete="name"></label>
+      <label>Instructor<input id="pp-mla-instructor" autocomplete="off"></label>
+      <label>Course<input id="pp-mla-course" autocomplete="off"></label>
+    </div>
+    <div id="pp-apa">
+      <label>Author name<input id="pp-apa-author" autocomplete="name"></label>
+      <label>Affiliation (department, school)<input id="pp-apa-affiliation" autocomplete="organization"></label>
+      <label>Course number and name<input id="pp-apa-course" autocomplete="off"></label>
+      <label>Instructor<input id="pp-apa-instructor" autocomplete="off"></label>
+    </div>
+    <p class="hint">The note's first line is used as the title unless you change it here. Headings in the note become paper headings.</p>
+    <div class="row">
+      <button class="btn primary" id="btn-paper-docx">Download Word file</button>
+      <button class="btn" id="btn-paper-view">Preview and print</button>
+    </div>
+    <p class="msg" id="paper-msg" role="status"></p>
+  </dialog>
+
+  <!-- Paper view -->
+  <div class="paper-view" id="paper-view" hidden>
+    <div class="paper-bar">
+      <button class="btn" id="btn-paper-close">Close</button>
+      <span class="spacer"></span>
+      <button class="btn" id="btn-paper-print">Print or save PDF</button>
+      <button class="btn primary" id="btn-paper-docx2">Download Word file</button>
+    </div>
+    <div class="paper-scroll"><div class="paper" id="paper-sheet"></div></div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast" role="status" hidden><span id="toast-text"></span><button class="text-btn" id="toast-action" hidden></button></div>
+
+  <!-- Lock screen -->
+  <div class="lock" id="lock" hidden>
+    <form class="lock-card" id="lock-form" autocomplete="on">
+      <p class="lock-word">Reiimei</p>
+      <p class="lock-text" id="lock-text">Enter your passphrase to open your notes.</p>
+      <input type="text" name="username" value="Reiimei" autocomplete="username" class="visually-hidden" tabindex="-1" aria-hidden="true" readonly>
+      <input type="password" id="lock-pass" name="password" autocomplete="current-password" placeholder="Passphrase" aria-label="Passphrase" required>
+      <button class="btn primary" id="lock-btn" type="submit">Unlock</button>
+      <p class="msg error" id="lock-msg" role="alert"></p>
+      <details class="lock-help">
+        <summary>Forgot your passphrase?</summary>
+        <p>No one can recover it, including Reiimei. If your notes are also synced and another device is still unlocked, you can turn encryption off there and back on with a new passphrase.</p>
+        <p>To start over on this device, erase its notes. This cannot be undone. Type ERASE to confirm.</p>
+        <input id="lock-erase-confirm" autocomplete="off" autocapitalize="characters" aria-label="Type ERASE">
+        <button class="btn danger" type="button" id="lock-erase">Erase notes on this device</button>
+      </details>
+    </form>
+  </div>
 
   <script type="module" src="app.js"></script>
 </body>

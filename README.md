@@ -1,8 +1,25 @@
-# Reiimei v0.2.1
+# Reiimei v0.4.0
 
 *reiimei* (REE-h-may), n. The cold, luminous stillness peculiar to a clear winter night; especially the sensation of moonlight upon frost, when darkness seems to brighten rather than recede.
 
 An offline-first notes app for Windows and iPhone, built as a Progressive Web App (PWA). No Mac, no App Store, no developer fee.
+
+## What changed in v0.4.0
+
+- **Code notes.** Set any note to Python, HTML5, or XML. Code is colored as you type, with line numbers, smart Tab and Enter, comment toggling, and Tidy. HTML5 renders as a live page, with its CSS and JavaScript, in a sealed-off frame. XML is checked for errors and shown as a tree. Code blocks in Markdown notes are colored too.
+- **Sharing.** Share one note as text (share sheet, email, text message, or copy) or as a file. Share a folder, a tag, a list, or any notes you check, as one combined document with a section per note (Word, web page, Markdown, or text) or as a .zip of separate files.
+
+## What changed in v0.3.0
+
+- **Encryption you can turn on and off.** A passphrase seals every note on the device and before it syncs. Includes a lock screen, auto-lock, passphrase change, and an erase option for a forgotten passphrase.
+- **Security hardening.** A content security policy, safe rendering of formatted text, no referrer leaks, and a security checklist in Settings.
+- **Markdown and Populi markup.** Each note is set to one or the other, with a formatting toolbar, a preview, and conversion between the two. **Copy for Populi** turns any note into Populi markup.
+- **MLA 9 and APA 7.** Add sources (books, chapters, journal articles, web pages), insert in-text citations, and get a Works Cited or References list. Switch a note between MLA and APA at any time without changing what you entered.
+- **Papers.** Lay out a note as an MLA paper or an APA student paper, then download a Word file or print or save a PDF.
+
+## What changed in v0.2.2
+
+- All headings are set in small caps: the Reiimei wordmark, list titles, sidebar section labels, dialog and Settings titles, Settings tabs, and the word on the definition screen
 
 ## What changed in v0.2.1
 
@@ -33,13 +50,22 @@ An offline-first notes app for Windows and iPhone, built as a Progressive Web Ap
 |---|---|
 | `index.html`, `styles.css` | The interface |
 | `app.js` | App logic, diagnostics, settings |
+| `ui-writing.js` | Toolbar, preview, conversion, copying, sources, papers |
+| `ui-security.js` | Lock screen and encryption settings |
+| `code.js`, `ui-code.js` | Code coloring, editing helpers, tidy, HTML and XML previews |
+| `render.html`, `render.js` | The sealed-off frame that renders HTML notes |
+| `share.js`, `ui-share.js` | Sharing as text, combined documents, and archives |
+| `format.js` | Markdown and Populi markup engine |
+| `cite.js` | MLA 9 and APA 7 citation rules |
+| `paper.js`, `zip.js` | Paper layout, Word (.docx) and print output |
+| `crypto.js` | Passphrase encryption (PBKDF2 and AES-GCM) |
 | `db.js` | On-device database (IndexedDB) |
 | `sync.js` | Supabase sync and conflict handling |
 | `logger.js` | Rolling log (last 1000 entries) |
 | `sw.js` | Service worker: makes the app open offline |
 | `manifest.webmanifest` | Install metadata |
 | `icon-192.png`, `icon-512.png`, `apple-touch-icon.png` | App icons |
-| `supabase-setup.sql` | Creates the sync tables and security rules |
+| `supabase-setup.sql` | Creates or upgrades the sync tables and security rules |
 
 ## 1. Try it on your laptop
 
@@ -55,9 +81,9 @@ Then open http://localhost:8000 in Edge or Chrome. Notes work immediately, saved
 
 The iPhone needs an HTTPS address. GitHub Pages hosts the app for free. Only the app's code goes to GitHub; your notes never do.
 
-1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.2.1` folder.
+1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.4.0` folder.
 2. **Create the repository.** In Safari, sign in at github.com, tap **+** › **New repository**. Name it `reiimei`, set it to **Public** (free Pages needs a public repository), and tap **Create repository**.
-3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.2.1` folder, tap **Select**, select all 13 files, and tap **Open**. Scroll down and tap **Commit changes**.
+3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.4.0` folder, tap **Select**, select all 26 files, and tap **Open**. Scroll down and tap **Commit changes**.
    - If you don't see the upload link, tap the **aA** button in Safari's address bar › **Request Desktop Website** and try again.
 4. **Turn on Pages.** In the repository, open **Settings** › **Pages**. Under **Build and deployment**, set Source to **Deploy from a branch**, Branch to **main** and **/ (root)**, then tap **Save**.
 5. **Wait a minute or two**, then reload the Pages screen. It shows your address, which looks like `https://yourname.github.io/reiimei/`.
@@ -79,7 +105,75 @@ On a laptop, Netlify Drop (app.netlify.com/drop) is another option: drag the fol
 
 Each user can only see their own notes; the database enforces this with row level security.
 
+## Security
+
+**What encryption protects.** With encryption on, each note's text, tags, format, sources, and paper details, and each folder's name, are sealed with AES-256-GCM using a key made from your passphrase (PBKDF2-SHA-256, 600,000 rounds). They are sealed on the device before they are saved, and stay sealed on Supabase. The passphrase and key are never stored or sent anywhere; the key exists only in memory while Reiimei is unlocked.
+
+**What stays readable.** To keep sync working, these are not sealed: which folder a note is in, whether it is pinned or deleted, and when it was created and changed.
+
+**Things to know.**
+- If you forget your passphrase, no one can recover the notes. Another unlocked device can turn encryption off and back on with a new passphrase. Otherwise, the lock screen can erase the device so you can start over.
+- Changing the passphrase on one device makes the others ask for the new one the next time they sync.
+- Backups from **Settings › Backup** are not encrypted. Keep them somewhere private.
+- Notes synced before encryption was turned on may remain in Supabase's own backups or logs for a while.
+- The security policy only allows sync with addresses ending in `supabase.co` or `supabase.in`. A custom Supabase domain would need a change in `index.html`.
+
+**Checklist.** Settings › Security repeats this list:
+1. Turn on two-factor authentication for GitHub. Anyone who could change the app's code could read notes as you type them.
+2. Turn on two-factor authentication for Supabase.
+3. After creating your sync account, turn off new sign-ups in Supabase (**Authentication › Sign In / Providers › Allow new users to sign up**).
+4. Use a unique password for sync.
+5. Keep your devices locked with a passcode and up to date.
+
+## Sharing the link
+
+Anyone can open your Reiimei address, but they never see your notes. Notes live in each person's own browser, and synced notes are tied to the account that wrote them. A visitor starts with an empty app. The repository holds only the app's code.
+
+## Writing
+
+**Formats.** Choose Markdown or Populi for each note in the toolbar. **Settings › Writing** sets the default for new notes and shows the syntax for both. Converting a note keeps everything both formats share. Markdown features Populi lacks (headings, lists, quotes, code, tables, strikethrough) are kept as plain text, and you are asked first. **Undo** appears right after converting.
+
+**Citations.** Open **Sources** to add what you are citing, then tap **Cite** to insert a citation where your cursor was. Citations are short codes in your text:
+
+| You type | APA 7 | MLA 9 |
+|---|---|---|
+| `[@smith2019, 42]` | (Smith, 2019, p. 42) | (Smith 42) |
+| `[@smith2019, 42-45]` | (Smith, 2019, pp. 42–45) | (Smith 42-45) |
+| `[@smith2019, para. 3]` | (Smith, 2019, para. 3) | (Smith, par. 3) |
+| `[@smith2019; @lee2020]` | (Lee & Park, 2020; Smith, 2019) | (Smith; Lee and Park) |
+| `@lee2020` | Lee and Park (2020) | Lee and Park |
+
+Titles are typed once. Reiimei applies title case for MLA and sentence case for APA. Wrap words that must keep their capitals in braces, like `{Texas}` or `{Erikson}`.
+
+**Papers.** **Paper** formats the note as an APA 7 student paper (title page, page numbers, bold headings, References) or an MLA 9 paper (heading block, last name and page number, Works Cited). The note's headings become paper headings. **Download Word file** gives a .docx for Word, Google Docs, or Pages. On iPhone it opens the share sheet, where **Save to Files** works. **Print or save PDF** works too, but iPhone may leave out page numbers, so use the Word file for submissions.
+
+## Code
+
+Choose **Python**, **HTML5**, or **XML** from the format menu in the toolbar (or make one the default in **Settings › Writing**). Switching between writing and code never changes the text; **Undo** appears right after.
+
+- **Tab** and **Shift+Tab** indent and outdent. **Enter** keeps the indentation, adds a level after a Python line ending in `:` or an opening HTML/XML tag, and drops a level after `return`, `pass`, `break`, `continue`, or `raise`.
+- **Ctrl+/** (or **Comment**) comments or uncomments the selected lines.
+- **Tidy** fixes indentation: Python tabs become 4 spaces and trailing spaces go; HTML and XML lines are re-indented by tag nesting. Text inside `<pre>`, `<script>`, `<style>`, and `<textarea>` is left alone. Undo is offered.
+- **Render** (HTML5) runs the page with its CSS and JavaScript. It runs in a sealed-off frame with its own origin, so the page cannot read your notes, Reiimei's storage, or the app. It works offline after the first online launch.
+- **Check** (XML) reports whether the XML is well formed, shows the line with the problem, or shows the document as a collapsible tree.
+- Python is colored and indented but does not run; running Python in the browser needs a large add-on that could be added later.
+- The note list titles code notes by the HTML `<title>`, the first Python comment, or the first XML comment.
+- In Markdown notes, fenced code blocks such as ```` ```python ```` are colored in Preview.
+
+## Sharing
+
+- **One note:** the share button in the note's toolbar. **Send as text** offers the share sheet, Email, Text message, and Copy, in plain text, Markdown, or Populi markup. **Send as a file** offers Word, web page, Markdown, or text, and code notes can be sent as their own .py, .html, or .xml file.
+- **Several notes:** the share button above the note list shares the list you are looking at (All Notes, a folder, a tag, or search results). Uncheck any notes you want to leave out. A folder's **⋯** menu also has **Share folder**.
+- **One document** puts every note in its own section with its title, folder, tags, and date. Word files start each note on a new page. Web pages include a table of contents.
+- **Separate files (.zip)** keeps your folders and saves each note as its own file: Markdown notes as .md, Populi notes as .txt with Populi markup, and code notes as .py, .html, or .xml. A Contents.txt lists everything.
+- Citations are filled in, and each note's reference list is included.
+- **Share file…** opens the share sheet, where Mail, Messages, and Save to Files can take the file. Where a browser cannot share files (most Windows browsers), use **Download** and attach the file to an email.
+- Shared copies are not encrypted, even when encryption is on.
+
 ## Updating the app
+
+On GitHub, open the repository › **Add file** › **Upload files**, choose only the changed files, and tap **Commit changes**. Files with the same name replace the old ones. Within a minute or two, Pages republishes.
+
 
 The service worker caches the app files. When you change any file, bump `VERSION` in `sw.js` (and `APP_VERSION` in `app.js`), then upload. Devices pick up the new version the next time the app is opened online, and use it from the following launch.
 
@@ -89,9 +183,13 @@ The service worker caches the app files. When you change any file, bump `VERSION
 - **Settings › Log** › Download gives a text log of everything the app did, including sync results and errors.
 - **"Test connection"** in Settings › Sync confirms the URL, key, sign-in, and tables are all correct.
 
-## Known limits in v0.2.1
+## Known limits in v0.4.0
 
-- Plain text only (no bold, checklists, or images yet)
+- Images can be linked but not attached
+- Sources belong to one note; there is no shared library yet
+- Citation types: books, chapters, journal articles, and web pages
+- Python code is not run
+- Email and text-message links carry text only; to attach a file, use Share file… or Download
 - Folders are one level deep
 - Items in Recently Deleted stay there until a future "empty" feature is added
 - The first launch needs a connection for the fonts; until then the app uses similar system fonts

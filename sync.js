@@ -4,6 +4,7 @@
 // wins and the other is kept as a "conflicted copy" note, so nothing is lost.
 import { log } from './logger.js';
 import * as db from './db.js';
+import * as vault from './crypto.js';
 
 const CFG_KEY = 'reiimei.sync.config';
 const SESSION_KEY = 'reiimei.sync.session';
@@ -127,16 +128,34 @@ async function rest(method, path, body, retried = false) {
 // ---- Sync --------------------------------------------------------------
 // Send exactly the server's columns, in the same shape for every row
 // (Supabase bulk upserts require all rows to have identical keys).
+// When encryption is on, private fields are sent only inside `sealed`, and the
+// readable columns are blanked, so the server never sees note text or names.
 const COLUMNS = {
-  notes: { id: null, body: '', folder_id: null, tags: [], pinned: false, created_at: null, updated_at: null, deleted: false },
-  folders: { id: null, name: '', updated_at: null, deleted: false },
+  notes: { id: null, body: '', folder_id: null, tags: [], pinned: false, created_at: null, updated_at: null, deleted: false, format: null, meta: null, sealed: null },
+  folders: { id: null, name: '', updated_at: null, deleted: false, sealed: null },
 };
-const toServer = (table, rec) => {
+async function toServer(table, rec) {
+  let src = rec;
+  if (rec.locked) {
+    // Never decrypted on this device: pass the sealed value through unchanged.
+    src = { ...rec, sealed: rec.sealedRaw };
+  } else if (vault.isEnabled()) {
+    const secret = {};
+    for (const f of db.SECRET[table]) secret[f] = rec[f];
+    src = { ...rec, sealed: await vault.seal(secret) };
+    for (const f of db.SECRET[table]) delete src[f];
+  } else {
+    src = { ...rec, sealed: null };
+  }
   const out = {};
-  for (const [k, def] of Object.entries(COLUMNS[table])) out[k] = rec[k] ?? def;
+  for (const [k, def] of Object.entries(COLUMNS[table])) out[k] = src[k] ?? def;
   if (table === 'notes' && !out.created_at) out.created_at = out.updated_at;
   return out;
-};
+}
+
+export class SyncLockedError extends Error {
+  constructor(sample) { super('Encrypted notes need your passphrase'); this.name = 'SyncLockedError'; this.sample = sample; }
+}
 
 async function pullTable(table, cursor) {
   // Overlap the cursor by a few seconds so slow server commits are not missed;
@@ -157,7 +176,23 @@ async function pullTable(table, cursor) {
 
 const sameNote = (a, b) =>
   a.body === b.body && a.folder_id === b.folder_id && !!a.deleted === !!b.deleted &&
-  !!a.pinned === !!b.pinned && JSON.stringify(a.tags || []) === JSON.stringify(b.tags || []);
+  !!a.pinned === !!b.pinned && JSON.stringify(a.tags || []) === JSON.stringify(b.tags || []) &&
+  (a.format || 'markdown') === (b.format || 'markdown') && JSON.stringify(a.meta || {}) === JSON.stringify(b.meta || {});
+
+// Turn a server row into a local record, opening sealed fields if possible.
+async function fromServer(store, r) {
+  const row = { ...r };
+  delete row.user_id;
+  if (!row.sealed) {
+    delete row.sealed;
+    if (store === 'notes') { row.tags = row.tags || []; row.format = row.format || 'markdown'; row.meta = row.meta || {}; }
+    return row;
+  }
+  for (const f of db.SECRET[store]) delete row[f];
+  const opened = await db.decode(store, row);
+  if (opened.locked) throw new SyncLockedError(r.sealed);
+  return opened;
+}
 
 async function mergeRemote(store, rows) {
   let applied = 0;
@@ -167,9 +202,7 @@ async function mergeRemote(store, rows) {
     // the app writes so comparisons line up.
     r.updated_at = new Date(r.updated_at).toISOString();
     if (r.created_at) r.created_at = new Date(r.created_at).toISOString();
-    const remote = { ...r, dirty: false, synced_updated_at: r.updated_at };
-    if (store === 'notes') remote.tags = r.tags || [];
-    delete remote.user_id;
+    const remote = { ...(await fromServer(store, r)), dirty: false, synced_updated_at: r.updated_at };
     const local = await db.get(store, r.id);
 
     if (!local || !local.dirty) {
@@ -203,7 +236,7 @@ async function mergeRemote(store, rows) {
       const winner = localWins ? { ...local, synced_updated_at: r.updated_at } : remote;
       const loser = localWins ? remote : local;
       await db.put(store, winner);
-      const copy = await db.createNote({ folder_id: loser.folder_id, tags: loser.tags });
+      const copy = await db.createNote({ folder_id: loser.folder_id, tags: loser.tags, format: loser.format, meta: loser.meta });
       await db.saveNote(copy, { body: `${loser.body}\n\n(Conflicted copy from ${new Date(loser.updated_at).toLocaleString()})` });
     }
     log.warn('sync', 'Resolved edit conflict', { id: r.id, localUpdated: local.updated_at, localSynced: local.synced_updated_at, remoteUpdated: r.updated_at });
@@ -216,7 +249,7 @@ async function pushTable(store, table) {
   if (!dirty.length) return 0;
   for (let i = 0; i < dirty.length; i += PAGE) {
     const batch = dirty.slice(i, i + PAGE);
-    await rest('POST', `${table}?on_conflict=id`, batch.map((r) => toServer(table, r)));
+    await rest('POST', `${table}?on_conflict=id`, await Promise.all(batch.map((r) => toServer(table, r))));
     // Mark clean only if the record was not edited again while uploading.
     for (const sent of batch) {
       const current = await db.get(store, sent.id);
@@ -268,9 +301,19 @@ export async function syncNow(reason = 'manual') {
     });
     return summary;
   } catch (e) {
+    if (e instanceof SyncLockedError) {
+      log.warn('sync', 'Sync paused: encrypted notes need the passphrase');
+      setState({ status: 'locked', message: 'Encrypted notes found: enter your passphrase' });
+      return { locked: true, sample: e.sample };
+    }
+    if (e instanceof vault.LockedError) {
+      setState({ status: 'locked', message: 'Locked: unlock to sync' });
+      return { locked: true };
+    }
     log.error('sync', 'Sync failed', e);
-    setState({ status: 'error', message: `Sync failed: ${e.message}` });
-    return { error: e.message };
+    const hint = /column|sealed|format|meta/i.test(e.message) ? ' (run the latest supabase-setup.sql)' : '';
+    setState({ status: 'error', message: `Sync failed: ${e.message}${hint}` });
+    return { error: e.message + hint };
   } finally {
     syncing = false;
   }

@@ -2,8 +2,13 @@
 import { log } from './logger.js';
 import * as db from './db.js';
 import * as sync from './sync.js';
+import * as vault from './crypto.js';
+import * as writing from './ui-writing.js';
+import * as security from './ui-security.js';
+import * as shareUi from './ui-share.js';
+import { noteTitle, noteSnippet, sharedFileCheck } from './share.js';
 
-export const APP_VERSION = '0.2.1';
+export const APP_VERSION = '0.4.0';
 
 const $ = (id) => document.getElementById(id);
 const el = {
@@ -28,8 +33,33 @@ const state = {
 // ---- Helpers -----------------------------------------------------------
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const lines = (body) => body.split('\n').map((l) => l.trim()).filter(Boolean);
-const titleOf = (n) => (lines(n.body)[0] || 'New Note').slice(0, 120);
-const snippetOf = (n) => lines(n.body)[1] || 'No additional text';
+// Titles and snippets come from share.js so lists and shared files match.
+const titleOf = (n) => noteTitle(n);
+const snippetOf = (n) => noteSnippet(n);
+
+// ---- Preferences (per device) ------------------------------------------
+const PREFS_KEY = 'reiimei.prefs';
+function prefs() {
+  try { return { format: 'markdown', style: 'apa', ...JSON.parse(localStorage.getItem(PREFS_KEY) || '{}') }; }
+  catch { return { format: 'markdown', style: 'apa' }; }
+}
+function setPrefs(patch) {
+  try { localStorage.setItem(PREFS_KEY, JSON.stringify({ ...prefs(), ...patch })); } catch { /* storage blocked */ }
+}
+
+// ---- Toast ---------------------------------------------------------------
+let toastTimer = null;
+function toast(text, actionLabel = null, action = null) {
+  const t = $('toast');
+  $('toast-text').textContent = text;
+  const btn = $('toast-action');
+  btn.hidden = !actionLabel;
+  btn.textContent = actionLabel || '';
+  btn.onclick = action ? () => { t.hidden = true; action(); } : null;
+  t.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.hidden = true; }, actionLabel ? 8000 : 3000);
+}
 const activeNotes = () => state.notes.filter((n) => !n.deleted);
 const liveFolders = () => state.folders.filter((f) => !f.deleted).sort((a, b) => a.name.localeCompare(b.name));
 const currentNote = () => state.notes.find((n) => n.id === state.currentId) || null;
@@ -77,7 +107,7 @@ function setMobileView(view) { el.app.dataset.mobileView = view; }
 const isPhone = () => window.matchMedia('(max-width: 760px)').matches;
 
 // ---- Dialog ------------------------------------------------------------
-function ask({ title, text = '', value = null, placeholder = '', okText = 'OK', extra = null }) {
+function ask({ title, text = '', value = null, placeholder = '', okText = 'OK', extra = null, extra2 = null }) {
   const dlg = $('ask-dialog');
   $('ask-title').textContent = title;
   $('ask-text').textContent = text;
@@ -90,6 +120,9 @@ function ask({ title, text = '', value = null, placeholder = '', okText = 'OK', 
   const extraBtn = $('ask-extra');
   extraBtn.hidden = !extra;
   extraBtn.textContent = extra || '';
+  const extra2Btn = $('ask-extra2');
+  extra2Btn.hidden = !extra2;
+  extra2Btn.textContent = extra2 || '';
   return new Promise((resolve) => {
     const onKey = (e) => {
       // Handle Enter ourselves so it never triggers the extra (delete) button.
@@ -196,7 +229,8 @@ function renderEditor() {
   const n = currentNote();
   const show = !!n;
   el.emptyEditor.hidden = show;
-  [el.body, el.tagRow, el.folderSel, el.pin, el.del].forEach((x) => { x.hidden = !show; });
+  [el.body, el.tagRow, el.folderSel, el.pin, el.del, $('btn-share')].forEach((x) => { x.hidden = !show; });
+  if (!show) { writing.renderToolbar(null); $('preview').hidden = true; }
   el.trashBar.hidden = !(n && n.deleted);
   if (!n) return;
 
@@ -221,6 +255,7 @@ function renderEditor() {
 
   el.chips.innerHTML = (n.tags || []).map((t) =>
     `<span class="chip">#${esc(t)}${n.deleted ? '' : `<button data-tag="${esc(t)}" aria-label="Remove tag ${esc(t)}">×</button>`}</span>`).join('');
+  writing.renderToolbar(n);
 }
 
 function render() {
@@ -284,10 +319,14 @@ async function newNote() {
   await flushSave();
   const f = state.filter;
   if (f.type === 'trash') state.filter = { type: 'all' };
+  const p = prefs();
   const note = await db.createNote({
     folder_id: f.type === 'folder' ? f.id : null,
     tags: f.type === 'tag' ? [f.tag] : [],
+    format: p.format,
+    meta: writing.newNoteMeta(p),
   });
+  writing.resetView();
   replaceNote(note);
   state.query = '';
   el.search.value = '';
@@ -345,7 +384,11 @@ async function newFolder() {
 }
 
 async function folderMenu(folder) {
-  const r = await ask({ title: 'Folder', value: folder.name, okText: 'Rename', extra: 'Delete folder' });
+  const r = await ask({ title: 'Folder', value: folder.name, okText: 'Rename', extra: 'Delete folder', extra2: 'Share folder' });
+  if (r.action === 'extra2') {
+    shareUi.open(activeNotes().filter((n) => n.folder_id === folder.id), { title: folder.name, single: false });
+    return;
+  }
   if (r.action === 'ok' && r.value && r.value !== folder.name) {
     replaceFolder(await db.saveFolder(folder, { name: r.value.slice(0, 80) }));
     render();
@@ -371,8 +414,10 @@ function scheduleSync(delay = 3000) {
 }
 
 async function runSync(reason = 'auto') {
+  if (security.isLocked()) return { skipped: 'locked' };
   await flushSave();
   const r = await sync.syncNow(reason);
+  if (r?.locked && r.sample) security.askForRemotePassphrase(r.sample);
   if (r && (r.pulled || r.pushed)) {
     // Reload from the database so the UI holds the post-sync records.
     state.notes = await db.getAll('notes');
@@ -441,6 +486,19 @@ async function runDiagnostics() {
     add('Offline support', 'fail', 'Service workers not supported');
   }
 
+  add('Encryption support', vault.isSupported() ? 'pass' : 'fail', vault.isSupported() ? 'Web Crypto available (AES-GCM, PBKDF2)' : 'Web Crypto missing: encryption cannot be used here');
+  const sec = security.status();
+  if (sec.enabled) {
+    const counts = await db.countSealed().catch(() => null);
+    add('Encryption', 'pass', `On: ${counts ? `${counts.sealed} of ${counts.total} items sealed` : 'sealed'}; auto-lock ${sec.autoLockMin ? `after ${sec.autoLockMin} min away` : 'off'}`);
+  } else {
+    add('Encryption', 'warn', 'Off: notes are stored as plain text (Settings › Security)');
+  }
+  const sh = sharedFileCheck();
+  add('Sharing', sh.text ? 'pass' : 'warn', `${sh.text ? 'Share sheet available' : 'No share sheet: use Email, Copy, or Download'}${sh.files ? '; files can be shared' : '; files are downloaded'}`);
+  const csp = document.querySelector('meta[http-equiv="Content-Security-Policy"]');
+  add('Content security policy', csp ? 'pass' : 'warn', csp ? 'Active: scripts load only from this site' : 'Missing');
+
   const cfg = sync.getConfig();
   const sess = sync.getSession();
   add('Sync', sess ? 'pass' : 'warn', sess ? `Signed in as ${sess.user?.email || 'unknown'} (${cfg?.url})` : 'Not set up: notes stay on this device only');
@@ -480,6 +538,9 @@ function updateSettingsSync() {
 
 function openSettings(tab = 'sync') {
   updateSettingsSync();
+  security.renderSettings();
+  $('pref-format').value = prefs().format;
+  $('pref-style').value = prefs().style;
   renderDiagnostics();
   $('log-view').textContent = log.exportText() || '(empty)';
   showTab(tab);
@@ -537,7 +598,7 @@ async function exportBackup() {
   const data = { app: 'reiimei', version: APP_VERSION, exported_at: new Date().toISOString(), notes: await db.getAll('notes'), folders: await db.getAll('folders') };
   download(`reiimei-backup-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(data, null, 2), 'application/json');
   log.info('backup', 'Backup exported', { notes: data.notes.length, folders: data.folders.length });
-  setMsg('data-msg', `Exported ${data.notes.length} notes and ${data.folders.length} folders.`, 'ok');
+  setMsg('data-msg', `Exported ${data.notes.length} notes and ${data.folders.length} folders.${security.isEnabled() ? ' This backup file is not encrypted, so keep it somewhere private.' : ''}`, 'ok');
 }
 
 async function importBackup(file) {
@@ -572,6 +633,17 @@ async function importBackup(file) {
 
 // ---- Events ------------------------------------------------------------
 function bindEvents() {
+  $('btn-share').addEventListener('click', async () => {
+    await flushSave();
+    const n = currentNote();
+    if (n) shareUi.open([n], { single: true });
+  });
+  $('btn-share-list').addEventListener('click', async () => {
+    await flushSave();
+    shareUi.open(filteredNotes(), { title: listTitle(), single: false });
+  });
+  $('pref-format').addEventListener('change', (e) => { setPrefs({ format: e.target.value }); log.info('prefs', 'Default format changed', { format: e.target.value }); });
+  $('pref-style').addEventListener('change', (e) => { setPrefs({ style: e.target.value }); log.info('prefs', 'Default citation style changed', { style: e.target.value }); });
   $('btn-new-note').addEventListener('click', newNote);
   $('btn-new-folder').addEventListener('click', newFolder);
   $('btn-back-sidebar').addEventListener('click', () => setMobileView('sidebar'));
@@ -694,27 +766,75 @@ async function registerServiceWorker() {
   }
 }
 
+// ---- Data loading (also used after unlocking) ----------------------------
+async function loadData() {
+  [state.notes, state.folders] = await Promise.all([db.getAll('notes'), db.getAll('folders')]);
+  // Tidy up: brand-new empty notes left behind are discarded silently.
+  for (const n of state.notes.filter((x) => !x.deleted && !x.locked && !x.body.trim() && !x.synced_updated_at && !(x.tags || []).length)) {
+    await db.remove('notes', n.id);
+  }
+  state.notes = await db.getAll('notes');
+  if (state.filter.type === 'folder' && !liveFolders().some((f) => f.id === state.filter.id)) state.filter = { type: 'all' };
+  if (!state.notes.some((n) => n.id === state.currentId)) state.currentId = isPhone() ? null : filteredNotes()[0]?.id || null;
+  render();
+}
+
+function clearData() {
+  clearTimeout(saveTimer);
+  pending = null;
+  state.notes = [];
+  state.folders = [];
+  state.currentId = null;
+  el.body.value = '';
+  render();
+}
+
+function setEditorText(text) {
+  pending = null;
+  if (el.body.value !== text) el.body.value = text;
+}
+
+const hooks = {
+  note: () => currentNote(),
+  update: (changes) => updateCurrent(changes),
+  flushSave: () => flushSave(),
+  setEditorText,
+  ask: (o) => ask(o),
+  toast,
+  prefs,
+  reload: () => loadData(),
+  clearData,
+  runSync: (reason) => runSync(reason),
+  syncOn: () => sync.isConfigured(),
+  folders: () => state.folders,
+  encrypted: () => security.isEnabled(),
+};
+
 // ---- Boot --------------------------------------------------------------
 async function boot() {
   const t0 = performance.now();
   log.info('boot', `Reiimei ${APP_VERSION} starting`);
   try {
     bindEvents();
+    writing.init(hooks);
+    writing.setStyleDefault(() => prefs().style);
+    security.init(hooks);
+    shareUi.init(hooks);
     await db.openDb();
-    [state.notes, state.folders] = await Promise.all([db.getAll('notes'), db.getAll('folders')]);
-    // Tidy up: brand-new empty notes left behind are discarded silently.
-    for (const n of state.notes.filter((x) => !x.deleted && !x.body.trim() && !x.synced_updated_at && !(x.tags || []).length)) {
-      await db.remove('notes', n.id);
+    const cfg = await security.loadConfig();
+    if (cfg.enabled) {
+      log.info('boot', 'Encryption is on; waiting for passphrase');
+      await security.requireUnlock();
     }
-    state.notes = await db.getAll('notes');
-    if (!isPhone()) state.currentId = filteredNotes()[0]?.id || null;
-    render();
+    await loadData();
     setMobileView('list');
     log.info('boot', `UI ready in ${Math.round(performance.now() - t0)} ms`, { notes: state.notes.length, folders: state.folders.length });
   } catch (e) {
     log.error('boot', 'Startup failed', e);
-    document.body.insertAdjacentHTML('afterbegin',
-      `<div style="padding:16px;background:#a3302a;color:#fff;font:14px system-ui">Reiimei could not start: ${esc(e.message)}. Open Settings › Log for details.</div>`);
+    const banner = document.createElement('div');
+    banner.className = 'boot-error';
+    banner.textContent = `Reiimei could not start: ${e.message}. Open Settings › Log for details.`;
+    document.body.prepend(banner);
   }
   await registerServiceWorker();
   await runDiagnostics();
