@@ -1,8 +1,17 @@
-# Reiimei v0.8.0
+# Reiimei v0.9.0
 
 *reiimei* (REE-h-may), n. The cold, luminous stillness peculiar to a clear winter night; especially the effect of moonlight upon frost, illuminating the night without dispelling it.
 
 An offline-first notes app for Windows and iPhone, built as a Progressive Web App (PWA). No Mac, no App Store, no developer fee.
+
+## What changed in v0.9.0
+
+- **Modes.** Four modes: **Notes**, **Research**, **Coding** and **Storyboard**. The switcher sits at the top of the sidebar, and Ctrl+1 to Ctrl+4 jump between them (in a browser tab, Ctrl+1 to 4 may switch browser tabs instead; the installed app does not have that problem). Your last mode is remembered on each device.
+- **A mode filters your notes.** All Notes, This device and folders show only the notes of the current mode, with counts to match. **Show all modes**, at the top of the note list, lists every mode together and labels each note with its mode.
+- **Search, tags and Recently Deleted cover every mode.** Folders and tags are shared by all modes.
+- **Every note has a mode.** New notes start in the mode you are in. Notes written before modes are sorted for you: code notes go to Coding, notes with sources go to Research, everything else goes to Notes. To change one, use the **mode menu** at the top of the note (next to the folder menu). Your other devices follow after sync.
+- **A note keeps the tools it needs.** Open a code note from Notes mode and it still shows its code tools.
+- This release is the framework. Each mode's own features come next, one mode at a time. Until then the modes differ in what they list, not yet in what they offer.
 
 ## What changed in v0.8.0
 
@@ -121,9 +130,9 @@ Then open http://localhost:8000 in Edge or Chrome. Notes work immediately, saved
 
 The iPhone needs an HTTPS address. GitHub Pages hosts the app for free. Only the app's code goes to GitHub; your notes never do.
 
-1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.8.0` folder.
+1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.9.0` folder.
 2. **Create the repository.** In Safari, sign in at github.com, tap **+** › **New repository**. Name it `reiimei`, set it to **Public** (free Pages needs a public repository), and tap **Create repository**.
-3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.8.0` folder, tap **Select**, select all 30 files, and tap **Open**. Scroll down and tap **Commit changes**.
+3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.9.0` folder, tap **Select**, select all 31 files, and tap **Open**. Scroll down and tap **Commit changes**.
    - If you don't see the upload link, tap the **aA** button in Safari's address bar › **Request Desktop Website** and try again.
 4. **Turn on Pages.** In the repository, open **Settings** › **Pages**. Under **Build and deployment**, set Source to **Deploy from a branch**, Branch to **main** and **/ (root)**, then tap **Save**.
 5. **Wait a minute or two**, then reload the Pages screen. It shows your address, which looks like `https://yourname.github.io/reiimei/`.
@@ -223,7 +232,7 @@ The service worker caches the app files. When you change any file, bump `VERSION
 - **Settings › Log** › Download gives a text log of everything the app did, including sync results and errors.
 - **"Test connection"** in Settings › Sync confirms the URL, key, sign-in, and tables are all correct.
 
-## Known limits in v0.8.0
+## Known limits in v0.9.0
 
 - Images can be linked but not attached
 - Sources belong to one note; there is no shared library yet

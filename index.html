@@ -31,6 +31,7 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
         </button>
       </header>
+      <div class="mode-switch" id="mode-switch" role="tablist" aria-label="Mode"></div>
       <nav class="side-scroll">
         <ul class="side-list" id="smart-list"></ul>
         <div class="side-section">
@@ -81,11 +82,12 @@
         <button class="btn small" id="sel-restore" hidden>Restore</button>
         <button class="btn small danger" id="sel-delete">Delete</button>
       </div>
+      <button class="mode-all" id="mode-all" type="button" hidden></button>
       <ul class="note-list" id="note-list"></ul>
     </section>
 
     <!-- Editor -->
-    <main class="pane editor" aria-label="Editor">
+    <main class="pane editor" id="editor" aria-label="Editor">
       <header class="pane-head editor-head">
         <button class="icon-btn mobile-only" id="btn-back-list" aria-label="Back to notes">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
@@ -94,6 +96,7 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>
         </button>
         <select id="note-folder" aria-label="Folder"></select>
+        <select id="note-mode" aria-label="Move to mode" title="Move to mode"></select>
         <span class="spacer"></span>
         <span class="save-state" id="save-state"></span>
         <button class="icon-btn" id="btn-share" title="Share" aria-label="Share note"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M5 12v7h14v-7"/></svg></button>

@@ -610,3 +610,13 @@ html[data-note-font="display"] #body { line-height: 1.7; letter-spacing: .01em; 
 .tag-filter .tf-chip button { border: 0; background: none; color: inherit; cursor: pointer; padding: 0 5px; font-size: 15px; line-height: 1; }
 .tag-filter .tf-note { flex-basis: 100%; font-size: 12px; color: var(--ink-3); }
 .side-item.tag-on { background: var(--accent-soft); }
+
+/* ---- Modes ---- */
+.mode-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 0 12px 10px; }
+.mode-btn { font: inherit; font-size: 13px; padding: 7px 6px; border-radius: 8px; border: 1px solid var(--rule); background: transparent; color: inherit; cursor: pointer; opacity: .75; }
+.mode-btn:hover { opacity: 1; }
+.mode-btn.on { opacity: 1; background: var(--accent-soft); border-color: var(--accent); }
+.mode-all { display: block; width: calc(100% - 24px); margin: 0 12px 8px; text-align: left; font: inherit; font-size: 13px; padding: 8px 10px; border-radius: 8px; border: 1px dashed var(--rule); background: transparent; color: inherit; cursor: pointer; opacity: .85; }
+.mode-all[aria-pressed="true"] { border-style: solid; opacity: 1; }
+.note-item .kind { font-size: 11px; opacity: .7; border: 1px solid currentColor; border-radius: 6px; padding: 0 5px; margin-right: 6px; }
+#note-mode { max-width: 120px; }

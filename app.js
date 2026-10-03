@@ -6,22 +6,25 @@ import * as vault from './crypto.js';
 import * as writing from './ui-writing.js';
 import * as security from './ui-security.js';
 import * as shareUi from './ui-share.js';
+import * as modes from './modes.js';
 import { noteTitle, noteSnippet, sharedFileCheck } from './share.js';
 
-export const APP_VERSION = '0.8.0';
+export const APP_VERSION = '0.9.0';
 
 const $ = (id) => document.getElementById(id);
 const el = {
   app: $('app'),
   smartList: $('smart-list'), folderList: $('folder-list'), tagList: $('tag-list'),
   listTitle: $('list-title'), noteList: $('note-list'), search: $('search'),
-  body: $('body'), folderSel: $('note-folder'), pin: $('btn-pin'), del: $('btn-delete'),
+  body: $('body'), modeSel: $('note-mode'), folderSel: $('note-folder'), pin: $('btn-pin'), del: $('btn-delete'),
   chips: $('chips'), tagInput: $('tag-input'), tagSuggest: $('tag-suggest'), tagRow: $('tag-row'),
   trashBar: $('trash-bar'), emptyEditor: $('empty-editor'), saveState: $('save-state'),
   syncDot: $('sync-dot'), syncText: $('sync-text'),
 };
 
 const state = {
+  mode: 'notes',
+  showAll: false, // true: list notes from every mode
   notes: [],
   folders: [],
   filter: { type: 'all' }, // all | none | folder | tag | trash
@@ -45,7 +48,7 @@ const snippetOf = (n) => noteSnippet(n);
 // ---- Preferences (per device) ------------------------------------------
 const PREFS_KEY = 'reiimei.prefs';
 const VIEW_DEFAULT = { sort: 'updated', dir: 'desc', hidden: [] };
-const PREF_DEFAULTS = { format: 'markdown', style: 'apa', headFont: 'reiimei', noteFont: 'newsreader', view: VIEW_DEFAULT };
+const PREF_DEFAULTS = { mode: 'notes', format: 'markdown', style: 'apa', headFont: 'reiimei', noteFont: 'newsreader', view: VIEW_DEFAULT };
 function prefs() {
   try { return { ...PREF_DEFAULTS, ...JSON.parse(localStorage.getItem(PREFS_KEY) || '{}') }; }
   catch { return { ...PREF_DEFAULTS }; }
@@ -174,9 +177,17 @@ function tagCounts() {
   return [...counts.entries()].sort((a, b) => a[0].localeCompare(b[0]));
 }
 
+// A mode filters folders and the main lists. Tags, search and Recently Deleted always span every mode.
+function inMode(n) {
+  const f = state.filter;
+  if (state.showAll || f.type === 'tag' || f.type === 'trash' || state.query.trim()) return true;
+  return modes.kindOf(n) === state.mode;
+}
+
 function filteredNotes() {
   const f = state.filter;
   let list = f.type === 'trash' ? trashNotes() : activeNotes();
+  list = list.filter(inMode);
   const v = view();
   if (f.type === 'folder') list = list.filter((n) => n.folder_id === f.id);
   if (f.type === 'device') list = list.filter((n) => originOf(n)?.id === device().id);
@@ -320,8 +331,9 @@ function sideItem(filter, icon, name, count, withMore = false) {
 }
 
 function renderSidebar() {
-  const act = activeNotes();
+  const act = activeNotes().filter((n) => state.showAll || modes.kindOf(n) === state.mode);
   const folders = liveFolders();
+  renderModeSwitch();
   const folderIds = new Set(folders.map((f) => f.id));
   el.smartList.replaceChildren(
     sideItem({ type: 'all' }, 'all', 'All Notes', act.length),
@@ -361,6 +373,71 @@ function renderSidebar() {
   el.tagSuggest.innerHTML = tags.map(([t]) => `<option value="${esc(t)}">`).join('');
 }
 
+// ---- Modes -----------------------------------------------------------------
+function renderModeSwitch() {
+  const box = $('mode-switch');
+  const act = activeNotes();
+  box.innerHTML = modes.MODES.map((m) => {
+    const on = m.id === state.mode;
+    const c = act.filter((n) => modes.kindOf(n) === m.id).length;
+    return `<button class="mode-btn${on ? ' on' : ''}" role="tab" aria-selected="${on}" data-mode="${m.id}" title="${m.name} (Ctrl+${m.key}) · ${c} ${c === 1 ? 'note' : 'notes'}">${esc(m.name)}</button>`;
+  }).join('');
+}
+
+function renderModeAll() {
+  const b = $('mode-all');
+  const f = state.filter;
+  const relevant = f.type !== 'tag' && f.type !== 'trash' && !state.query.trim();
+  b.hidden = !relevant;
+  if (!relevant) return;
+  b.textContent = state.showAll ? `Showing all modes · back to ${modes.modeName(state.mode)}` : 'Show all modes';
+  b.setAttribute('aria-pressed', String(state.showAll));
+}
+
+async function afterListChange(before) {
+  let visible = filteredNotes();
+  if (!visible.some((n) => n.id === state.currentId)) state.currentId = isPhone() ? null : visible[0]?.id || null;
+  if (before && before !== state.currentId) await discardIfBlank(before);
+  visible = filteredNotes();
+  if (!visible.some((n) => n.id === state.currentId)) state.currentId = isPhone() ? null : visible[0]?.id || null;
+}
+
+async function setMode(id) {
+  if (!modes.MODE_IDS.includes(id)) return;
+  closeSettings();
+  await flushSave();
+  state.selecting = false;
+  state.selected.clear();
+  state.mode = id;
+  state.showAll = false;
+  if (state.filter.type === 'tag' || state.filter.type === 'trash') state.filter = { type: 'all' };
+  setPrefs({ mode: id });
+  await afterListChange(state.currentId);
+  log.info('modes', 'Mode changed', { mode: id });
+  render();
+  setMobileView('list');
+}
+
+async function toggleShowAll() {
+  await flushSave();
+  state.showAll = !state.showAll;
+  await afterListChange(state.currentId);
+  render();
+}
+
+async function moveToMode(id) {
+  const n = currentNote();
+  if (!n || n.deleted || !modes.MODE_IDS.includes(id) || modes.kindOf(n) === id) return;
+  await updateCurrent({ meta: { ...(n.meta || {}), kind: id } });
+  log.info('modes', 'Note moved to mode', { id: n.id, mode: id });
+  toast(`Moved to ${modes.modeName(id)}`);
+  if (!state.showAll && id !== state.mode) {
+    state.currentId = isPhone() ? null : filteredNotes()[0]?.id || null;
+    render();
+    if (isPhone()) setMobileView('list');
+  }
+}
+
 function listTitle() {
   const f = state.filter;
   if (f.type === 'folder') return liveFolders().find((x) => x.id === f.id)?.name || 'Folder';
@@ -368,7 +445,7 @@ function listTitle() {
   if (f.type === 'trash') return 'Recently Deleted';
   if (f.type === 'device') return 'This device';
   if (f.type === 'none') return 'Notes';
-  return 'All Notes';
+  return state.showAll ? 'All Notes · every mode' : `All Notes · ${modes.modeName(state.mode)}`;
 }
 
 function renderList() {
@@ -376,6 +453,7 @@ function renderList() {
   const notes = filteredNotes();
   renderSelectBar(notes);
   renderTagFilter();
+  renderModeAll();
   if (!notes.length) {
     const hiddenNote = state.filter.type === 'all' && view().hidden.length && !state.query;
     el.noteList.innerHTML = `<li class="list-empty">${state.query ? 'No matching notes' : state.filter.type === 'trash' ? 'Nothing deleted' : hiddenNote ? 'Some devices are hidden. Use the sort icon to show them.' : 'No notes here yet'}</li>`;
@@ -391,7 +469,7 @@ function renderList() {
     return head + `
     <li class="note-item${n.id === state.currentId && !state.selecting ? ' active' : ''}${state.selected.has(n.id) ? ' selected' : ''}" data-id="${n.id}" role="option" aria-selected="${state.selected.has(n.id)}">
       <div class="title">${n.pinned ? ICONS.pin : ''}<span>${esc(titleOf(n))}</span></div>
-      <div class="meta"><span class="date">${esc(formatDate(view().sort === 'created' ? (n.created_at || n.updated_at) : n.updated_at))}</span>${multi ? `<span class="dev">${esc(deviceOf(n).name)}</span>` : ''}<span class="snippet">${esc(snippetOf(n))}</span></div>
+      <div class="meta"><span class="date">${esc(formatDate(view().sort === 'created' ? (n.created_at || n.updated_at) : n.updated_at))}</span>${multi ? `<span class="dev">${esc(deviceOf(n).name)}</span>` : ''}${state.showAll ? `<span class="kind">${esc(modes.modeName(modes.kindOf(n)))}</span>` : ''}<span class="snippet">${esc(snippetOf(n))}</span></div>
       ${(n.tags || []).length ? `<div class="tags">${n.tags.map((t) => `<span class="mini-tag">#${esc(t)}</span>`).join('')}</div>` : ''}
     </li>`;
   }).join('');
@@ -424,6 +502,10 @@ function renderEditor() {
     folders.map((f) => `<option value="${f.id}">${esc(f.name)}</option>`).join('');
   el.folderSel.value = folders.some((f) => f.id === n.folder_id) ? n.folder_id : '';
 
+  el.modeSel.innerHTML = modes.MODES.map((m) => `<option value="${m.id}">${esc(m.name)}</option>`).join('');
+  el.modeSel.value = modes.kindOf(n);
+  el.modeSel.disabled = n.deleted;
+  $('editor').dataset.kind = modes.kindOf(n);
   el.pin.setAttribute('aria-pressed', String(!!n.pinned));
   el.del.title = n.deleted ? 'Already deleted' : 'Delete';
   el.del.disabled = n.deleted;
@@ -550,7 +632,7 @@ async function newNote() {
     folder_id: f.type === 'folder' ? f.id : null,
     tags: f.type === 'tag' ? [...f.tags] : [],
     format: p.format,
-    meta: { ...writing.newNoteMeta(p), origin: { id: device().id, name: device().name } },
+    meta: { ...writing.newNoteMeta(p), kind: state.mode, origin: { id: device().id, name: device().name } },
   });
   writing.resetView();
   if (view().hidden.includes(device().id)) setPrefs({ view: { ...view(), hidden: view().hidden.filter((x) => x !== device().id) } });
@@ -1250,6 +1332,14 @@ function bindEvents() {
   });
   el.body.addEventListener('blur', flushSave);
 
+  el.modeSel.addEventListener('change', () => moveToMode(el.modeSel.value));
+  $('mode-switch').addEventListener('click', (e) => { const b = e.target.closest('[data-mode]'); if (b) setMode(b.dataset.mode); });
+  $('mode-all').addEventListener('click', toggleShowAll);
+  document.addEventListener('keydown', (e) => {
+    if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey || document.querySelector('dialog[open]')) return;
+    const m = modes.MODES.find((x) => x.key === e.key);
+    if (m) { e.preventDefault(); setMode(m.id); }
+  });
   el.folderSel.addEventListener('change', () => updateCurrent({ folder_id: el.folderSel.value || null }));
   el.pin.addEventListener('click', () => { const n = currentNote(); if (n) updateCurrent({ pinned: !n.pinned }); });
   el.del.addEventListener('click', deleteCurrent);
@@ -1348,6 +1438,7 @@ async function registerServiceWorker() {
 
 // ---- Data loading (also used after unlocking) ----------------------------
 async function loadData() {
+  if (modes.MODE_IDS.includes(prefs().mode)) state.mode = prefs().mode;
   [state.notes, state.folders] = await Promise.all([db.getAll('notes'), db.getAll('folders')]);
   // Tidy up: brand-new empty notes left behind are discarded silently.
   for (const n of state.notes.filter((x) => !x.deleted && !x.locked && !x.body.trim())) await discardIfBlank(n.id);
