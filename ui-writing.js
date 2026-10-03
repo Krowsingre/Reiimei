@@ -27,7 +27,7 @@ async function saveMeta(patch) {
 }
 
 // ---- Toolbar -------------------------------------------------------------
-const LABELS = { b: 'B', i: 'I', u: 'U', s: 'S', mark: '<span>H</span>', sup: 'x²', sub: 'x₂', h: 'H', ul: '•', ol: '1.', task: '☐', quote: '❝', code: '{ }', link: 'Link' };
+const LABELS = { b: 'B', i: 'I', u: 'U', s: 'S', mark: '<span>H</span>', sup: 'x²', sub: 'x₂', h: 'H', ul: '•', ol: '1.', task: '☐', outdent: '⇤', indent: '⇥', quote: '❝', code: '{ }', link: 'Link' };
 
 export function renderToolbar(note) {
   const bar = $('toolbar');
@@ -91,6 +91,28 @@ function renderPreview(note) {
   pv.innerHTML = html || '<p class="hint">Nothing to preview yet.</p>';
 }
 
+// Replace the text with `value` the way typing would, so Ctrl+Z / Undo still works.
+// Only the part that changed is rewritten.
+export function applyEdit(ta, value, start, end) {
+  const old = ta.value;
+  if (value !== old) {
+    let p = 0;
+    const max = Math.min(old.length, value.length);
+    while (p < max && old[p] === value[p]) p++;
+    let q = 0;
+    while (q < max - p && old[old.length - 1 - q] === value[value.length - 1 - q]) q++;
+    ta.setSelectionRange(p, old.length - q);
+    const mid = value.slice(p, value.length - q);
+    let ok = false;
+    try { ok = mid ? document.execCommand('insertText', false, mid) : document.execCommand('delete'); } catch { ok = false; }
+    if (!ok || ta.value !== value) {
+      ta.value = value;
+      ta.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+  }
+  ta.setSelectionRange(start, end);
+}
+
 function applyToolById(id) {
   const note = app.note();
   if (!note || note.deleted) return;
@@ -100,9 +122,13 @@ function applyToolById(id) {
   const run = (extra = {}) => {
     const r = F.applyTool(tool, ta.value, ta.selectionStart, ta.selectionEnd, { ...extra, format: fmtOf(note) });
     ta.focus();
-    ta.value = r.value;
-    ta.setSelectionRange(r.start, r.end);
-    ta.dispatchEvent(new Event('input', { bubbles: true }));
+    if (tool.indent || tool.id === 'ul' || tool.id === 'ol') {
+      applyEdit(ta, r.value, r.start, r.end); // list edits stay undoable
+    } else {
+      ta.value = r.value;
+      ta.setSelectionRange(r.start, r.end);
+      ta.dispatchEvent(new Event('input', { bubbles: true }));
+    }
   };
   if (tool.link) {
     const sel = { s: ta.selectionStart, e: ta.selectionEnd };
@@ -533,6 +559,22 @@ export function init(hooks) {
   $('tool-buttons').addEventListener('click', (e) => {
     const b = e.target.closest('[data-tool]');
     if (b) applyToolById(b.dataset.tool);
+  });
+  // Lists: Enter continues, Tab / Shift+Tab move an item in and out, Ctrl+Shift+8 / 7 start a list.
+  $('body').addEventListener('keydown', (e) => {
+    const note = app.note();
+    if (!note || note.deleted || isCodeNote(note) || e.isComposing || e.altKey) return;
+    const ta = $('body');
+    if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+      const r = F.listEnter(ta.value, ta.selectionStart, ta.selectionEnd);
+      if (r) { e.preventDefault(); applyEdit(ta, r.value, r.start, r.end); }
+    } else if (e.key === 'Tab' && !e.ctrlKey && !e.metaKey) {
+      const r = F.listIndent(ta.value, ta.selectionStart, ta.selectionEnd, e.shiftKey ? -1 : 1);
+      if (r.value !== ta.value) { e.preventDefault(); applyEdit(ta, r.value, r.start, r.end); }
+    } else if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.code === 'Digit8' || e.code === 'Digit7')) {
+      e.preventDefault();
+      applyToolById(e.code === 'Digit8' ? 'ul' : 'ol');
+    }
   });
   $('body').addEventListener('keydown', (e) => {
     if (!(e.ctrlKey || e.metaKey) || e.altKey) return;

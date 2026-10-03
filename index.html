@@ -40,8 +40,11 @@
           </div>
           <ul class="side-list" id="folder-list"></ul>
         </div>
-        <div class="side-section">
-          <div class="side-label"><span>Tags</span></div>
+        <div class="side-section" id="tag-section">
+          <button class="side-label side-toggle" id="btn-tags-toggle" aria-expanded="true" aria-controls="tag-list">
+            <span>Tags</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
           <ul class="side-list" id="tag-list"></ul>
         </div>
       </nav>
@@ -69,6 +72,7 @@
       <div class="search-wrap">
         <input type="search" id="search" placeholder="Search notes and tags" autocomplete="off" aria-label="Search">
       </div>
+      <div class="tag-filter" id="tag-filter" hidden></div>
       <div class="select-bar" id="select-bar" hidden>
         <span class="sel-count" id="sel-count">0 selected</span>
         <button class="text-btn" id="sel-all">All</button>
@@ -136,6 +140,10 @@
         <button class="text-btn" id="btn-restore">Restore</button>
         <button class="text-btn danger-text" id="btn-purge">Delete permanently</button>
       </div>
+      <div class="trash-bar" id="erased-bar" hidden>
+        Text you erased from another note is waiting.
+        <button class="text-btn" id="btn-paste-erased">Paste erased text</button>
+      </div>
       <div class="editor-area" id="editor-area">
         <div class="gutter" id="gutter" hidden aria-hidden="true"></div>
         <pre class="code-layer" id="code-layer" hidden aria-hidden="true"><code id="code-hl"></code></pre>
@@ -153,74 +161,36 @@
         </div>
       </div>
     </main>
-  </div>
 
-  <!-- Generic prompt dialog -->
-  <dialog id="ask-dialog" class="dialog">
-    <form method="dialog">
-      <h3 id="ask-title"></h3>
-      <p id="ask-text"></p>
-      <input id="ask-input" autocomplete="off">
-      <menu>
-        <button value="extra" class="btn danger" id="ask-extra" hidden></button>
-        <button value="extra2" class="btn" id="ask-extra2" hidden></button>
-        <span class="spacer"></span>
-        <button value="cancel" class="btn">Cancel</button>
-        <button value="ok" class="btn primary" id="ask-ok">OK</button>
-      </menu>
-    </form>
-  </dialog>
-
-  <!-- Sort and show -->
-  <dialog id="view-dialog" class="dialog">
-    <div class="settings-head">
-      <h3>Sort and show</h3>
-      <button class="icon-btn" id="view-close" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
-    </div>
-    <label>Sort notes by
-      <select id="view-sort">
-        <option value="updated">Last updated</option>
-        <option value="created">Date written</option>
-        <option value="tag">Tag</option>
-        <option value="device" id="view-sort-device">Where written</option>
-      </select>
-    </label>
-    <label>Order
-      <select id="view-dir"></select>
-    </label>
-    <div id="view-devices-wrap">
-      <h4 class="sec-head">Show notes written on</h4>
-      <ul class="device-checks" id="view-devices"></ul>
-      <p class="hint" id="view-devices-hint"></p>
-    </div>
-    <h4 class="sec-head">This device</h4>
-    <label>Name
-      <input id="device-name" maxlength="40" autocomplete="off" placeholder="iPhone, Windows laptop…">
-    </label>
-    <p class="hint">New notes remember the device they were written on. Renaming updates every note written here.</p>
-    <div class="row"><button class="btn" id="btn-mark-mine">Mark unlabeled notes as written here</button></div>
-    <p class="msg" id="view-msg" role="status"></p>
-    <div class="row"><button class="btn" id="view-reset">Reset view</button><span class="spacer"></span><button class="btn primary" id="view-done">Done</button></div>
-  </dialog>
-
-  <!-- Settings -->
-  <dialog id="settings-dialog" class="dialog wide">
-    <div class="settings-head">
-      <h3>Settings</h3>
-      <button class="icon-btn" id="btn-close-settings" aria-label="Close">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>
-      </button>
-    </div>
-    <div class="tabs" role="tablist">
-      <button class="tab active" data-tab="sync" role="tab">Sync</button>
-      <button class="tab" data-tab="security" role="tab">Security</button>
-      <button class="tab" data-tab="fonts" role="tab">Fonts</button>
-      <button class="tab" data-tab="writing" role="tab">Writing</button>
-      <button class="tab" data-tab="diag" role="tab">Diagnostics</button>
-      <button class="tab" data-tab="log" role="tab">Log</button>
-      <button class="tab" data-tab="data" role="tab">Backup</button>
-    </div>
-
+    <!-- Settings: the tab list takes the note list's place, the options take the editor's place -->
+    <section class="pane settings-list" id="settings-list" aria-label="Settings" hidden>
+      <header class="pane-head">
+        <button class="icon-btn mobile-only" id="btn-settings-back" aria-label="Back">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <h2 class="pane-title">Settings</h2>
+      </header>
+      <nav class="tabs" role="tablist" aria-label="Settings sections">
+        <button class="tab active" data-tab="sync" role="tab">Sync</button>
+        <button class="tab" data-tab="security" role="tab">Security</button>
+        <button class="tab" data-tab="fonts" role="tab">Fonts</button>
+        <button class="tab" data-tab="writing" role="tab">Writing</button>
+        <button class="tab" data-tab="diag" role="tab">Diagnostics</button>
+        <button class="tab" data-tab="log" role="tab">Log</button>
+        <button class="tab" data-tab="data" role="tab">Backup</button>
+      </nav>
+    </section>
+    <main class="pane settings-main" id="settings-main" aria-label="Setting options" hidden>
+      <header class="pane-head">
+        <button class="icon-btn mobile-only" id="btn-settings-tabs" aria-label="Back to settings list">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <h2 class="pane-title" id="settings-title">Sync</h2>
+        <button class="icon-btn" id="btn-close-settings" title="Close settings (Esc)" aria-label="Close settings">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </header>
+      <div class="settings-body">
     <section class="tab-panel" data-panel="sync">
       <div id="sync-signed-out">
         <details class="cfg-details" id="cfg-details" open>
@@ -400,8 +370,59 @@
       <div class="row"><button class="btn" id="btn-find-copies">Find conflicted copies</button></div>
       <p class="msg" id="data-msg" role="status"></p>
     </section>
+      </div>
+    </main>
+  </div>
+
+  <!-- Generic prompt dialog -->
+  <dialog id="ask-dialog" class="dialog">
+    <form method="dialog">
+      <h3 id="ask-title"></h3>
+      <p id="ask-text"></p>
+      <input id="ask-input" autocomplete="off">
+      <menu>
+        <button value="extra" class="btn danger" id="ask-extra" hidden></button>
+        <button value="extra2" class="btn" id="ask-extra2" hidden></button>
+        <span class="spacer"></span>
+        <button value="cancel" class="btn">Cancel</button>
+        <button value="ok" class="btn primary" id="ask-ok">OK</button>
+      </menu>
+    </form>
   </dialog>
 
+  <!-- Sort and show -->
+  <dialog id="view-dialog" class="dialog">
+    <div class="settings-head">
+      <h3>Sort and show</h3>
+      <button class="icon-btn" id="view-close" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+    </div>
+    <label>Sort notes by
+      <select id="view-sort">
+        <option value="updated">Last updated</option>
+        <option value="created">Date written</option>
+        <option value="tag">Tag</option>
+        <option value="device" id="view-sort-device">Where written</option>
+      </select>
+    </label>
+    <label>Order
+      <select id="view-dir"></select>
+    </label>
+    <div id="view-devices-wrap">
+      <h4 class="sec-head">Show notes written on</h4>
+      <ul class="device-checks" id="view-devices"></ul>
+      <p class="hint" id="view-devices-hint"></p>
+    </div>
+    <h4 class="sec-head">This device</h4>
+    <label>Name
+      <input id="device-name" maxlength="40" autocomplete="off" placeholder="iPhone, Windows laptop…">
+    </label>
+    <p class="hint">New notes remember the device they were written on. Renaming updates every note written here.</p>
+    <div class="row"><button class="btn" id="btn-mark-mine">Mark unlabeled notes as written here</button></div>
+    <p class="msg" id="view-msg" role="status"></p>
+    <div class="row"><button class="btn" id="view-reset">Reset view</button><span class="spacer"></span><button class="btn primary" id="view-done">Done</button></div>
+  </dialog>
+
+  <!-- Settings (shown in place of the note list and editor) -->
   <!-- Share -->
   <dialog id="share-dialog" class="dialog wide">
     <div class="settings-head">

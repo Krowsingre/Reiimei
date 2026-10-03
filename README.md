@@ -1,8 +1,19 @@
-# Reiimei v0.7.0
+# Reiimei v0.8.0
 
 *reiimei* (REE-h-may), n. The cold, luminous stillness peculiar to a clear winter night; especially the effect of moonlight upon frost, illuminating the night without dispelling it.
 
 An offline-first notes app for Windows and iPhone, built as a Progressive Web App (PWA). No Mac, no App Store, no developer fee.
+
+## What changed in v0.8.0
+
+- **Lists.** Bullet and numbered list buttons (Markdown and Populi notes). Enter continues a list; Enter on an empty item ends it. Tab / Shift+Tab (or the new indent / outdent buttons on a phone) nest items, and numbers renumber themselves. Ctrl+Shift+8 and Ctrl+Shift+7 are shortcuts. List edits can be undone.
+- **Settings is a page, not a popup.** The gear opens the settings tab list where the note list normally is, and the options where the note would be. Press Esc, the gear, or any folder to leave. On a phone it moves list, then options.
+- **Empty notes are deleted.** A note closed with no content is permanently deleted at once. It never sits blank and never goes to Recently Deleted.
+- **Erased-text cache.** If you erase a whole note, its text is kept in one slot shared by all your devices and surviving restarts. The first brand-new empty note you open (on any device) shows **Paste erased text**. Using it clears the slot; opening a separate second new note clears it too. Ctrl+Z can no longer pull erased text into a different note.
+- **Copy and paste across notes** works.
+- **Tags list** at the bottom of the sidebar (collapsible). Click a tag to see its notes in every folder; click more, up to five, to narrow to notes that have all of them. Chips with × sit above the note list.
+
+Note: a device still on v0.7 would show the hidden cache record in Recently Deleted until it is updated.
 
 ## What changed in v0.7.0
 
@@ -110,9 +121,9 @@ Then open http://localhost:8000 in Edge or Chrome. Notes work immediately, saved
 
 The iPhone needs an HTTPS address. GitHub Pages hosts the app for free. Only the app's code goes to GitHub; your notes never do.
 
-1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.7.0` folder.
+1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.8.0` folder.
 2. **Create the repository.** In Safari, sign in at github.com, tap **+** › **New repository**. Name it `reiimei`, set it to **Public** (free Pages needs a public repository), and tap **Create repository**.
-3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.7.0` folder, tap **Select**, select all 30 files, and tap **Open**. Scroll down and tap **Commit changes**.
+3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.8.0` folder, tap **Select**, select all 30 files, and tap **Open**. Scroll down and tap **Commit changes**.
    - If you don't see the upload link, tap the **aA** button in Safari's address bar › **Request Desktop Website** and try again.
 4. **Turn on Pages.** In the repository, open **Settings** › **Pages**. Under **Build and deployment**, set Source to **Deploy from a branch**, Branch to **main** and **/ (root)**, then tap **Save**.
 5. **Wait a minute or two**, then reload the Pages screen. It shows your address, which looks like `https://yourname.github.io/reiimei/`.
@@ -212,7 +223,7 @@ The service worker caches the app files. When you change any file, bump `VERSION
 - **Settings › Log** › Download gives a text log of everything the app did, including sync results and errors.
 - **"Test connection"** in Settings › Sync confirms the URL, key, sign-in, and tables are all correct.
 
-## Known limits in v0.7.0
+## Known limits in v0.8.0
 
 - Images can be linked but not attached
 - Sources belong to one note; there is no shared library yet

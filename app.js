@@ -8,7 +8,7 @@ import * as security from './ui-security.js';
 import * as shareUi from './ui-share.js';
 import { noteTitle, noteSnippet, sharedFileCheck } from './share.js';
 
-export const APP_VERSION = '0.7.0';
+export const APP_VERSION = '0.8.0';
 
 const $ = (id) => document.getElementById(id);
 const el = {
@@ -28,6 +28,9 @@ const state = {
   query: '',
   currentId: null,
   selecting: false,
+  settingsOpen: false,
+  cache: null, // { text, from, offeredTo }: the single erased-text slot
+  prevMobileView: 'list',
   selected: new Set(),
   diagnostics: [],
 };
@@ -145,6 +148,17 @@ function formatDate(iso) {
   return d.toLocaleDateString([], { month: 'numeric', day: 'numeric', year: '2-digit' });
 }
 
+// The editor is one text box shared by every note. Its built-in undo history must
+// not reach back into a previously open note, so undo stops at the text the note
+// had when it was opened.
+let baseline = '';
+let undoneSteps = 0;
+function setBody(text) {
+  el.body.value = text;
+  baseline = text;
+  undoneSteps = 0;
+}
+
 function replaceNote(updated) {
   const i = state.notes.findIndex((n) => n.id === updated.id);
   if (i >= 0) state.notes[i] = updated; else state.notes.push(updated);
@@ -166,7 +180,8 @@ function filteredNotes() {
   const v = view();
   if (f.type === 'folder') list = list.filter((n) => n.folder_id === f.id);
   if (f.type === 'device') list = list.filter((n) => originOf(n)?.id === device().id);
-  if (f.type === 'tag') list = list.filter((n) => (n.tags || []).includes(f.tag));
+  // Several tags narrow the list: a note must carry every chosen tag (in any mode or folder).
+  if (f.type === 'tag') list = list.filter((n) => f.tags.every((t) => (n.tags || []).includes(t)));
   if (f.type === 'all' && v.hidden.length) list = list.filter((n) => !v.hidden.includes(deviceOf(n).id));
   const q = state.query.trim().toLowerCase();
   if (q) {
@@ -253,9 +268,42 @@ const ICONS = {
   pin: '<svg viewBox="0 0 24 24"><path d="M12 17v5"/><path d="M9 10.8V4h6v6.8l3 3.2H6z"/></svg>',
 };
 
+const MAX_TAGS = 5;
+async function toggleTagFilter(tag) {
+  closeSettings();
+  await flushSave();
+  const cur = state.filter.type === 'tag' ? state.filter.tags : [];
+  if (cur.includes(tag)) {
+    const left = cur.filter((t) => t !== tag);
+    state.filter = left.length ? { type: 'tag', tags: left } : { type: 'all' };
+  } else if (cur.length >= MAX_TAGS) {
+    toast(`Five tags is the most. Remove one to add another.`);
+    return;
+  } else {
+    state.filter = { type: 'tag', tags: [...cur, tag] };
+  }
+  state.selecting = false;
+  state.selected.clear();
+  const before = state.currentId;
+  let visible = filteredNotes();
+  if (!visible.some((n) => n.id === state.currentId)) state.currentId = isPhone() ? null : visible[0]?.id || null;
+  if (before && before !== state.currentId) await discardIfBlank(before);
+  render();
+  setMobileView('list');
+}
+
+function renderTagFilter() {
+  const box = $('tag-filter');
+  const f = state.filter;
+  if (f.type !== 'tag') { box.hidden = true; return; }
+  box.hidden = false;
+  box.innerHTML = f.tags.map((t) => `<span class="tf-chip">#${esc(t)}<button data-untag="${esc(t)}" aria-label="Remove tag ${esc(t)} from the filter">×</button></span>`).join('') +
+    `<span class="tf-note">${f.tags.length > 1 ? 'Notes with all of these tags. ' : ''}${f.tags.length < MAX_TAGS ? `Pick up to ${MAX_TAGS - f.tags.length} more in Tags.` : 'Five tags is the most.'}</span>`;
+}
+
 function isActive(f) {
   const cur = state.filter;
-  return cur.type === f.type && cur.id === f.id && cur.tag === f.tag;
+  return cur.type === f.type && cur.id === f.id && (f.type !== 'tag' || cur.tags.join() === f.tags.join());
 }
 
 function sideItem(filter, icon, name, count, withMore = false) {
@@ -288,7 +336,16 @@ function renderSidebar() {
   if (!folders.length) el.folderList.innerHTML = '<li class="side-empty">No folders yet</li>';
 
   const tags = tagCounts();
-  el.tagList.replaceChildren(...tags.map(([t, c]) => sideItem({ type: 'tag', tag: t }, 'tag', t, c)));
+  el.tagList.replaceChildren(...tags.map(([t, c]) => {
+    const li = sideItem({ type: 'tag', tags: [t] }, 'tag', t, c);
+    li.classList.toggle('tag-on', state.filter.type === 'tag' && state.filter.tags.includes(t));
+    li.classList.toggle('active', false);
+    const fresh = li.cloneNode(true); // drop the default click, tags toggle instead
+    fresh.addEventListener('click', () => toggleTagFilter(t));
+    return fresh;
+  }));
+  $('btn-tags-toggle').setAttribute('aria-expanded', String(prefs().tagsOpen !== false));
+  el.tagList.hidden = prefs().tagsOpen === false;
   if (!tags.length) el.tagList.innerHTML = '<li class="side-empty">Add tags to a note</li>';
 
   const trashCount = trashNotes().length;
@@ -299,7 +356,7 @@ function renderSidebar() {
   const existing = document.getElementById('trash-section');
   if (existing) existing.remove();
   wrap.id = 'trash-section';
-  el.tagList.parentElement.insertAdjacentElement('afterend', wrap);
+  $('tag-section').insertAdjacentElement('beforebegin', wrap);
 
   el.tagSuggest.innerHTML = tags.map(([t]) => `<option value="${esc(t)}">`).join('');
 }
@@ -307,7 +364,7 @@ function renderSidebar() {
 function listTitle() {
   const f = state.filter;
   if (f.type === 'folder') return liveFolders().find((x) => x.id === f.id)?.name || 'Folder';
-  if (f.type === 'tag') return `#${f.tag}`;
+  if (f.type === 'tag') return f.tags.map((t) => `#${t}`).join(' + ');
   if (f.type === 'trash') return 'Recently Deleted';
   if (f.type === 'device') return 'This device';
   if (f.type === 'none') return 'Notes';
@@ -318,6 +375,7 @@ function renderList() {
   el.listTitle.textContent = listTitle();
   const notes = filteredNotes();
   renderSelectBar(notes);
+  renderTagFilter();
   if (!notes.length) {
     const hiddenNote = state.filter.type === 'all' && view().hidden.length && !state.query;
     el.noteList.innerHTML = `<li class="list-empty">${state.query ? 'No matching notes' : state.filter.type === 'trash' ? 'Nothing deleted' : hiddenNote ? 'Some devices are hidden. Use the sort icon to show them.' : 'No notes here yet'}</li>`;
@@ -348,12 +406,13 @@ function renderEditor() {
   [el.body, el.tagRow, el.folderSel, el.pin, el.del, $('btn-share'), $('btn-close-note')].forEach((x) => { x.hidden = !show; });
   if (!show) { writing.renderToolbar(null); $('preview').hidden = true; }
   el.trashBar.hidden = !(n && n.deleted);
+  $('erased-bar').hidden = !(n && !n.deleted && !n.body.trim() && state.cache && state.cache.offeredTo === n.id);
   if (!n) return;
 
   if (el.body.value !== n.body && !(pending && pending.id === n.id)) {
     const focused = document.activeElement === el.body;
     const { selectionStart, selectionEnd } = el.body;
-    el.body.value = n.body;
+    setBody(n.body);
     if (focused) el.body.setSelectionRange(Math.min(selectionStart, n.body.length), Math.min(selectionEnd, n.body.length));
   }
   el.body.readOnly = n.deleted;
@@ -384,6 +443,28 @@ function render() {
 let saveTimer = null;
 let pending = null; // { id, body }: unsaved text, tied to the note it was typed into
 
+// ---- Empty notes and the erased-text cache -------------------------------------
+// A note left with no text is deleted for good the moment it is closed. If its text
+// was just erased, that text waits in one shared slot (see db.js) so it can be pasted
+// into the first new note you start.
+async function refreshCache() {
+  try { state.cache = await db.getCache(); } catch (e) { log.warn('cache', 'Could not read the erased-text cache', { error: e.message }); state.cache = null; }
+}
+
+async function discardIfBlank(id) {
+  const n = state.notes.find((x) => x.id === id);
+  if (!n || n.deleted || n.locked || n.body.trim()) return false;
+  if (!n.synced_updated_at) {
+    await db.locked(() => db.remove('notes', id));
+    state.notes = state.notes.filter((x) => x.id !== id);
+  } else {
+    replaceNote(await db.purgeNote(n));
+  }
+  log.info('editor', 'Empty note deleted', { id });
+  scheduleSync();
+  return true;
+}
+
 async function flushSave() {
   clearTimeout(saveTimer);
   saveTimer = null;
@@ -394,6 +475,12 @@ async function flushSave() {
   if (!n || body === n.body) return;
   try {
     replaceNote(await db.saveNote(n, { body }));
+    if (!body.trim() && n.body.trim()) {
+      // Everything was erased: keep the text in the cache (one slot, shared by all devices).
+      await db.setCache(n.body, id);
+      await refreshCache();
+      log.info('cache', 'Erased text cached', { from: id, chars: n.body.length });
+    }
     el.saveState.textContent = 'Saved';
     renderList();
     renderSidebar();
@@ -402,6 +489,21 @@ async function flushSave() {
     log.error('editor', 'Save failed', e);
     el.saveState.textContent = 'Save failed!';
   }
+}
+
+async function pasteErased() {
+  const n = currentNote();
+  const c = state.cache;
+  if (!n || !c || n.body.trim()) return;
+  await flushSave();
+  replaceNote(await db.saveNote(currentNote(), { body: c.text }));
+  setBody(c.text);
+  await db.clearCache();
+  state.cache = null;
+  log.info('cache', 'Erased text pasted', { into: n.id, chars: c.text.length });
+  render();
+  scheduleSync();
+  toast('Pasted the erased text');
 }
 
 async function updateCurrent(changes) {
@@ -415,6 +517,8 @@ async function updateCurrent(changes) {
 
 async function selectNote(id) {
   await flushSave();
+  const prev = state.currentId;
+  if (prev && prev !== id) await discardIfBlank(prev);
   state.currentId = id;
   el.saveState.textContent = '';
   renderList();
@@ -423,30 +527,46 @@ async function selectNote(id) {
 }
 
 async function selectFilter(filter) {
+  closeSettings();
   await flushSave();
   state.selecting = false;
   state.selected.clear();
   state.filter = filter;
-  const visible = filteredNotes();
+  const before = state.currentId;
+  let visible = filteredNotes();
   if (!visible.some((n) => n.id === state.currentId)) state.currentId = isPhone() ? null : visible[0]?.id || null;
+  if (before && before !== state.currentId) { await discardIfBlank(before); visible = filteredNotes(); if (!visible.some((n) => n.id === state.currentId)) state.currentId = isPhone() ? null : visible[0]?.id || null; }
   render();
   setMobileView('list');
 }
 
 async function newNote() {
   await flushSave();
+  if (state.currentId) await discardIfBlank(state.currentId);
   const f = state.filter;
   if (f.type === 'trash') state.filter = { type: 'all' };
   const p = prefs();
   const note = await db.createNote({
     folder_id: f.type === 'folder' ? f.id : null,
-    tags: f.type === 'tag' ? [f.tag] : [],
+    tags: f.type === 'tag' ? [...f.tags] : [],
     format: p.format,
     meta: { ...writing.newNoteMeta(p), origin: { id: device().id, name: device().name } },
   });
   writing.resetView();
   if (view().hidden.includes(device().id)) setPrefs({ view: { ...view(), hidden: view().hidden.filter((x) => x !== device().id) } });
   replaceNote(note);
+  // The first new note after an erasure is offered the erased text; a second, separate new note drops it.
+  if (state.cache) {
+    if (state.cache.offeredTo && state.cache.offeredTo !== note.id) {
+      await db.clearCache();
+      state.cache = null;
+      log.info('cache', 'Erased-text cache cleared by a separate new note');
+    } else if (!state.cache.offeredTo) {
+      await db.offerCache(note.id);
+      await refreshCache();
+    }
+    scheduleSync();
+  }
   state.query = '';
   el.search.value = '';
   state.currentId = note.id;
@@ -472,9 +592,8 @@ async function deleteCurrent() {
 // ---- Trash, selection, closing -------------------------------------------
 // Move one note to Recently Deleted (a blank note that never synced is simply dropped).
 async function trashNote(n) {
-  if (!n.body.trim() && !n.synced_updated_at && !(n.tags || []).length) {
-    await db.remove('notes', n.id);
-    state.notes = state.notes.filter((x) => x.id !== n.id);
+  if (!n.body.trim()) {
+    await discardIfBlank(n.id);
   } else {
     replaceNote(await db.deleteNote(n));
   }
@@ -576,6 +695,7 @@ async function emptyTrash() {
 // Close the open note and show the Reiimei page.
 async function closeNote() {
   await flushSave();
+  if (state.currentId) await discardIfBlank(state.currentId);
   state.currentId = null;
   el.saveState.textContent = '';
   writing.resetView();
@@ -683,8 +803,9 @@ async function removeTag(tag) {
   const n = currentNote();
   if (!n) return;
   await updateCurrent({ tags: (n.tags || []).filter((t) => t !== tag) });
-  if (state.filter.type === 'tag' && state.filter.tag === tag && !tagCounts().some(([t]) => t === tag)) {
-    state.filter = { type: 'all' };
+  if (state.filter.type === 'tag' && state.filter.tags.includes(tag) && !tagCounts().some(([t]) => t === tag)) {
+    const left = state.filter.tags.filter((t) => t !== tag);
+    state.filter = left.length ? { type: 'tag', tags: left } : { type: 'all' };
     render();
   }
 }
@@ -745,6 +866,7 @@ async function runSync(reason = 'auto') {
   if (r && (r.pulled || r.pushed)) {
     // Reload from the database so the UI holds the post-sync records.
     await reloadFromDb();
+    await refreshCache();
     if (state.filter.type === 'folder' && !liveFolders().some((f) => f.id === state.filter.id)) state.filter = { type: 'all' };
     render();
   }
@@ -810,6 +932,7 @@ async function runDiagnostics() {
   }
 
   add('This device', 'pass', `Named “${device().name}”; ${activeNotes().filter((n) => originOf(n)?.id === device().id).length} notes written here, ${activeNotes().filter((n) => !originOf(n)).length} unlabeled`);
+  add('Erased-text cache', 'pass', state.cache ? `Holding ${state.cache.text.length} characters` : 'Empty');
   add('Encryption support', vault.isSupported() ? 'pass' : 'fail', vault.isSupported() ? 'Web Crypto available (AES-GCM, PBKDF2)' : 'Web Crypto missing: encryption cannot be used here');
   const sec = security.status();
   if (sec.enabled) {
@@ -882,7 +1005,7 @@ function collapseProjectDetailsIfVerified() {
   setProjectDetailsOpen(!(cfg?.verified && cfg.url && cfg.anonKey));
 }
 
-function openSettings(tab = 'sync') {
+function openSettings(tab = 'sync', explicitTab = tab !== 'sync') {
   updateSettingsSync();
   collapseProjectDetailsIfVerified();
   security.renderSettings();
@@ -893,11 +1016,33 @@ function openSettings(tab = 'sync') {
   renderDiagnostics();
   $('log-view').textContent = log.exportText() || '(empty)';
   showTab(tab);
-  $('settings-dialog').showModal();
+  state.settingsOpen = true;
+  state.prevMobileView = el.app.dataset.mobileView === 'settings-list' || el.app.dataset.mobileView === 'settings-detail' ? state.prevMobileView : el.app.dataset.mobileView;
+  flushSave();
+  document.querySelector('.list').hidden = true;
+  document.querySelector('.editor').hidden = true;
+  $('settings-list').hidden = false;
+  $('settings-main').hidden = false;
+  $('btn-settings').setAttribute('aria-pressed', 'true');
+  // On a phone, the gear shows the list of sections; picking a section (or the Aa
+  // and sync shortcuts) goes straight to its options.
+  setMobileView(explicitTab ? 'settings-detail' : 'settings-list');
+}
+
+function closeSettings() {
+  if (!state.settingsOpen) return;
+  state.settingsOpen = false;
+  document.querySelector('.list').hidden = false;
+  document.querySelector('.editor').hidden = false;
+  $('settings-list').hidden = true;
+  $('settings-main').hidden = true;
+  $('btn-settings').setAttribute('aria-pressed', 'false');
+  setMobileView(state.prevMobileView && !state.prevMobileView.startsWith('settings') ? state.prevMobileView : 'list');
 }
 
 function showTab(tab) {
-  document.querySelectorAll('.tab').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
+  document.querySelectorAll('.tab').forEach((b) => { b.classList.toggle('active', b.dataset.tab === tab); if (b.dataset.tab === tab) $('settings-title').textContent = b.textContent; });
+  $('settings-main').querySelector('.settings-body').scrollTop = 0;
   document.querySelectorAll('.tab-panel').forEach((p) => { p.hidden = p.dataset.panel !== tab; });
   if (tab === 'log') {
     const v = $('log-view');
@@ -1011,8 +1156,10 @@ function bindEvents() {
   $('btn-new-note').addEventListener('click', newNote);
   $('btn-new-folder').addEventListener('click', newFolder);
   $('btn-back-sidebar').addEventListener('click', () => setMobileView('sidebar'));
-  $('btn-back-list').addEventListener('click', async () => { await flushSave(); state.currentId = null; renderList(); setMobileView('list'); });
-  $('btn-settings').addEventListener('click', () => openSettings());
+  $('btn-back-list').addEventListener('click', async () => { await flushSave(); if (state.currentId) await discardIfBlank(state.currentId); state.currentId = null; render(); setMobileView('list'); });
+  $('btn-settings').addEventListener('click', () => (state.settingsOpen ? closeSettings() : openSettings('sync', false)));
+  $('btn-settings-back').addEventListener('click', closeSettings);
+  $('btn-settings-tabs').addEventListener('click', () => setMobileView('settings-list'));
   $('sync-foot').addEventListener('click', () => openSettings('sync'));
 
   let longPressed = false;
@@ -1032,6 +1179,8 @@ function bindEvents() {
     pressTimer = setTimeout(() => { longPressed = true; state.selecting = true; flushSave(); toggleSelected(item.dataset.id); }, 550);
   });
   for (const t of ['pointerup', 'pointercancel', 'pointermove', 'pointerleave']) el.noteList.addEventListener(t, () => clearTimeout(pressTimer));
+  $('tag-filter').addEventListener('click', (e) => { const b = e.target.closest('[data-untag]'); if (b) toggleTagFilter(b.dataset.untag); });
+  $('btn-tags-toggle').addEventListener('click', () => { setPrefs({ tagsOpen: prefs().tagsOpen === false }); renderSidebar(); });
   $('btn-select').addEventListener('click', () => setSelecting(!state.selecting));
   $('sel-all').addEventListener('click', () => {
     const notes = filteredNotes();
@@ -1072,6 +1221,7 @@ function bindEvents() {
   $('view-reset').addEventListener('click', () => { setPrefs({ view: VIEW_DEFAULT }); renderViewDialog(); renderList(); });
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape' || document.querySelector('dialog[open]')) return;
+    if (state.settingsOpen) { if (!['TEXTAREA', 'INPUT', 'SELECT'].includes(document.activeElement?.tagName)) closeSettings(); return; }
     if (state.selecting) { setSelecting(false); return; }
     if (state.currentId && !['TEXTAREA', 'INPUT', 'SELECT'].includes(document.activeElement?.tagName)) closeNote();
   });
@@ -1082,6 +1232,15 @@ function bindEvents() {
     searchTimer = setTimeout(() => { state.query = el.search.value; renderList(); }, 120);
   });
 
+  el.body.addEventListener('beforeinput', (e) => {
+    if (e.inputType === 'historyUndo') {
+      if (el.body.value === baseline) e.preventDefault(); else undoneSteps++;
+    } else if (e.inputType === 'historyRedo') {
+      if (undoneSteps <= 0) e.preventDefault(); else undoneSteps--;
+    } else {
+      undoneSteps = 0;
+    }
+  });
   el.body.addEventListener('input', () => {
     if (!state.currentId) return;
     pending = { id: state.currentId, body: el.body.value };
@@ -1094,6 +1253,7 @@ function bindEvents() {
   el.folderSel.addEventListener('change', () => updateCurrent({ folder_id: el.folderSel.value || null }));
   el.pin.addEventListener('click', () => { const n = currentNote(); if (n) updateCurrent({ pinned: !n.pinned }); });
   el.del.addEventListener('click', deleteCurrent);
+  $('btn-paste-erased').addEventListener('click', pasteErased);
   $('btn-restore').addEventListener('click', async () => {
     await updateCurrent({ deleted: false });
     log.info('editor', 'Note restored', { id: state.currentId });
@@ -1120,8 +1280,8 @@ function bindEvents() {
   });
 
   // Settings
-  $('btn-close-settings').addEventListener('click', () => $('settings-dialog').close());
-  document.querySelectorAll('.tab').forEach((b) => b.addEventListener('click', () => showTab(b.dataset.tab)));
+  $('btn-close-settings').addEventListener('click', closeSettings);
+  document.querySelectorAll('.tab').forEach((b) => b.addEventListener('click', () => { showTab(b.dataset.tab); setMobileView('settings-detail'); }));
   $('btn-signin').addEventListener('click', () => authAction('in'));
   $('btn-signup').addEventListener('click', () => authAction('up'));
   $('btn-sync-now').addEventListener('click', async () => {
@@ -1190,10 +1350,9 @@ async function registerServiceWorker() {
 async function loadData() {
   [state.notes, state.folders] = await Promise.all([db.getAll('notes'), db.getAll('folders')]);
   // Tidy up: brand-new empty notes left behind are discarded silently.
-  for (const n of state.notes.filter((x) => !x.deleted && !x.locked && !x.body.trim() && !x.synced_updated_at && !(x.tags || []).length)) {
-    await db.remove('notes', n.id);
-  }
+  for (const n of state.notes.filter((x) => !x.deleted && !x.locked && !x.body.trim())) await discardIfBlank(n.id);
   state.notes = await db.getAll('notes');
+  await refreshCache();
   if (state.filter.type === 'folder' && !liveFolders().some((f) => f.id === state.filter.id)) state.filter = { type: 'all' };
   if (!state.notes.some((n) => n.id === state.currentId)) state.currentId = isPhone() ? null : filteredNotes()[0]?.id || null;
   render();
@@ -1205,13 +1364,13 @@ function clearData() {
   state.notes = [];
   state.folders = [];
   state.currentId = null;
-  el.body.value = '';
+  setBody('');
   render();
 }
 
 function setEditorText(text) {
   pending = null;
-  if (el.body.value !== text) el.body.value = text;
+  if (el.body.value !== text) setBody(text);
 }
 
 const hooks = {
@@ -1224,6 +1383,7 @@ const hooks = {
   prefs,
   reload: () => loadData(),
   clearData,
+  closeSettings: () => closeSettings(),
   runSync: (reason) => runSync(reason),
   syncOn: () => sync.isConfigured(),
   folders: () => state.folders,

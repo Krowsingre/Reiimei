@@ -108,7 +108,11 @@ export async function decode(store, raw) {
   return out;
 }
 
-export const getAll = async (store) => Promise.all((await rawGetAll(store)).map((r) => decode(store, r)));
+// The erased-text cache is stored as one hidden record in the notes table (so it
+// syncs and is sealed like everything else). It is never listed as a note.
+export const CACHE_ID = '00000000-0000-4000-8000-00000000cac4';
+export const getAll = async (store, { internal = false } = {}) =>
+  (await Promise.all((await rawGetAll(store)).map((r) => decode(store, r)))).filter((r) => internal || r.id !== CACHE_ID);
 export const get = async (store, id) => decode(store, await rawGet(store, id));
 export async function put(store, value) {
   if (value?.locked) throw new Error('Refusing to overwrite a record that is still locked');
@@ -131,7 +135,7 @@ export async function countSealed() {
 export async function rewriteAll(between = async () => {}) {
   const data = {};
   for (const store of ['folders', 'notes']) {
-    data[store] = await getAll(store);
+    data[store] = await getAll(store, { internal: true });
     if (data[store].some((r) => r.locked)) throw new Error('Some notes could not be opened with the current passphrase');
   }
   await between();
@@ -234,4 +238,25 @@ export async function deleteFolder(folder) {
   if (moved.length) await putMany('notes', moved);
   log.info('db', 'Folder deleted', { id: folder.id, notesMoved: moved.length });
   return saveFolder(folder, { deleted: true });
+}
+
+// ---- Erased-text cache -------------------------------------------------------
+// One slot for the whole account: the text of the note most recently erased.
+const cacheBase = () => ({ id: CACHE_ID, body: '', format: 'markdown', meta: { erasedCache: true }, folder_id: null, tags: [], pinned: false, created_at: now(), deleted: true });
+
+export async function getCache() {
+  const r = await get('notes', CACHE_ID);
+  if (!r || r.locked || !(r.body || '').trim()) return null;
+  return { text: r.body, from: r.meta?.from || null, offeredTo: r.meta?.offeredTo || null };
+}
+async function writeCache(changes) {
+  const cur = await get('notes', CACHE_ID);
+  if (cur?.locked) return;
+  await update('notes', CACHE_ID, { deleted: true, ...changes }, cacheBase());
+}
+export const setCache = (text, from) => writeCache({ body: text, meta: { erasedCache: true, from, offeredTo: null } });
+export const clearCache = async () => { if (await get('notes', CACHE_ID)) await writeCache({ body: '', meta: { erasedCache: true, from: null, offeredTo: null } }); };
+export async function offerCache(noteId) {
+  const cur = await get('notes', CACHE_ID);
+  if (cur) await writeCache({ meta: { ...(cur.meta || {}), erasedCache: true, offeredTo: noteId } });
 }

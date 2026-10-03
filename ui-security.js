@@ -233,7 +233,7 @@ export function init(hooks) {
   $('btn-enc-on').addEventListener('click', turnOn);
   $('btn-enc-off').addEventListener('click', turnOff);
   $('btn-enc-change').addEventListener('click', changePassphrase);
-  $('btn-lock-now').addEventListener('click', () => { $('settings-dialog').close(); lockNow('button'); });
+  $('btn-lock-now').addEventListener('click', () => { app.closeSettings?.(); lockNow('button'); });
   $('sec-autolock').addEventListener('change', async (e) => {
     await saveConfig({ autoLockMin: +e.target.value });
     log.info('security', 'Auto-lock changed', { minutes: +e.target.value });

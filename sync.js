@@ -248,6 +248,13 @@ async function mergeRemote(store, rows) {
         return;
       }
 
+      if (r.id === db.CACHE_ID) {
+        // The erased-text cache is a single slot: the newest write wins, with no conflict copy.
+        if (r.updated_at > local.updated_at) await db.put(store, remote);
+        else await db.put(store, { ...local, synced_updated_at: r.updated_at });
+        return;
+      }
+
       if (store === 'folders' || (store === 'notes' && sameNote(local, remote))) {
         // Folders: newest rename/delete wins. Identical notes: just mark clean.
         if (store === 'notes' || r.updated_at > local.updated_at) await db.put(store, remote);
@@ -281,7 +288,7 @@ async function mergeRemote(store, rows) {
 }
 
 async function pushTable(store, table) {
-  const dirty = (await db.getAll(store)).filter((r) => r.dirty);
+  const dirty = (await db.getAll(store, { internal: true })).filter((r) => r.dirty);
   if (!dirty.length) return 0;
   for (let i = 0; i < dirty.length; i += PAGE) {
     const batch = dirty.slice(i, i + PAGE);

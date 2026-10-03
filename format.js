@@ -481,6 +481,8 @@ export const TOOLBAR = {
     { id: 'ul', label: 'Bulleted list', line: '- ' },
     { id: 'ol', label: 'Numbered list', line: '1. ' },
     { id: 'task', label: 'Checklist', line: '- [ ] ' },
+    { id: 'outdent', label: 'Move list item out', indent: -1 },
+    { id: 'indent', label: 'Move list item in', indent: 1 },
     { id: 'quote', label: 'Quote', line: '> ' },
     { id: 'code', label: 'Code', wrap: '`' },
     { id: 'link', label: 'Link', link: true },
@@ -492,9 +494,101 @@ export const TOOLBAR = {
     { id: 'mark', label: 'Highlight', wrap: '+' },
     { id: 'sup', label: 'Superscript', wrap: '^' },
     { id: 'sub', label: 'Subscript', wrap: '~' },
+    { id: 'ul', label: 'Bulleted list', line: '- ' },
+    { id: 'ol', label: 'Numbered list', line: '1. ' },
+    { id: 'outdent', label: 'Move list item out', indent: -1 },
+    { id: 'indent', label: 'Move list item in', indent: 1 },
     { id: 'link', label: 'Link', link: true },
   ],
 };
+
+// ---- Lists while typing --------------------------------------------------
+// A list line: indent, marker (- * + • or 1. 1)), optional [ ] checkbox.
+const LINE_RE = /^([ \t]*)([-*+•]|\d+[.)])([ \t]+)(\[[ xX]\][ \t]+)?/;
+const levelOf = (indent) => Math.floor(indent.replace(/\t/g, '  ').length / 2);
+
+// Number the items of the list around line `at`: each level counts 1, 2, 3…
+// (a list that opens at 3 keeps counting from 3), and a nested list restarts at 1.
+export function renumber(value, at) {
+  const lines = value.split('\n');
+  let a = Math.min(Math.max(at, 0), lines.length - 1);
+  if (!LINE_RE.test(lines[a])) return value;
+  let s = a;
+  while (s > 0 && LINE_RE.test(lines[s - 1])) s--;
+  let e = a;
+  while (e < lines.length - 1 && LINE_RE.test(lines[e + 1])) e++;
+  const counters = [];
+  for (let i = s; i <= e; i++) {
+    const m = LINE_RE.exec(lines[i]);
+    const lvl = levelOf(m[1]);
+    counters.length = lvl + 1; // deeper levels start over
+    if (/\d/.test(m[2])) {
+      const own = parseInt(m[2], 10);
+      const start = counters[lvl] === undefined ? (i === s ? own : (lvl === 0 ? own : 1)) : counters[lvl] + 1;
+      counters[lvl] = start;
+      lines[i] = m[1] + `${start}${m[2].slice(-1)}` + lines[i].slice(m[1].length + m[2].length);
+    } else {
+      counters[lvl] = undefined;
+    }
+  }
+  return lines.join('\n');
+}
+
+// Enter inside a list: continue it (next number, same bullet, empty checkbox).
+// Enter on an empty item moves it out a level, or ends the list.
+// Returns {value, start, end} or null when Enter should behave normally.
+export function listEnter(value, start, end) {
+  if (start !== end) return null;
+  const ls = value.lastIndexOf('\n', start - 1) + 1;
+  let le = value.indexOf('\n', start);
+  if (le < 0) le = value.length;
+  const line = value.slice(ls, le);
+  const m = LINE_RE.exec(line);
+  if (!m || start < ls + m[0].length) return null;
+  const rest = line.slice(m[0].length);
+  const atEnd = start === le;
+  if (!rest.trim() && atEnd) {
+    const lvl = levelOf(m[1]);
+    const nl = lvl > 0
+      ? m[1].replace(/\t/g, '  ').slice(2) + line.slice(m[1].length)
+      : '';
+    let v = value.slice(0, ls) + nl + value.slice(le);
+    const caret = ls + nl.length;
+    v = renumber(v, v.slice(0, ls).split('\n').length - 1);
+    return { value: v, start: caret + (v.length - (value.length - (le - ls) + nl.length)), end: caret + (v.length - (value.length - (le - ls) + nl.length)) };
+  }
+  let marker = m[2];
+  if (/\d/.test(marker)) marker = `${parseInt(marker, 10) + 1}${marker.slice(-1)}`;
+  const box = m[4] ? '[ ] ' : '';
+  const head = m[1] + marker + m[3].replace(/\t/g, ' ') + box;
+  const before = value.slice(0, start);
+  const after = value.slice(start);
+  const lineIdx = before.split('\n').length; // index of the new line
+  let v = `${before}\n${head}${after}`;
+  const caret = start + 1 + head.length;
+  const v2 = /\d/.test(marker) ? renumber(v, lineIdx) : v;
+  return { value: v2, start: caret, end: caret };
+}
+
+// Move the list items touched by the selection one level in (dir 1) or out (dir -1).
+export function listIndent(value, start, end, dir) {
+  const ls = value.lastIndexOf('\n', start - 1) + 1;
+  let le = value.indexOf('\n', Math.max(end, start));
+  if (le < 0) le = value.length;
+  const lines = value.slice(ls, le).split('\n');
+  if (!lines.some((l) => LINE_RE.test(l))) return { value, start, end };
+  const firstIdx = value.slice(0, ls).split('\n').length - 1;
+  const out = lines.map((l) => {
+    if (!LINE_RE.test(l)) return l;
+    if (dir > 0) return `  ${l}`;
+    return l.replace(/^(\t| {1,2})/, '');
+  });
+  const block = out.join('\n');
+  let v = value.slice(0, ls) + block + value.slice(le);
+  v = renumber(v, firstIdx);
+  const diff = v.length - value.length;
+  return { value: v, start: Math.max(ls, start + (dir > 0 ? 2 : -Math.min(2, (lines[0].match(/^(\t| {1,2})/) || [''])[0].length))), end: end + diff };
+}
 
 // Returns {value, start, end} after applying a toolbar action to a textarea state.
 export function applyTool(tool, value, start, end, extra = {}) {
@@ -508,6 +602,7 @@ export function applyTool(tool, value, start, end, extra = {}) {
     const text = sel || tool.label.toLowerCase();
     return { value: value.slice(0, start) + w + text + w + value.slice(end), start: start + w.length, end: start + w.length + text.length };
   }
+  if (tool.indent) return listIndent(value, start, end, tool.indent);
   if (tool.line) {
     const ls = value.lastIndexOf('\n', start - 1) + 1;
     let le = value.indexOf('\n', end);
