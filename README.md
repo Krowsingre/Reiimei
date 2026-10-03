@@ -1,13 +1,23 @@
-# Reiimei v0.5.0
+# Reiimei v0.6.0
 
 *reiimei* (REE-h-may), n. The cold, luminous stillness peculiar to a clear winter night; especially the effect of moonlight upon frost, illuminating the night without dispelling it.
 
 An offline-first notes app for Windows and iPhone, built as a Progressive Web App (PWA). No Mac, no App Store, no developer fee.
 
+## What changed in v0.6.0
+
+- **Round app icon.** The moon now sits on a circular night-sky badge with transparent corners instead of a square. (iPhone always draws its own rounded square around home-screen icons, so it will show the badge on a dark tile.)
+- **Fonts tab.** Settings has a new **Fonts** tab, and the **Aa** button in the editor toolbar opens it directly. Pick a face for headings and the wordmark (Marcellus, Reiimei Display, or Echolume) and a face for note text (Newsreader, Reiimei Display, Echolume, or system sans-serif). All three custom fonts are built in, so they work offline.
+- **Reiimei Display font** added (Krowsingre Publishing LLC).
+- **Duplicate notes fixed.** A note could be copied ("Conflicted copy") after auto-save when a sync ran while you were typing. Saving, uploading, and downloading now take turns, this device recognises its own uploads, and text typed during a sync is never overwritten. If you already have copies, use Settings › Backup › **Find conflicted copies**.
+- **Recently Deleted** now lets you **Restore** a note, **Delete permanently** (one note), or **Empty** the whole folder. Permanent deletion wipes the text on every device.
+- **Select several notes.** Tap **Select** above the note list (on a phone you can also press and hold a note; on a laptop, Ctrl-click). Then **Share**, **Delete**, or in Recently Deleted **Restore** or **Delete forever**.
+- **Close note.** The **×** at the top of the editor (or the Esc key) closes the open note and shows the Reiimei page. On a phone, the back arrow does this.
+
 ## What changed in v0.5.0
 
 - **New app icon:** the frosted crescent moon with its star, on a winter night sky. Android gets a version with extra margin for round icons.
-- **Echolume font option.** Settings › Writing has a **Heading font** (Reiimei or Echolume) and a **Note font** (Newsreader, Echolume, or system sans-serif). Echolume is Krowsingre Publishing's capitals and small caps family; it is bundled with the app, so it works offline.
+- **Echolume font option.** Settings › Fonts has a heading font and a note font. Echolume is Krowsingre Publishing's capitals and small caps family; it is bundled with the app, so it works offline.
 - **Updated definition** on the opening screen.
 
 ## What changed in v0.4.1
@@ -65,6 +75,7 @@ An offline-first notes app for Windows and iPhone, built as a Progressive Web Ap
 | `code.js`, `ui-code.js` | Code coloring, editing helpers, tidy, HTML and XML previews |
 | `render.html`, `render.js` | The sealed-off frame that renders HTML notes |
 | `Echolume-VF.woff2`, `Echolume-Italic-VF.woff2` | Echolume font (variable weight), © Krowsingre Publishing LLC |
+| `ReiimeiDisplay-Regular.woff` | Reiimei Display font, © Krowsingre Publishing LLC |
 | `share.js`, `ui-share.js` | Sharing as text, combined documents, and archives |
 | `format.js` | Markdown and Populi markup engine |
 | `cite.js` | MLA 9 and APA 7 citation rules |
@@ -92,9 +103,9 @@ Then open http://localhost:8000 in Edge or Chrome. Notes work immediately, saved
 
 The iPhone needs an HTTPS address. GitHub Pages hosts the app for free. Only the app's code goes to GitHub; your notes never do.
 
-1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.5.0` folder.
+1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.6.0` folder.
 2. **Create the repository.** In Safari, sign in at github.com, tap **+** › **New repository**. Name it `reiimei`, set it to **Public** (free Pages needs a public repository), and tap **Create repository**.
-3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.5.0` folder, tap **Select**, select all 29 files, and tap **Open**. Scroll down and tap **Commit changes**.
+3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.6.0` folder, tap **Select**, select all 30 files, and tap **Open**. Scroll down and tap **Commit changes**.
    - If you don't see the upload link, tap the **aA** button in Safari's address bar › **Request Desktop Website** and try again.
 4. **Turn on Pages.** In the repository, open **Settings** › **Pages**. Under **Build and deployment**, set Source to **Deploy from a branch**, Branch to **main** and **/ (root)**, then tap **Save**.
 5. **Wait a minute or two**, then reload the Pages screen. It shows your address, which looks like `https://yourname.github.io/reiimei/`.
@@ -194,7 +205,7 @@ The service worker caches the app files. When you change any file, bump `VERSION
 - **Settings › Log** › Download gives a text log of everything the app did, including sync results and errors.
 - **"Test connection"** in Settings › Sync confirms the URL, key, sign-in, and tables are all correct.
 
-## Known limits in v0.5.0
+## Known limits in v0.6.0
 
 - Images can be linked but not attached
 - Sources belong to one note; there is no shared library yet
@@ -202,5 +213,5 @@ The service worker caches the app files. When you change any file, bump `VERSION
 - Python code is not run
 - Email and text-message links carry text only; to attach a file, use Share file… or Download
 - Folders are one level deep
-- Items in Recently Deleted stay there until a future "empty" feature is added
+- Recently Deleted is never emptied automatically; empty it yourself when you like
 - The first launch needs a connection for the fonts; until then the app uses similar system fonts

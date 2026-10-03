@@ -8,7 +8,7 @@ import * as security from './ui-security.js';
 import * as shareUi from './ui-share.js';
 import { noteTitle, noteSnippet, sharedFileCheck } from './share.js';
 
-export const APP_VERSION = '0.5.0';
+export const APP_VERSION = '0.6.0';
 
 const $ = (id) => document.getElementById(id);
 const el = {
@@ -27,6 +27,8 @@ const state = {
   filter: { type: 'all' }, // all | none | folder | tag | trash
   query: '',
   currentId: null,
+  selecting: false,
+  selected: new Set(),
   diagnostics: [],
 };
 
@@ -47,21 +49,27 @@ function prefs() {
 
 // Fonts: set CSS variables through the style API (allowed by the security policy).
 const FONT_STACKS = {
+  display: '"Reiimei Display", "Marcellus", "Palatino Linotype", Georgia, serif',
   echolume: '"Echolume", "Marcellus", system-ui, sans-serif',
   newsreader: '"Newsreader", "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif',
   sans: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
 };
+const FONT_NAMES = { reiimei: 'Marcellus', display: 'Reiimei Display', echolume: 'Echolume', newsreader: 'Newsreader', sans: 'System sans-serif' };
 function applyFonts(p = prefs()) {
   const root = document.documentElement.style;
-  if (p.headFont === 'echolume') {
-    root.setProperty('--display', FONT_STACKS.echolume);
-    root.setProperty('--head-font', FONT_STACKS.echolume);
+  const head = ['display', 'echolume'].includes(p.headFont) ? p.headFont : 'reiimei';
+  const note = FONT_STACKS[p.noteFont] ? p.noteFont : 'newsreader';
+  if (head !== 'reiimei') {
+    root.setProperty('--display', FONT_STACKS[head]);
+    root.setProperty('--head-font', FONT_STACKS[head]);
   } else {
     root.removeProperty('--display');
     root.removeProperty('--head-font');
   }
-  if (FONT_STACKS[p.noteFont] && p.noteFont !== 'newsreader') root.setProperty('--note-font', FONT_STACKS[p.noteFont]);
+  if (note !== 'newsreader') root.setProperty('--note-font', FONT_STACKS[note]);
   else root.removeProperty('--note-font');
+  document.documentElement.dataset.headFont = head;
+  document.documentElement.dataset.noteFont = note;
 }
 function setPrefs(patch) {
   try { localStorage.setItem(PREFS_KEY, JSON.stringify({ ...prefs(), ...patch })); } catch { /* storage blocked */ }
@@ -81,6 +89,9 @@ function toast(text, actionLabel = null, action = null) {
   toastTimer = setTimeout(() => { t.hidden = true; }, actionLabel ? 8000 : 3000);
 }
 const activeNotes = () => state.notes.filter((n) => !n.deleted);
+// A permanently deleted note is a blank deleted stub (kept only so other devices wipe it too).
+const isPurged = (n) => n.deleted && !n.locked && !(n.body || '').trim() && !(n.tags || []).length;
+const trashNotes = () => state.notes.filter((n) => n.deleted && !isPurged(n));
 const liveFolders = () => state.folders.filter((f) => !f.deleted).sort((a, b) => a.name.localeCompare(b.name));
 const currentNote = () => state.notes.find((n) => n.id === state.currentId) || null;
 const normTag = (t) => t.trim().replace(/^#+/, '').toLowerCase().replace(/\s+/g, '-').replace(/[^\p{L}\p{N}_-]/gu, '').slice(0, 40);
@@ -111,7 +122,7 @@ function tagCounts() {
 
 function filteredNotes() {
   const f = state.filter;
-  let list = f.type === 'trash' ? state.notes.filter((n) => n.deleted) : activeNotes();
+  let list = f.type === 'trash' ? trashNotes() : activeNotes();
   if (f.type === 'folder') list = list.filter((n) => n.folder_id === f.id);
   if (f.type === 'none') list = list.filter((n) => !n.folder_id || !liveFolders().some((x) => x.id === n.folder_id));
   if (f.type === 'tag') list = list.filter((n) => (n.tags || []).includes(f.tag));
@@ -208,7 +219,7 @@ function renderSidebar() {
   el.tagList.replaceChildren(...tags.map(([t, c]) => sideItem({ type: 'tag', tag: t }, 'tag', t, c)));
   if (!tags.length) el.tagList.innerHTML = '<li class="side-empty">Add tags to a note</li>';
 
-  const trashCount = state.notes.filter((n) => n.deleted).length;
+  const trashCount = trashNotes().length;
   const trash = sideItem({ type: 'trash' }, 'trash', 'Recently Deleted', trashCount);
   const wrap = document.createElement('div');
   wrap.className = 'side-section';
@@ -233,12 +244,13 @@ function listTitle() {
 function renderList() {
   el.listTitle.textContent = listTitle();
   const notes = filteredNotes();
+  renderSelectBar(notes);
   if (!notes.length) {
     el.noteList.innerHTML = `<li class="list-empty">${state.query ? 'No matching notes' : state.filter.type === 'trash' ? 'Nothing deleted' : 'No notes here yet'}</li>`;
     return;
   }
   el.noteList.innerHTML = notes.map((n) => `
-    <li class="note-item${n.id === state.currentId ? ' active' : ''}" data-id="${n.id}">
+    <li class="note-item${n.id === state.currentId && !state.selecting ? ' active' : ''}${state.selected.has(n.id) ? ' selected' : ''}" data-id="${n.id}" role="option" aria-selected="${state.selected.has(n.id)}">
       <div class="title">${n.pinned ? ICONS.pin : ''}<span>${esc(titleOf(n))}</span></div>
       <div class="meta"><span class="date">${esc(formatDate(n.updated_at))}</span><span class="snippet">${esc(snippetOf(n))}</span></div>
       ${(n.tags || []).length ? `<div class="tags">${n.tags.map((t) => `<span class="mini-tag">#${esc(t)}</span>`).join('')}</div>` : ''}
@@ -249,12 +261,12 @@ function renderEditor() {
   const n = currentNote();
   const show = !!n;
   el.emptyEditor.hidden = show;
-  [el.body, el.tagRow, el.folderSel, el.pin, el.del, $('btn-share')].forEach((x) => { x.hidden = !show; });
+  [el.body, el.tagRow, el.folderSel, el.pin, el.del, $('btn-share'), $('btn-close-note')].forEach((x) => { x.hidden = !show; });
   if (!show) { writing.renderToolbar(null); $('preview').hidden = true; }
   el.trashBar.hidden = !(n && n.deleted);
   if (!n) return;
 
-  if (el.body.value !== n.body) {
+  if (el.body.value !== n.body && !(pending && pending.id === n.id)) {
     const focused = document.activeElement === el.body;
     const { selectionStart, selectionEnd } = el.body;
     el.body.value = n.body;
@@ -328,6 +340,8 @@ async function selectNote(id) {
 
 async function selectFilter(filter) {
   await flushSave();
+  state.selecting = false;
+  state.selected.clear();
   state.filter = filter;
   const visible = filteredNotes();
   if (!visible.some((n) => n.id === state.currentId)) state.currentId = isPhone() ? null : visible[0]?.id || null;
@@ -362,19 +376,142 @@ async function deleteCurrent() {
   await flushSave();
   const list = filteredNotes();
   const idx = list.findIndex((x) => x.id === n.id);
-  if (!n.body.trim() && !n.synced_updated_at) {
-    // A blank note that never left this device is simply removed.
-    await db.remove('notes', n.id);
-    state.notes = state.notes.filter((x) => x.id !== n.id);
-    log.info('editor', 'Empty note discarded', { id: n.id });
-  } else {
-    replaceNote(await db.deleteNote(n));
-  }
+  await trashNote(n);
   const remaining = filteredNotes();
   state.currentId = isPhone() ? null : (remaining[idx] || remaining[idx - 1] || null)?.id || null;
   render();
   setMobileView('list');
   scheduleSync();
+}
+
+// ---- Trash, selection, closing -------------------------------------------
+// Move one note to Recently Deleted (a blank note that never synced is simply dropped).
+async function trashNote(n) {
+  if (!n.body.trim() && !n.synced_updated_at && !(n.tags || []).length) {
+    await db.remove('notes', n.id);
+    state.notes = state.notes.filter((x) => x.id !== n.id);
+  } else {
+    replaceNote(await db.deleteNote(n));
+  }
+}
+
+const selectedNotes = () => state.notes.filter((n) => state.selected.has(n.id));
+
+function renderSelectBar(notes = filteredNotes()) {
+  const trash = state.filter.type === 'trash';
+  const ids = new Set(notes.map((n) => n.id));
+  for (const id of [...state.selected]) if (!ids.has(id)) state.selected.delete(id);
+  el.app.dataset.select = state.selecting ? 'on' : 'off';
+  $('select-bar').hidden = !state.selecting;
+  $('btn-select').textContent = state.selecting ? 'Done' : 'Select';
+  $('btn-select').hidden = !notes.length && !state.selecting;
+  $('btn-empty-trash').hidden = !(trash && notes.length) || state.selecting;
+  $('btn-share-list').hidden = state.selecting;
+  const count = state.selected.size;
+  $('sel-count').textContent = count ? `${count} selected` : 'Tap notes to select';
+  $('sel-all').textContent = count && count === notes.length ? 'None' : 'All';
+  $('sel-restore').hidden = !trash;
+  $('sel-delete').textContent = trash ? 'Delete forever' : 'Delete';
+  for (const id of ['sel-share', 'sel-restore', 'sel-delete']) $(id).disabled = !count;
+}
+
+function setSelecting(on) {
+  state.selecting = on;
+  if (!on) state.selected.clear();
+  if (on) { flushSave(); }
+  renderList();
+}
+
+function toggleSelected(id) {
+  if (state.selected.has(id)) state.selected.delete(id); else state.selected.add(id);
+  renderList();
+}
+
+async function afterBulkChange() {
+  state.selected.clear();
+  state.selecting = false;
+  if (!filteredNotes().some((n) => n.id === state.currentId)) state.currentId = null;
+  render();
+  if (isPhone()) setMobileView('list');
+  scheduleSync();
+}
+
+async function deleteSelected() {
+  const notes = selectedNotes();
+  if (!notes.length) return;
+  await flushSave();
+  const trash = state.filter.type === 'trash';
+  const c = await ask(trash
+    ? { title: `Delete ${notes.length === 1 ? 'this note' : `${notes.length} notes`} forever?`, text: 'This cannot be undone.', okText: 'Delete forever' }
+    : { title: `Delete ${notes.length === 1 ? 'this note' : `${notes.length} notes`}?`, text: 'They move to Recently Deleted, where you can restore them.', okText: 'Delete' });
+  if (c.action !== 'ok') return;
+  for (const n of notes) { if (trash) replaceNote(await db.purgeNote(n)); else await trashNote(n); }
+  log.info('editor', trash ? 'Notes deleted permanently' : 'Notes moved to Recently Deleted', { count: notes.length });
+  await afterBulkChange();
+  toast(trash ? `Deleted ${notes.length} forever` : `${notes.length} moved to Recently Deleted`);
+}
+
+async function restoreSelected() {
+  const notes = selectedNotes();
+  if (!notes.length) return;
+  for (const n of notes) replaceNote(await db.restoreNote(n));
+  log.info('editor', 'Notes restored', { count: notes.length });
+  await afterBulkChange();
+  toast(`Restored ${notes.length} ${notes.length === 1 ? 'note' : 'notes'}`);
+}
+
+async function purgeCurrent() {
+  const n = currentNote();
+  if (!n || !n.deleted) return;
+  const c = await ask({ title: 'Delete this note forever?', text: 'This cannot be undone.', okText: 'Delete forever' });
+  if (c.action !== 'ok') return;
+  const idx = filteredNotes().findIndex((x) => x.id === n.id);
+  replaceNote(await db.purgeNote(n));
+  const remaining = filteredNotes();
+  state.currentId = isPhone() ? null : (remaining[idx] || remaining[idx - 1] || null)?.id || null;
+  log.info('editor', 'Note deleted permanently', { id: n.id });
+  render();
+  if (isPhone()) setMobileView('list');
+  scheduleSync();
+}
+
+async function emptyTrash() {
+  const notes = trashNotes();
+  if (!notes.length) return;
+  const c = await ask({ title: `Delete ${notes.length === 1 ? '1 note' : `all ${notes.length} notes`} forever?`, text: 'Everything in Recently Deleted will be removed. This cannot be undone.', okText: 'Empty Recently Deleted' });
+  if (c.action !== 'ok') return;
+  for (const n of notes) replaceNote(await db.purgeNote(n));
+  state.currentId = null;
+  log.info('editor', 'Recently Deleted emptied', { count: notes.length });
+  render();
+  if (isPhone()) setMobileView('list');
+  scheduleSync();
+}
+
+// Close the open note and show the Reiimei page.
+async function closeNote() {
+  await flushSave();
+  state.currentId = null;
+  el.saveState.textContent = '';
+  writing.resetView();
+  render();
+  if (isPhone()) setMobileView('list');
+  log.debug('editor', 'Note closed');
+}
+
+// Notes that sync once left as "Conflicted copy" go to Recently Deleted, still restorable.
+async function findConflictedCopies() {
+  await flushSave();
+  const copies = activeNotes().filter((n) => /\(Conflicted copy from [^)]*\)\s*$/.test(n.body));
+  if (!copies.length) { setMsg('data-msg', 'No conflicted copies found.', 'ok'); return; }
+  const c = await ask({ title: `Move ${copies.length} conflicted ${copies.length === 1 ? 'copy' : 'copies'} to Recently Deleted?`, text: 'Your original notes are not touched. You can restore any of these from Recently Deleted.', okText: 'Move them' });
+  if (c.action !== 'ok') return;
+  for (const n of copies) replaceNote(await db.deleteNote(n));
+  state.currentId = filteredNotes().some((n) => n.id === state.currentId) ? state.currentId : null;
+  render();
+  scheduleSync();
+  log.info('editor', 'Conflicted copies moved to Recently Deleted', { count: copies.length });
+  setMsg('data-msg', `Moved ${copies.length} conflicted ${copies.length === 1 ? 'copy' : 'copies'} to Recently Deleted.`, 'ok');
 }
 
 async function addTag(raw) {
@@ -433,6 +570,15 @@ function scheduleSync(delay = 3000) {
   syncTimer = setTimeout(runSync, delay);
 }
 
+// Reload records after a sync without ever replacing something newer that the
+// screen already holds (an edit saved while the sync was running).
+async function reloadFromDb() {
+  const [notes, folders] = await Promise.all([db.getAll('notes'), db.getAll('folders')]);
+  const held = new Map(state.notes.map((n) => [n.id, n]));
+  state.notes = notes.map((n) => { const h = held.get(n.id); return h && !h.locked && h.updated_at > n.updated_at ? h : n; });
+  state.folders = folders;
+}
+
 async function runSync(reason = 'auto') {
   if (security.isLocked()) return { skipped: 'locked' };
   await flushSave();
@@ -440,8 +586,7 @@ async function runSync(reason = 'auto') {
   if (r?.locked && r.sample) security.askForRemotePassphrase(r.sample);
   if (r && (r.pulled || r.pushed)) {
     // Reload from the database so the UI holds the post-sync records.
-    state.notes = await db.getAll('notes');
-    state.folders = await db.getAll('folders');
+    await reloadFromDb();
     if (state.filter.type === 'folder' && !liveFolders().some((f) => f.id === state.filter.id)) state.filter = { type: 'all' };
     render();
   }
@@ -516,9 +661,10 @@ async function runDiagnostics() {
   }
   try {
     const p = prefs();
-    const want = [p.headFont === 'echolume' || p.noteFont === 'echolume' ? 'Echolume' : null].filter(Boolean);
+    const names = { display: 'Reiimei Display', echolume: 'Echolume' };
+    const want = [...new Set([names[p.headFont], names[p.noteFont]].filter(Boolean))];
     const loaded = await Promise.all(want.map((f) => document.fonts.load(`16px "${f}"`).then((r) => r.length > 0)));
-    add('Fonts', loaded.every(Boolean) ? 'pass' : 'warn', `Headings: ${p.headFont === 'echolume' ? 'Echolume' : 'Reiimei'}; notes: ${p.noteFont === 'echolume' ? 'Echolume' : p.noteFont === 'sans' ? 'System sans-serif' : 'Newsreader'}${loaded.every(Boolean) ? '' : ' (Echolume did not load)'}`);
+    add('Fonts', loaded.every(Boolean) ? 'pass' : 'warn', `Headings: ${FONT_NAMES[p.headFont] || 'Marcellus'}; notes: ${FONT_NAMES[p.noteFont] || 'Newsreader'}${loaded.every(Boolean) ? '' : ' (a bundled font did not load)'}`);
   } catch (e) { add('Fonts', 'warn', e.message); }
   const sh = sharedFileCheck();
   add('Sharing', sh.text ? 'pass' : 'warn', `${sh.text ? 'Share sheet available' : 'No share sheet: use Email, Copy, or Download'}${sh.files ? '; files can be shared' : '; files are downloaded'}`);
@@ -710,9 +856,46 @@ function bindEvents() {
   $('btn-settings').addEventListener('click', () => openSettings());
   $('sync-foot').addEventListener('click', () => openSettings('sync'));
 
+  let longPressed = false;
   el.noteList.addEventListener('click', (e) => {
     const item = e.target.closest('.note-item');
-    if (item) selectNote(item.dataset.id);
+    if (!item) return;
+    if (longPressed) { longPressed = false; return; }
+    if (state.selecting) toggleSelected(item.dataset.id);
+    else if (e.ctrlKey || e.metaKey || e.shiftKey) { state.selecting = true; flushSave(); toggleSelected(item.dataset.id); }
+    else selectNote(item.dataset.id);
+  });
+  // Press and hold a note (phone) to start selecting.
+  let pressTimer = null;
+  el.noteList.addEventListener('pointerdown', (e) => {
+    const item = e.target.closest('.note-item');
+    if (!item || state.selecting || e.pointerType === 'mouse') return;
+    pressTimer = setTimeout(() => { longPressed = true; state.selecting = true; flushSave(); toggleSelected(item.dataset.id); }, 550);
+  });
+  for (const t of ['pointerup', 'pointercancel', 'pointermove', 'pointerleave']) el.noteList.addEventListener(t, () => clearTimeout(pressTimer));
+  $('btn-select').addEventListener('click', () => setSelecting(!state.selecting));
+  $('sel-all').addEventListener('click', () => {
+    const notes = filteredNotes();
+    if (state.selected.size === notes.length) state.selected.clear(); else notes.forEach((n) => state.selected.add(n.id));
+    renderList();
+  });
+  $('sel-share').addEventListener('click', async () => {
+    const notes = selectedNotes();
+    if (!notes.length) return;
+    await flushSave();
+    shareUi.open(selectedNotes(), { title: '', single: notes.length === 1 });
+  });
+  $('sel-delete').addEventListener('click', deleteSelected);
+  $('sel-restore').addEventListener('click', restoreSelected);
+  $('btn-empty-trash').addEventListener('click', emptyTrash);
+  $('btn-purge').addEventListener('click', purgeCurrent);
+  $('btn-close-note').addEventListener('click', closeNote);
+  $('btn-fonts').addEventListener('click', () => openSettings('fonts'));
+  $('btn-find-copies').addEventListener('click', findConflictedCopies);
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || document.querySelector('dialog[open]')) return;
+    if (state.selecting) { setSelecting(false); return; }
+    if (state.currentId && !['TEXTAREA', 'INPUT', 'SELECT'].includes(document.activeElement?.tagName)) closeNote();
   });
 
   let searchTimer = null;

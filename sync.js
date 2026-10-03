@@ -205,52 +205,77 @@ async function fromServer(store, r) {
   return opened;
 }
 
+// Versions this device has uploaded, per record. When the server hands one of
+// them back, it is our own change coming home, never a conflict.
+let pushedMap = null;
+async function pushedLog() {
+  if (!pushedMap) pushedMap = (await db.getMeta('pushedVersions', {})) || {};
+  return pushedMap;
+}
+async function notePushed(id, stamp) {
+  const m = await pushedLog();
+  m[id] = [...(m[id] || []).filter((x) => x !== stamp), stamp].slice(-12);
+  await db.setMeta('pushedVersions', m);
+}
+const wasPushed = (id, stamp) => !!(pushedMap?.[id] || []).includes(stamp);
+
 async function mergeRemote(store, rows) {
+  await pushedLog();
   let applied = 0;
   let conflicts = 0;
+  const copies = [];
   for (const r of rows) {
     // Postgres returns timestamps as "+00:00"; store them in the same ISO form
     // the app writes so comparisons line up.
     r.updated_at = new Date(r.updated_at).toISOString();
     if (r.created_at) r.created_at = new Date(r.created_at).toISOString();
     const remote = { ...(await fromServer(store, r)), dirty: false, synced_updated_at: r.updated_at };
-    const local = await db.get(store, r.id);
+    await db.locked(async () => {
+      const local = await db.get(store, r.id);
+      if (local?.locked) return;
 
-    if (!local || !local.dirty) {
-      if (!local || local.updated_at !== r.updated_at || local.server_updated_at !== r.server_updated_at) {
-        await db.put(store, remote);
-        applied++;
+      if (!local || !local.dirty) {
+        if (!local || local.updated_at !== r.updated_at || local.server_updated_at !== r.server_updated_at) {
+          await db.put(store, remote);
+          applied++;
+        }
+        return;
       }
-      continue;
-    }
-    // Local has unsynced edits. If the server still holds the version we last
-    // synced, the local copy is simply newer: keep it and push it.
-    if (local.synced_updated_at === r.updated_at) continue;
+      // Local has unsynced edits. If the server still holds the version we last
+      // synced, or one this device uploaded, the local copy is simply newer.
+      if (local.synced_updated_at === r.updated_at || wasPushed(r.id, r.updated_at)) {
+        if (local.synced_updated_at !== r.updated_at) await db.put(store, { ...local, synced_updated_at: r.updated_at });
+        return;
+      }
 
-    if (store === 'folders' || (store === 'notes' && sameNote(local, remote))) {
-      // Folders: newest rename/delete wins. Identical notes: just mark clean.
-      if (store === 'notes' || r.updated_at > local.updated_at) await db.put(store, remote);
-      else await db.put(store, { ...local, synced_updated_at: r.updated_at });
-      continue;
-    }
+      if (store === 'folders' || (store === 'notes' && sameNote(local, remote))) {
+        // Folders: newest rename/delete wins. Identical notes: just mark clean.
+        if (store === 'notes' || r.updated_at > local.updated_at) await db.put(store, remote);
+        else await db.put(store, { ...local, synced_updated_at: r.updated_at });
+        return;
+      }
 
-    // True note conflict.
-    conflicts++;
-    if (r.deleted && !local.deleted) {
-      // Deleted elsewhere, edited here: keep the edit.
-      await db.put(store, { ...local, synced_updated_at: r.updated_at });
-    } else if (local.deleted && !r.deleted) {
-      // Deleted here, edited elsewhere: keep the edit.
-      await db.put(store, remote);
-    } else {
-      const localWins = local.updated_at > r.updated_at;
-      const winner = localWins ? { ...local, synced_updated_at: r.updated_at } : remote;
-      const loser = localWins ? remote : local;
-      await db.put(store, winner);
-      const copy = await db.createNote({ folder_id: loser.folder_id, tags: loser.tags, format: loser.format, meta: loser.meta });
-      await db.saveNote(copy, { body: `${loser.body}\n\n(Conflicted copy from ${new Date(loser.updated_at).toLocaleString()})` });
-    }
-    log.warn('sync', 'Resolved edit conflict', { id: r.id, localUpdated: local.updated_at, localSynced: local.synced_updated_at, remoteUpdated: r.updated_at });
+      // True note conflict.
+      conflicts++;
+      if (r.deleted && !local.deleted) {
+        // Deleted elsewhere, edited here: keep the edit.
+        await db.put(store, { ...local, synced_updated_at: r.updated_at });
+      } else if (local.deleted && !r.deleted) {
+        // Deleted here, edited elsewhere: keep the edit.
+        await db.put(store, remote);
+      } else {
+        const localWins = local.updated_at > r.updated_at;
+        const winner = localWins ? { ...local, synced_updated_at: r.updated_at } : remote;
+        const loser = localWins ? remote : local;
+        await db.put(store, winner);
+        copies.push(loser);
+      }
+      log.warn('sync', 'Resolved edit conflict', { id: r.id, localUpdated: local.updated_at, localSynced: local.synced_updated_at, remoteUpdated: r.updated_at });
+    });
+  }
+  for (const loser of copies) {
+    const copy = await db.createNote({ folder_id: loser.folder_id, tags: loser.tags, format: loser.format, meta: loser.meta });
+    await db.saveNote(copy, { body: `${loser.body}\n\n(Conflicted copy from ${new Date(loser.updated_at).toLocaleString()})` });
   }
   return { applied, conflicts };
 }
@@ -260,15 +285,20 @@ async function pushTable(store, table) {
   if (!dirty.length) return 0;
   for (let i = 0; i < dirty.length; i += PAGE) {
     const batch = dirty.slice(i, i + PAGE);
+    await pushedLog();
+    // Note each version before sending, so it is recognised if it comes straight back.
+    for (const sent of batch) if (store === 'notes') await notePushed(sent.id, sent.updated_at);
     await rest('POST', `${table}?on_conflict=id`, await Promise.all(batch.map((r) => toServer(table, r))));
     // Mark clean only if the record was not edited again while uploading.
     for (const sent of batch) {
-      const current = await db.get(store, sent.id);
-      if (!current) continue;
-      await db.put(store, {
-        ...current,
-        dirty: current.updated_at !== sent.updated_at,
-        synced_updated_at: sent.updated_at,
+      await db.locked(async () => {
+        const current = await db.get(store, sent.id);
+        if (!current || current.locked) return;
+        await db.put(store, {
+          ...current,
+          dirty: current.updated_at !== sent.updated_at,
+          synced_updated_at: sent.updated_at,
+        });
       });
     }
   }

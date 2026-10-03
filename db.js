@@ -163,6 +163,16 @@ export const setMeta = (key, value) => rawPut('meta', { key, value });
 
 const now = () => new Date().toISOString();
 
+// One writer at a time. Every read-change-write of a record (editing, marking
+// clean after upload, applying a downloaded change) runs inside this lock, so a
+// background sync can never overwrite an edit made a moment earlier.
+let lockTail = Promise.resolve();
+export function locked(fn) {
+  const run = lockTail.then(fn, fn);
+  lockTail = run.catch(() => {});
+  return run;
+}
+
 // ---- Notes -------------------------------------------------------------
 export async function createNote({ folder_id = null, tags = [], format = 'markdown', meta = {} } = {}) {
   const note = {
@@ -186,15 +196,23 @@ export async function createNote({ folder_id = null, tags = [], format = 'markdo
 // Apply changes on top of the record currently in the database (not a possibly
 // stale copy held by the UI).
 async function update(store, id, changes, fallback) {
-  const current = (await get(store, id)) || fallback;
-  const updated = { ...current, ...changes, updated_at: now(), dirty: true };
-  await put(store, updated);
-  return updated;
+  return locked(async () => {
+    const current = (await get(store, id)) || fallback;
+    const updated = { ...current, ...changes, updated_at: now(), dirty: true };
+    await put(store, updated);
+    return updated;
+  });
 }
 
 export const saveNote = (note, changes) => update('notes', note.id, changes, note);
 
 export const deleteNote = (note) => saveNote(note, { deleted: true });
+export const restoreNote = (note) => saveNote(note, { deleted: false });
+
+// Permanent delete: the note's text and tags are wiped and only a blank deleted
+// stub remains, which syncs so every other device wipes its copy too. Blank
+// deleted stubs are never listed in Recently Deleted (see isPurged in app.js).
+export const purgeNote = (note) => saveNote(note, { deleted: true, body: '', tags: [], meta: {}, pinned: false });
 
 // ---- Folders -----------------------------------------------------------
 export async function createFolder(name) {
