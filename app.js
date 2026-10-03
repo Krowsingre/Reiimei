@@ -7,9 +7,10 @@ import * as writing from './ui-writing.js';
 import * as security from './ui-security.js';
 import * as shareUi from './ui-share.js';
 import * as modes from './modes.js';
+import * as story from './storyboard.js';
 import { noteTitle, noteSnippet, sharedFileCheck } from './share.js';
 
-export const APP_VERSION = '0.10.0';
+export const APP_VERSION = '0.11.0';
 
 const $ = (id) => document.getElementById(id);
 const el = {
@@ -134,27 +135,29 @@ function toast(text, actionLabel = null, action = null) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => { t.hidden = true; }, actionLabel ? 8000 : 3000);
 }
-const activeNotes = () => state.notes.filter((n) => !n.deleted);
+// Storyboard registers are kept in a hidden note per project; it never shows in a list.
+const isRegistry = (n) => !!(n.meta && n.meta.registry);
+const activeNotes = () => state.notes.filter((n) => !n.deleted && !isRegistry(n));
 // A permanently deleted note is a blank deleted stub (kept only so other devices wipe it too).
 const isPurged = (n) => n.deleted && !n.locked && !(n.body || '').trim() && !(n.tags || []).length;
-const trashNotes = () => state.notes.filter((n) => n.deleted && !isPurged(n));
+const trashNotes = () => state.notes.filter((n) => n.deleted && !isPurged(n) && !isRegistry(n));
 const anyFolders = () => state.folders.filter((f) => !f.deleted);
 const liveFolders = () => anyFolders().filter((f) => !modes.isProject(f)).sort((a, b) => a.name.localeCompare(b.name));
-const liveProjects = () => anyFolders().filter(modes.isProject).sort((a, b) => modes.projectName(a).localeCompare(modes.projectName(b)));
+const liveProjects = (mode = state.mode) => anyFolders().filter((f) => modes.isProject(f, mode)).sort((a, b) => modes.projectName(a).localeCompare(modes.projectName(b)));
 const folderById = (id) => anyFolders().find((f) => f.id === id);
 // A Research note's project gives it a tag automatically. It is worked out, not stored, so
 // renaming the project renames the tag, and it cannot be removed from the note.
 function projectTagOf(n) {
-  if (!n || n.deleted || modes.kindOf(n) !== 'research') return null;
+  if (!n || n.deleted || !modes.hasProjects(modes.kindOf(n))) return null;
   const f = folderById(n.folder_id);
-  return f && modes.isProject(f) ? modes.slugTag(modes.projectName(f)) || null : null;
+  return f && modes.isProject(f, modes.kindOf(n)) ? modes.slugTag(modes.projectName(f)) || null : null;
 }
 function tagsOf(n) {
   const pt = projectTagOf(n);
   const t = n.tags || [];
   return pt && !t.includes(pt) ? [...t, pt] : t;
 }
-const projectTagSet = () => new Set(liveProjects().map((f) => modes.slugTag(modes.projectName(f))));
+const projectTagSet = () => new Set(anyFolders().filter((f) => modes.isProject(f)).map((f) => modes.slugTag(modes.projectName(f))));
 const currentNote = () => state.notes.find((n) => n.id === state.currentId) || null;
 const normTag = (t) => t.trim().replace(/^#+/, '').toLowerCase().replace(/\s+/g, '-').replace(/[^\p{L}\p{N}_-]/gu, '').slice(0, 40);
 
@@ -348,7 +351,7 @@ function sideItem(filter, icon, name, count, withMore = false) {
 
 function renderSidebar() {
   const act = activeNotes().filter((n) => state.showAll || modes.kindOf(n) === state.mode);
-  const research = state.mode === 'research';
+  const research = modes.hasProjects(state.mode);
   const folders = research ? liveProjects() : liveFolders();
   renderModeSwitch();
   $('folders-label').textContent = research ? 'Projects' : 'Folders';
@@ -449,9 +452,9 @@ async function moveToMode(id) {
   const n = currentNote();
   if (!n || n.deleted || !modes.MODE_IDS.includes(id) || modes.kindOf(n) === id) return;
   const changes = { meta: { ...(n.meta || {}), kind: id } };
-  const inProject = modes.isProject(folderById(n.folder_id));
-  if (id === 'research' && !inProject) changes.folder_id = (await projectForNew()).id; // Research notes live in a project
-  if (id !== 'research' && inProject) changes.folder_id = null;                        // other modes have no projects
+  const here = folderById(n.folder_id);
+  if (modes.hasProjects(id)) { if (!modes.isProject(here, id)) changes.folder_id = (await projectForNew(id)).id; } // these notes live in a project of their own mode
+  else if (modes.isProject(here)) changes.folder_id = null;                                                          // other modes have no projects
   await updateCurrent(changes);
   log.info('modes', 'Note moved to mode', { id: n.id, mode: id });
   toast(`Moved to ${modes.modeName(id)}`);
@@ -521,8 +524,8 @@ function renderEditor() {
   el.tagInput.disabled = n.deleted;
   el.folderSel.disabled = n.deleted;
 
-  const isResearch = modes.kindOf(n) === 'research';
-  const folders = isResearch ? liveProjects() : liveFolders();
+  const isResearch = modes.hasProjects(modes.kindOf(n));
+  const folders = isResearch ? liveProjects(modes.kindOf(n)) : liveFolders();
   el.folderSel.innerHTML = (isResearch ? '' : `<option value="">Notes (no folder)</option>`) +
     folders.map((f) => `<option value="${f.id}">${esc(modes.projectName(f))}</option>`).join('');
   el.folderSel.value = folders.some((f) => f.id === n.folder_id) ? n.folder_id : (isResearch ? folders[0]?.id || '' : '');
@@ -658,7 +661,7 @@ async function newNote() {
   if (f.type === 'trash') state.filter = { type: 'all' };
   const p = prefs();
   const note = await db.createNote({
-    folder_id: state.mode === 'research' ? (await projectForNew()).id : f.type === 'folder' && !modes.isProject(folderById(f.id)) ? f.id : null,
+    folder_id: modes.hasProjects(state.mode) ? (await projectForNew(state.mode)).id : f.type === 'folder' && !modes.isProject(folderById(f.id)) ? f.id : null,
     tags: f.type === 'tag' ? [...f.tags] : [],
     format: p.format,
     meta: { ...writing.newNoteMeta(p), kind: state.mode, origin: { id: device().id, name: device().name } },
@@ -830,7 +833,7 @@ function renderViewDialog() {
   $('view-dir').value = v.dir;
   $('view-devices-wrap').hidden = !all;
   const devs = knownDevices();
-  if (state.notes.some((n) => !n.deleted && !originOf(n)) && !devs.some((d) => d.id === UNKNOWN.id)) {
+  if (state.notes.some((n) => !n.deleted && !isRegistry(n) && !originOf(n)) && !devs.some((d) => d.id === UNKNOWN.id)) {
     devs.push({ ...UNKNOWN, count: activeNotes().filter((n) => !originOf(n)).length, mine: false });
   }
   $('view-devices').innerHTML = devs.map((d) =>
@@ -873,7 +876,7 @@ async function renameDevice(name) {
 async function offerDeviceSetup() {
   const key = 'reiimei.deviceAsked';
   try { if (localStorage.getItem(key)) return; } catch { return; }
-  const n = state.notes.filter((x) => !x.deleted && !x.locked && !originOf(x)).length;
+  const n = state.notes.filter((x) => !x.deleted && !x.locked && !isRegistry(x) && !originOf(x)).length;
   if (!n) return;
   const me = device();
   const r = await ask({
@@ -922,45 +925,99 @@ async function removeTag(tag) {
 }
 
 async function newFolder() {
-  const research = state.mode === 'research';
+  const research = modes.hasProjects(state.mode);
   const r = await ask({ title: research ? 'New project' : 'New folder', value: '', placeholder: research ? 'Project name' : 'Folder name', okText: 'Create' });
   if (r.action !== 'ok' || !r.value.trim()) return;
-  if (research && liveProjects().some((p) => modes.projectName(p).toLowerCase() === r.value.trim().toLowerCase())) { toast('A project with that name already exists.'); return; }
-  const f = await db.createFolder(research ? modes.projectStored(r.value) : r.value.slice(0, 80));
+  if (research && liveProjects(state.mode).some((p) => modes.projectName(p).toLowerCase() === r.value.trim().toLowerCase())) { toast('A project with that name already exists.'); return; }
+  const f = await db.createFolder(research ? modes.projectStored(r.value, state.mode) : r.value.slice(0, 80));
   replaceFolder(f);
+  if (research) setPrefs({ [lastProjectKey(state.mode)]: f.id });
   await selectFilter({ type: 'folder', id: f.id });
   scheduleSync();
 }
 
+// ---- Storyboard registers --------------------------------------------------
+// Each Storyboard project keeps its registers in one hidden note (meta.registry). If two devices
+// edit at once, sync leaves extra copies; they are merged here and the extras removed.
+const registryNotes = (folderId) => state.notes.filter((n) => !n.deleted && !n.locked && isRegistry(n) && n.folder_id === folderId)
+  .sort((a, b) => (b.updated_at || '').localeCompare(a.updated_at || ''));
+
+function registryOf(folderId) {
+  return story.mergeRegistries(registryNotes(folderId).map((n) => n.meta));
+}
+
+async function dropNote(n) {
+  if (!n.synced_updated_at) {
+    await db.locked(() => db.remove('notes', n.id));
+    state.notes = state.notes.filter((x) => x.id !== n.id);
+  } else {
+    replaceNote(await db.purgeNote(n));
+  }
+}
+
+async function saveRegistry(folderId, data) {
+  const list = registryNotes(folderId);
+  const meta = { registry: true, kind: 'storyboard', origin: { id: device().id, name: device().name }, registers: data.registers || [], dismissed: data.dismissed || [] };
+  let note = list[0];
+  if (!note) {
+    note = await db.createNote({ folder_id: folderId, format: 'markdown', meta });
+    note = await db.saveNote(note, { body: '[Registers. Kept by Reiimei, not shown in lists.]' });
+    replaceNote(note);
+    log.info('registers', 'Registry created', { folder: folderId });
+  } else {
+    replaceNote(await db.saveNote(note, { meta }));
+  }
+  for (const extra of list.slice(1)) await dropNote(extra);
+  scheduleSync();
+}
+
+// Two devices that edited registers at the same time leave extra copies; fold them into one.
+async function tidyRegistries() {
+  const byFolder = new Map();
+  for (const n of state.notes) if (!n.deleted && !n.locked && isRegistry(n)) byFolder.set(n.folder_id, (byFolder.get(n.folder_id) || 0) + 1);
+  for (const [folderId, count] of byFolder) {
+    if (count < 2) continue;
+    await saveRegistry(folderId, registryOf(folderId));
+    log.info('registers', 'Duplicate registry copies merged', { folder: folderId, copies: count });
+  }
+}
+
+async function dropRegistry(folderId) {
+  for (const n of registryNotes(folderId)) await dropNote(n);
+}
+
 // ---- Research projects -------------------------------------------------------
-async function ensureUnsorted() {
-  const found = liveProjects().find((p) => modes.projectName(p) === modes.UNSORTED);
+async function ensureUnsorted(mode = 'research') {
+  const found = liveProjects(mode).find((p) => modes.projectName(p) === modes.UNSORTED);
   if (found) return found;
-  const f = await db.createFolder(modes.projectStored(modes.UNSORTED));
+  const f = await db.createFolder(modes.projectStored(modes.UNSORTED, mode));
   replaceFolder(f);
-  log.info('projects', 'Unsorted project created');
+  log.info('projects', 'Unsorted project created', { mode });
   return f;
 }
 
 // The project a new Research note goes into: the one you are looking at, else the last
 // one you used, else Unsorted.
-async function projectForNew() {
+const lastProjectKey = (mode) => (mode === 'research' ? 'lastProject' : `lastProject_${mode}`);
+async function projectForNew(mode = state.mode) {
   const f = state.filter;
-  if (f.type === 'folder' && modes.isProject(folderById(f.id))) return folderById(f.id);
-  const last = folderById(prefs().lastProject);
-  if (last && modes.isProject(last)) return last;
-  return ensureUnsorted();
+  if (f.type === 'folder' && modes.isProject(folderById(f.id), mode)) return folderById(f.id);
+  const last = folderById(prefs()[lastProjectKey(mode)]);
+  if (last && modes.isProject(last, mode)) return last;
+  return ensureUnsorted(mode);
 }
 
 // Every Research note must be in a project. Older notes that were sorted into Research
 // without one are put in Unsorted. Runs at start-up and after each sync.
 async function fixResearchNotes() {
-  const stray = activeNotes().filter((n) => !n.locked && modes.kindOf(n) === 'research' && !modes.isProject(folderById(n.folder_id)));
-  if (!stray.length) return;
-  const dest = await ensureUnsorted();
-  for (const n of stray) replaceNote(await db.saveNote(n, { folder_id: dest.id }));
-  log.info('projects', 'Research notes placed in a project', { count: stray.length });
-  scheduleSync();
+  for (const mode of Object.keys(modes.PROJECT_MARKS)) {
+    const stray = activeNotes().filter((n) => !n.locked && modes.kindOf(n) === mode && !modes.isProject(folderById(n.folder_id), mode));
+    if (!stray.length) continue;
+    const dest = await ensureUnsorted(mode);
+    for (const n of stray) replaceNote(await db.saveNote(n, { folder_id: dest.id }));
+    log.info('projects', 'Notes placed in a project', { mode, count: stray.length });
+    scheduleSync();
+  }
 }
 
 async function folderMenu(folder) {
@@ -972,19 +1029,20 @@ async function folderMenu(folder) {
     return;
   }
   if (r.action === 'ok' && r.value && r.value !== label) {
-    if (proj && liveProjects().some((p) => p.id !== folder.id && modes.projectName(p).toLowerCase() === r.value.trim().toLowerCase())) { toast('A project with that name already exists.'); return; }
-    replaceFolder(await db.saveFolder(folder, { name: proj ? modes.projectStored(r.value) : r.value.slice(0, 80) }));
+    if (proj && liveProjects(modes.projectKind(folder)).some((p) => p.id !== folder.id && modes.projectName(p).toLowerCase() === r.value.trim().toLowerCase())) { toast('A project with that name already exists.'); return; }
+    replaceFolder(await db.saveFolder(folder, { name: proj ? modes.projectStored(r.value, modes.projectKind(folder)) : r.value.slice(0, 80) }));
     render();
     scheduleSync();
   } else if (r.action === 'extra') {
     const inside = activeNotes().filter((n) => n.folder_id === folder.id);
     if (proj && label === modes.UNSORTED && inside.length) { toast('Move the notes in Unsorted to other projects first.'); return; }
-    const c = await ask({ title: `Delete "${label}"?`, text: proj ? 'Its notes will move to the Unsorted project. They will not be deleted.' : 'Notes in this folder will move to Notes. They will not be deleted.', okText: proj ? 'Delete project' : 'Delete folder' });
+    const c = await ask({ title: `Delete "${label}"?`, text: proj ? `Its notes will move to the Unsorted project. They will not be deleted.${modes.projectKind(folder) === 'storyboard' ? ' Its registers (characters, locations and so on) will be deleted.' : ''}` : 'Notes in this folder will move to Notes. They will not be deleted.', okText: proj ? 'Delete project' : 'Delete folder' });
     if (c.action !== 'ok') return;
     if (proj && inside.length) {
-      const dest = await ensureUnsorted();
+      const dest = await ensureUnsorted(modes.projectKind(folder));
       for (const n of inside) replaceNote(await db.saveNote(n, { folder_id: dest.id }));
     }
+    if (proj) await dropRegistry(folder.id);
     await db.deleteFolder(folder);
     state.notes = await db.getAll('notes');
     state.folders = await db.getAll('folders');
@@ -1021,6 +1079,7 @@ async function runSync(reason = 'auto') {
     await reloadFromDb();
     await refreshCache();
     await fixResearchNotes();
+    await tidyRegistries();
     if (state.filter.type === 'folder' && !folderById(state.filter.id)) state.filter = { type: 'all' };
     render();
   }
@@ -1412,7 +1471,7 @@ function bindEvents() {
     const m = modes.MODES.find((x) => x.key === e.key);
     if (m) { e.preventDefault(); setMode(m.id); }
   });
-  el.folderSel.addEventListener('change', () => { if (modes.isProject(folderById(el.folderSel.value))) setPrefs({ lastProject: el.folderSel.value }); updateCurrent({ folder_id: el.folderSel.value || null }); });
+  el.folderSel.addEventListener('change', () => { { const pf = folderById(el.folderSel.value); if (modes.isProject(pf)) setPrefs({ [lastProjectKey(modes.projectKind(pf))]: el.folderSel.value }); } updateCurrent({ folder_id: el.folderSel.value || null }); });
   el.pin.addEventListener('click', () => { const n = currentNote(); if (n) updateCurrent({ pinned: !n.pinned }); });
   el.del.addEventListener('click', deleteCurrent);
   $('btn-paste-erased').addEventListener('click', pasteErased);
@@ -1517,6 +1576,7 @@ async function loadData() {
   state.notes = await db.getAll('notes');
   await refreshCache();
   await fixResearchNotes();
+  await tidyRegistries();
   if (state.filter.type === 'folder' && !folderById(state.filter.id)) state.filter = { type: 'all' };
   if (!state.notes.some((n) => n.id === state.currentId)) state.currentId = isPhone() ? null : filteredNotes()[0]?.id || null;
   render();
@@ -1545,13 +1605,23 @@ const hooks = {
   ask: (o) => ask(o),
   toast,
   prefs,
+  setPrefs: (p) => setPrefs(p),
+  flush: () => flushSave(),
   reload: () => loadData(),
   clearData,
   closeSettings: () => closeSettings(),
   runSync: (reason) => runSync(reason),
   syncOn: () => sync.isConfigured(),
-  projects: () => liveProjects().map((f) => ({ id: f.id, name: modes.projectName(f) })),
-  projectNotes: (folderId) => activeNotes().filter((n) => n.folder_id === folderId && !n.locked && modes.kindOf(n) === 'research'),
+  registry: (folderId) => registryOf(folderId),
+  saveRegistry: (folderId, data) => saveRegistry(folderId, data),
+  notesIn: (folderId, mode = 'storyboard') => activeNotes().filter((n) => n.folder_id === folderId && !n.locked && modes.kindOf(n) === mode),
+  openNote: async (id) => {
+    const n = state.notes.find((x) => x.id === id);
+    if (n && !filteredNotes().some((x) => x.id === id)) { state.filter = { type: 'folder', id: n.folder_id }; state.query = ''; el.search.value = ''; }
+    await selectNote(id);
+  },
+  projects: (mode = 'research') => liveProjects(mode).map((f) => ({ id: f.id, name: modes.projectName(f) })),
+  projectNotes: (folderId, mode = 'research') => activeNotes().filter((n) => n.folder_id === folderId && !n.locked && modes.kindOf(n) === mode),
   updateNote: async (n, changes) => { replaceNote(await db.saveNote(n, changes)); render(); scheduleSync(); },
   folders: () => state.folders.map((f) => (modes.isProject(f) ? { ...f, name: modes.projectName(f) } : f)),
   encrypted: () => security.isEnabled(),

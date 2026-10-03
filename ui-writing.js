@@ -9,6 +9,7 @@ import * as codeUi from './ui-code.js';
 import { isCode, LANGS } from './code.js';
 import * as S from './share.js';
 import * as research from './ui-research.js';
+import * as storyUi from './ui-storyboard.js';
 import * as modes from './modes.js';
 
 const $ = (id) => document.getElementById(id);
@@ -34,7 +35,7 @@ const LABELS = { b: 'B', i: 'I', u: 'U', s: 'S', mark: '<span>H</span>', sup: 'x
 export function renderToolbar(note) {
   const bar = $('toolbar');
   bar.hidden = !note;
-  if (!note) return;
+  if (!note) { storyUi.renderToolbar(null); return; }
   const code = isCodeNote(note);
   const format = fmtOf(note);
   $('note-format').value = code ? note.format : format;
@@ -62,6 +63,7 @@ export function renderToolbar(note) {
   $('btn-preview').textContent = previewOn ? 'Edit' : pl || 'Preview';
   $('btn-sources').textContent = sourcesOf(note).length ? `Sources (${sourcesOf(note).length})` : 'Sources';
   renderPreview(note);
+  storyUi.renderToolbar(note, code, previewOn);
 }
 
 let lastRendered = null;
@@ -562,6 +564,7 @@ async function openPaperView() {
 export function init(hooks) {
   app = hooks;
   codeUi.init(hooks);
+  storyUi.init(hooks);
   research.init(hooks, { renderSources, saveMeta, insertText: (t) => insertAtCaret(t), sourcesOf, styleOf, citerFor });
 
   $('tool-buttons').addEventListener('click', (e) => {

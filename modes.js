@@ -21,14 +21,22 @@ export function kindOf(note) {
   return 'notes';
 }
 
-// ---- Research projects -------------------------------------------------------
-// A project is a folder that belongs to Research. Folders sync with only a name, so a
-// project is a folder whose name starts with this mark. (A device on an older version simply
-// shows the mark as part of the name.) Every Research note lives in exactly one project.
-export const PROJECT_MARK = '[Project] ';
+// ---- Projects (Research and Storyboard) ------------------------------------
+// A project is a folder that belongs to a mode. Folders sync with only a name, so a project
+// is a folder whose name starts with a mark: "[Project] " for Research, "[Story] " for
+// Storyboard. (A device on an older version simply shows the mark as part of the name.)
+// Every note in those modes lives in exactly one project of its own mode.
+export const PROJECT_MARKS = { research: '[Project] ', storyboard: '[Story] ' };
+export const PROJECT_MARK = PROJECT_MARKS.research;
 export const UNSORTED = 'Unsorted';
-export const isProject = (f) => !!f && typeof f.name === 'string' && f.name.startsWith(PROJECT_MARK);
-export const projectName = (f) => (isProject(f) ? f.name.slice(PROJECT_MARK.length) : f?.name || '');
-export const projectStored = (name) => PROJECT_MARK + String(name).trim().slice(0, 80);
+export const hasProjects = (mode) => Object.prototype.hasOwnProperty.call(PROJECT_MARKS, mode);
+export function projectKind(f) {
+  if (!f || typeof f.name !== 'string') return null;
+  return Object.keys(PROJECT_MARKS).find((m) => f.name.startsWith(PROJECT_MARKS[m])) || null;
+}
+// isProject(f): a project of any mode. isProject(f, mode): a project of that mode.
+export const isProject = (f, mode) => { const k = projectKind(f); return !!k && (!mode || k === mode); };
+export const projectName = (f) => { const k = projectKind(f); return k ? f.name.slice(PROJECT_MARKS[k].length) : f?.name || ''; };
+export const projectStored = (name, mode = 'research') => PROJECT_MARKS[mode] + String(name).trim().slice(0, 80);
 // The tag a project gives its notes (the same shape as every tag).
 export const slugTag = (name) => String(name).trim().replace(/^#+/, '').toLowerCase().replace(/\s+/g, '-').replace(/[^\p{L}\p{N}_-]/gu, '').slice(0, 40);

@@ -135,6 +135,9 @@
         <button class="tool" id="btn-fonts" title="Choose fonts">Aa</button>
         <button class="tool" id="btn-preview" aria-pressed="false" title="Preview">Preview</button>
         <button class="tool" id="btn-sources" title="Sources and citations">Sources</button>
+        <button class="tool story-only" id="btn-board" aria-pressed="true" title="Switch between scene cards and text" hidden>Board</button>
+        <button class="tool story-only" id="btn-registers" title="Characters, locations, items and settings for this project" hidden>Registers</button>
+        <button class="tool story-only" id="btn-continuity" title="Check this story against its registers" hidden>Continuity</button>
         <button class="tool research-only" id="btn-quote" title="Quote a source" hidden>Quote</button>
         <button class="tool research-only" id="btn-outline" aria-pressed="false" title="Outline of headings" hidden>Outline</button>
         <button class="tool" id="btn-paper" title="Format as an MLA or APA paper">Paper</button>
@@ -155,6 +158,7 @@
         <pre class="code-layer" id="code-layer" hidden aria-hidden="true"><code id="code-hl"></code></pre>
         <textarea id="body" placeholder="Begin writing. The first line becomes the title." spellcheck="true"></textarea>
         <article class="preview" id="preview" hidden></article>
+        <div class="board" id="board" hidden></div>
         <iframe class="html-frame" id="html-frame" hidden title="Rendered HTML" sandbox="allow-scripts allow-modals allow-forms"></iframe>
       </div>
       <div class="empty-editor" id="empty-editor">
@@ -546,6 +550,61 @@
     <p class="msg" id="q-msg" role="status"></p>
     <h4>Saved quotes in this project</h4>
     <ul class="source-list" id="q-saved"></ul>
+  </dialog>
+
+  <!-- Scene card -->
+  <dialog id="scene-dialog" class="dialog wide">
+    <form method="dialog" id="scene-form">
+      <h3 id="scene-dialog-title">Scene</h3>
+      <label>Title<input id="sc-title" autocomplete="off"></label>
+      <div class="grid2">
+        <label>Location<input id="sc-location" list="sc-locations" autocomplete="off"></label>
+        <label>Time<input id="sc-time" autocomplete="off" placeholder="Dawn, three days later"></label>
+      </div>
+      <label>Characters<input id="sc-characters" list="sc-chars" autocomplete="off" placeholder="Ana, Bo"></label>
+      <datalist id="sc-locations"></datalist>
+      <datalist id="sc-chars"></datalist>
+      <label>Status
+        <select id="sc-status"><option value="idea">Idea</option><option value="drafted">Drafted</option><option value="final">Final</option></select>
+      </label>
+      <label>What happens<textarea id="sc-text" rows="7"></textarea></label>
+      <menu>
+        <button type="button" class="btn danger" id="sc-delete">Delete scene</button>
+        <span class="spacer"></span>
+        <button value="cancel" class="btn" formnovalidate>Cancel</button>
+        <button value="save" class="btn primary" id="sc-save">Save scene</button>
+      </menu>
+    </form>
+  </dialog>
+
+  <!-- Registers -->
+  <dialog id="registers-dialog" class="dialog wide">
+    <div class="settings-head">
+      <h3 id="reg-title">Registers</h3>
+      <button class="icon-btn" id="btn-close-registers" aria-label="Close">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div id="reg-body"></div>
+    <datalist id="reg-fact-labels"></datalist>
+  </dialog>
+
+  <!-- Continuity check -->
+  <dialog id="continuity-dialog" class="dialog wide">
+    <div class="settings-head">
+      <h3>Continuity check</h3>
+      <button class="icon-btn" id="btn-close-continuity" aria-label="Close">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <p class="hint">Compares what your notes say with the facts in your registers. Only people, places and things in a register are checked, and only clear statements such as "from X", "her eyes were X" or "Home: X".</p>
+    <div class="seg" role="radiogroup" aria-label="What to check">
+      <button class="seg-btn" data-scope="note" role="radio" aria-checked="true">This note</button>
+      <button class="seg-btn" data-scope="project" role="radio" aria-checked="false">All notes in this project</button>
+    </div>
+    <div class="row"><button class="btn primary" id="btn-run-continuity">Run check</button></div>
+    <p class="msg" id="cont-msg" role="status"></p>
+    <ul class="source-list" id="cont-list"></ul>
   </dialog>
 
   <!-- Source form -->

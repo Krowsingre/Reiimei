@@ -1,8 +1,19 @@
-# Reiimei v0.10.0
+# Reiimei v0.11.0
 
 *reiimei* (REE-h-may), n. The cold, luminous stillness peculiar to a clear winter night; especially the effect of moonlight upon frost, illuminating the night without dispelling it.
 
 An offline-first notes app for Windows and iPhone, built as a Progressive Web App (PWA). No Mac, no App Store, no developer fee.
+
+## What changed in v0.11.0 (Storyboard mode)
+
+- **Projects.** Storyboard has its own **Projects**, separate from Research. Every Storyboard note lives in one project, gets the project's name as an automatic tag (locked, not counted toward the five-tag limit), and notes with no project go to **Unsorted**. Deleting a project moves its notes to Unsorted and deletes its registers.
+- **Scene cards.** A storyboard is one note. Each scene is a card with a title, location, time, characters, a status (Idea, Drafted, Final) and what happens. The **Board** button switches between cards and the same text (each scene is a "## Heading" with Location, Time, Characters and Status lines under it, so everything still works as an ordinary note). Drag cards to reorder, or use the arrows (on a phone). The board shows progress, such as "2 of 5 final".
+- **Copy script** gives readable script-style text (SCENE 1: TITLE, location, time, characters, then the scene). Sharing a storyboard as a Word file or web page uses the normal Share tools.
+- **Registers.** Each project can have several registers, each for one kind of thing: **Characters, Locations, Items, Settings,** or **Custom** registers you name. A register can be divided into sections. Every entry opens into a **dossier**: other names, a section, facts (label and value, such as Home: Dunmore or Eyes: green) and free dossier notes. Scene cards suggest names from your Characters and Locations registers.
+- **Continuity check.** The **Continuity** button compares what your notes say with the facts in your registers, only when you press it. Choose **This note** or **All notes in this project**. Each possible discrepancy shows the register fact beside the note's wording, with **Go to it** (selects the mention in the text), **Update the register** (accept the note's version) and **It is intended** (dismiss it, and it stays dismissed). Anything not in a register is never checked, even if a new character appears in a note.
+  - It reads clear statements only: "from X", "born in X", "lives in X", "eyes were X" or "X eyes", "X hair", "N years old", "works as X", and "Label: value" or "Label is value" for any fact label you create. It works on sentences that name the entry (or one of its other names). A sentence that says "she" without the name is not checked, and unusual wording can be missed or occasionally flagged by mistake.
+- Registers are stored in a hidden note in each project that never appears in lists, search, tags or counts. If two devices edit registers at the same time, the copies are merged automatically.
+- No Supabase change is needed. A story project is stored as a folder named "[Story] Name", so an older version of Reiimei would show that prefix.
 
 ## What changed in v0.10.0 (Research mode)
 
@@ -142,9 +153,9 @@ Then open http://localhost:8000 in Edge or Chrome. Notes work immediately, saved
 
 The iPhone needs an HTTPS address. GitHub Pages hosts the app for free. Only the app's code goes to GitHub; your notes never do.
 
-1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.10.0` folder.
+1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.11.0` folder.
 2. **Create the repository.** In Safari, sign in at github.com, tap **+** › **New repository**. Name it `reiimei`, set it to **Public** (free Pages needs a public repository), and tap **Create repository**.
-3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.10.0` folder, tap **Select**, select all 32 files, and tap **Open**. Scroll down and tap **Commit changes**.
+3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.11.0` folder, tap **Select**, select all 34 files, and tap **Open**. Scroll down and tap **Commit changes**.
    - If you don't see the upload link, tap the **aA** button in Safari's address bar › **Request Desktop Website** and try again.
 4. **Turn on Pages.** In the repository, open **Settings** › **Pages**. Under **Build and deployment**, set Source to **Deploy from a branch**, Branch to **main** and **/ (root)**, then tap **Save**.
 5. **Wait a minute or two**, then reload the Pages screen. It shows your address, which looks like `https://yourname.github.io/reiimei/`.
@@ -244,7 +255,7 @@ The service worker caches the app files. When you change any file, bump `VERSION
 - **Settings › Log** › Download gives a text log of everything the app did, including sync results and errors.
 - **"Test connection"** in Settings › Sync confirms the URL, key, sign-in, and tables are all correct.
 
-## Known limits in v0.10.0
+## Known limits in v0.11.0
 
 - Images can be linked but not attached
 - Sources belong to one note; there is no shared library yet
