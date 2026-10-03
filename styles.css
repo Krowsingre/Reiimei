@@ -1,3 +1,7 @@
+/* Echolume: Krowsingre Publishing's capitals and small caps family (variable weight 100-700). */
+@font-face { font-family: "Echolume"; src: url("Echolume-VF.woff2") format("woff2"); font-weight: 100 700; font-style: normal; font-display: swap; }
+@font-face { font-family: "Echolume"; src: url("Echolume-Italic-VF.woff2") format("woff2"); font-weight: 100 700; font-style: italic; font-display: swap; }
+
 /* Reiimei: moonlight on frost. Cold, luminous neutrals with one warm note,
    the ivory-gold of the fruit's pith, kept for tags and pinned notes. */
 :root {
@@ -25,6 +29,9 @@
   --display: "Marcellus", "Optima", "Candara", "Palatino Linotype", serif;
   --serif: "Newsreader", "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
   --mono: ui-monospace, "Cascadia Mono", Consolas, Menlo, monospace;
+  /* Chosen in Settings › Writing: headings and note text can use different faces. */
+  --head-font: var(--serif);
+  --note-font: var(--serif);
   --radius: 10px;
   color-scheme: light;
 }
@@ -87,7 +94,7 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
   padding: 10px 12px; min-height: 52px;
 }
 .brand { font: 400 21px/1 var(--display); letter-spacing: .14em; margin: 0 auto 0 4px; }
-.pane-title { font: 600 19px/1.2 var(--serif); margin: 0 auto 0 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pane-title { font: 600 19px/1.2 var(--head-font); margin: 0 auto 0 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .spacer { flex: 1; }
 
 .icon-btn {
@@ -151,7 +158,7 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 }
 .note-item:hover { background: var(--paper-2); }
 .note-item.active { background: var(--accent-soft); border-bottom-color: transparent; }
-.note-item .title { font: 600 15px/1.3 var(--serif); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; gap: 6px; align-items: center; }
+.note-item .title { font: 600 15px/1.3 var(--note-font); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; gap: 6px; align-items: center; }
 .note-item .title svg { width: 13px; height: 13px; color: var(--gold); flex: none; }
 .note-item .meta { display: flex; gap: 8px; font-size: 13px; color: var(--ink-3); margin-top: 2px; }
 .note-item .meta .date { flex: none; color: var(--ink-2); }
@@ -184,7 +191,7 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 #body {
   flex: 1; width: 100%; border: 0; outline: none; resize: none;
   background: transparent; padding: 22px max(20px, calc((100% - 720px) / 2)) 40vh;
-  font: 17.5px/1.65 var(--serif);
+  font: 17.5px/1.65 var(--note-font);
 }
 .empty-editor {
   position: absolute; inset: 0; display: grid; place-items: center; padding: 32px;
@@ -206,7 +213,7 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 }
 .dialog.wide { width: min(620px, calc(100vw - 24px)); max-height: calc(100dvh - 40px); }
 .dialog::backdrop { background: rgba(6,10,18,.45); }
-.dialog h3 { margin: 0 0 6px; font: 600 19px var(--serif); }
+.dialog h3 { margin: 0 0 6px; font: 600 19px var(--head-font); }
 .dialog p { margin: 0 0 10px; color: var(--ink-2); }
 .dialog menu { display: flex; justify-content: flex-end; gap: 8px; padding: 0; margin: 16px 0 0; }
 .dialog input:not([type="file"]) {
@@ -303,9 +310,9 @@ code { font-family: var(--mono); font-size: .9em; background: var(--paper-2); pa
 
 .preview {
   flex: 1; overflow-y: auto; padding: 22px max(20px, calc((100% - 720px) / 2)) 40vh;
-  font: 17.5px/1.65 var(--serif); overflow-wrap: anywhere;
+  font: 17.5px/1.65 var(--note-font); overflow-wrap: anywhere;
 }
-.preview h1, .preview h2, .preview h3, .preview h4, .preview h5, .preview h6 { font-family: var(--serif); line-height: 1.25; margin: 1.1em 0 .4em; text-wrap: balance; }
+.preview h1, .preview h2, .preview h3, .preview h4, .preview h5, .preview h6 { font-family: var(--note-font); line-height: 1.25; margin: 1.1em 0 .4em; text-wrap: balance; }
 .preview h1 { font-size: 1.6em; } .preview h2 { font-size: 1.35em; } .preview h3 { font-size: 1.15em; }
 .preview p { margin: 0 0 .8em; }
 .preview blockquote { margin: 0 0 .8em; padding-left: 14px; border-left: 3px solid var(--rule); color: var(--ink-2); }
@@ -357,7 +364,7 @@ fieldset.authors legend { font-size: 13px; color: var(--ink-2); padding: 0 4px; 
 #source-dialog form { max-height: calc(100dvh - 80px); overflow-y: auto; }
 .stack { display: grid; gap: 8px; }
 .tab-panel select { width: 100%; margin-top: 4px; padding: 8px; border: 1px solid var(--rule); border-radius: 8px; background: var(--paper); }
-.sec-head { margin: 18px 0 6px; font: 600 15px var(--serif); font-variant-caps: small-caps; }
+.sec-head { margin: 18px 0 6px; font: 600 15px var(--head-font); font-variant-caps: small-caps; }
 .checklist { margin: 0; padding-left: 18px; font-size: 13.5px; color: var(--ink-2); }
 .checklist li { margin-bottom: 6px; }
 .sec-more { margin-top: 14px; border-top: 1px solid var(--rule); padding-top: 10px; }
@@ -522,3 +529,4 @@ fieldset.authors legend { font-size: 13px; color: var(--ink-2); padding: 0 4px; 
 .cfg-summary { color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; font-family: var(--mono); font-size: 12.5px; }
 .cfg-change { color: var(--accent); font-weight: 600; }
 .cfg-details[open] .cfg-change { display: none; }
+.font-sample { font: 17px/1.5 var(--note-font); color: var(--ink-2); margin: -4px 0 12px; }

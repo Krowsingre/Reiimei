@@ -8,7 +8,7 @@ import * as security from './ui-security.js';
 import * as shareUi from './ui-share.js';
 import { noteTitle, noteSnippet, sharedFileCheck } from './share.js';
 
-export const APP_VERSION = '0.4.1';
+export const APP_VERSION = '0.5.0';
 
 const $ = (id) => document.getElementById(id);
 const el = {
@@ -39,9 +39,29 @@ const snippetOf = (n) => noteSnippet(n);
 
 // ---- Preferences (per device) ------------------------------------------
 const PREFS_KEY = 'reiimei.prefs';
+const PREF_DEFAULTS = { format: 'markdown', style: 'apa', headFont: 'reiimei', noteFont: 'newsreader' };
 function prefs() {
-  try { return { format: 'markdown', style: 'apa', ...JSON.parse(localStorage.getItem(PREFS_KEY) || '{}') }; }
-  catch { return { format: 'markdown', style: 'apa' }; }
+  try { return { ...PREF_DEFAULTS, ...JSON.parse(localStorage.getItem(PREFS_KEY) || '{}') }; }
+  catch { return { ...PREF_DEFAULTS }; }
+}
+
+// Fonts: set CSS variables through the style API (allowed by the security policy).
+const FONT_STACKS = {
+  echolume: '"Echolume", "Marcellus", system-ui, sans-serif',
+  newsreader: '"Newsreader", "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif',
+  sans: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+};
+function applyFonts(p = prefs()) {
+  const root = document.documentElement.style;
+  if (p.headFont === 'echolume') {
+    root.setProperty('--display', FONT_STACKS.echolume);
+    root.setProperty('--head-font', FONT_STACKS.echolume);
+  } else {
+    root.removeProperty('--display');
+    root.removeProperty('--head-font');
+  }
+  if (FONT_STACKS[p.noteFont] && p.noteFont !== 'newsreader') root.setProperty('--note-font', FONT_STACKS[p.noteFont]);
+  else root.removeProperty('--note-font');
 }
 function setPrefs(patch) {
   try { localStorage.setItem(PREFS_KEY, JSON.stringify({ ...prefs(), ...patch })); } catch { /* storage blocked */ }
@@ -494,6 +514,12 @@ async function runDiagnostics() {
   } else {
     add('Encryption', 'warn', 'Off: notes are stored as plain text (Settings › Security)');
   }
+  try {
+    const p = prefs();
+    const want = [p.headFont === 'echolume' || p.noteFont === 'echolume' ? 'Echolume' : null].filter(Boolean);
+    const loaded = await Promise.all(want.map((f) => document.fonts.load(`16px "${f}"`).then((r) => r.length > 0)));
+    add('Fonts', loaded.every(Boolean) ? 'pass' : 'warn', `Headings: ${p.headFont === 'echolume' ? 'Echolume' : 'Reiimei'}; notes: ${p.noteFont === 'echolume' ? 'Echolume' : p.noteFont === 'sans' ? 'System sans-serif' : 'Newsreader'}${loaded.every(Boolean) ? '' : ' (Echolume did not load)'}`);
+  } catch (e) { add('Fonts', 'warn', e.message); }
   const sh = sharedFileCheck();
   add('Sharing', sh.text ? 'pass' : 'warn', `${sh.text ? 'Share sheet available' : 'No share sheet: use Email, Copy, or Download'}${sh.files ? '; files can be shared' : '; files are downloaded'}`);
   const csp = document.querySelector('meta[http-equiv="Content-Security-Policy"]');
@@ -557,6 +583,8 @@ function openSettings(tab = 'sync') {
   security.renderSettings();
   $('pref-format').value = prefs().format;
   $('pref-style').value = prefs().style;
+  $('pref-head-font').value = prefs().headFont;
+  $('pref-note-font').value = prefs().noteFont;
   renderDiagnostics();
   $('log-view').textContent = log.exportText() || '(empty)';
   showTab(tab);
@@ -662,6 +690,8 @@ async function importBackup(file) {
 
 // ---- Events ------------------------------------------------------------
 function bindEvents() {
+  $('pref-head-font').addEventListener('change', (e) => { setPrefs({ headFont: e.target.value }); applyFonts(); log.info('prefs', 'Heading font changed', { font: e.target.value }); });
+  $('pref-note-font').addEventListener('change', (e) => { setPrefs({ noteFont: e.target.value }); applyFonts(); log.info('prefs', 'Note font changed', { font: e.target.value }); });
   $('btn-share').addEventListener('click', async () => {
     await flushSave();
     const n = currentNote();
@@ -843,6 +873,7 @@ const hooks = {
 async function boot() {
   const t0 = performance.now();
   log.info('boot', `Reiimei ${APP_VERSION} starting`);
+  applyFonts();
   try {
     bindEvents();
     writing.init(hooks);

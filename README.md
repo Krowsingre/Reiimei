@@ -1,8 +1,14 @@
-# Reiimei v0.4.1
+# Reiimei v0.5.0
 
-*reiimei* (REE-h-may), n. The cold, luminous stillness peculiar to a clear winter night; especially the sensation of moonlight upon frost, when darkness seems to brighten rather than recede.
+*reiimei* (REE-h-may), n. The cold, luminous stillness peculiar to a clear winter night; especially the effect of moonlight upon frost, illuminating the night without dispelling it.
 
 An offline-first notes app for Windows and iPhone, built as a Progressive Web App (PWA). No Mac, no App Store, no developer fee.
+
+## What changed in v0.5.0
+
+- **New app icon:** the frosted crescent moon with its star, on a winter night sky. Android gets a version with extra margin for round icons.
+- **Echolume font option.** Settings › Writing has a **Heading font** (Reiimei or Echolume) and a **Note font** (Newsreader, Echolume, or system sans-serif). Echolume is Krowsingre Publishing's capitals and small caps family; it is bundled with the app, so it works offline.
+- **Updated definition** on the opening screen.
 
 ## What changed in v0.4.1
 
@@ -58,6 +64,7 @@ An offline-first notes app for Windows and iPhone, built as a Progressive Web Ap
 | `ui-security.js` | Lock screen and encryption settings |
 | `code.js`, `ui-code.js` | Code coloring, editing helpers, tidy, HTML and XML previews |
 | `render.html`, `render.js` | The sealed-off frame that renders HTML notes |
+| `Echolume-VF.woff2`, `Echolume-Italic-VF.woff2` | Echolume font (variable weight), © Krowsingre Publishing LLC |
 | `share.js`, `ui-share.js` | Sharing as text, combined documents, and archives |
 | `format.js` | Markdown and Populi markup engine |
 | `cite.js` | MLA 9 and APA 7 citation rules |
@@ -68,7 +75,7 @@ An offline-first notes app for Windows and iPhone, built as a Progressive Web Ap
 | `logger.js` | Rolling log (last 1000 entries) |
 | `sw.js` | Service worker: makes the app open offline |
 | `manifest.webmanifest` | Install metadata |
-| `icon-192.png`, `icon-512.png`, `apple-touch-icon.png` | App icons |
+| `icon-192.png`, `icon-512.png`, `apple-touch-icon.png`, `icon-maskable-512.png` | App icons |
 | `supabase-setup.sql` | Creates or upgrades the sync tables and security rules |
 
 ## 1. Try it on your laptop
@@ -85,9 +92,9 @@ Then open http://localhost:8000 in Edge or Chrome. Notes work immediately, saved
 
 The iPhone needs an HTTPS address. GitHub Pages hosts the app for free. Only the app's code goes to GitHub; your notes never do.
 
-1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.4.1` folder.
+1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.5.0` folder.
 2. **Create the repository.** In Safari, sign in at github.com, tap **+** › **New repository**. Name it `reiimei`, set it to **Public** (free Pages needs a public repository), and tap **Create repository**.
-3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.4.1` folder, tap **Select**, select all 26 files, and tap **Open**. Scroll down and tap **Commit changes**.
+3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.5.0` folder, tap **Select**, select all 29 files, and tap **Open**. Scroll down and tap **Commit changes**.
    - If you don't see the upload link, tap the **aA** button in Safari's address bar › **Request Desktop Website** and try again.
 4. **Turn on Pages.** In the repository, open **Settings** › **Pages**. Under **Build and deployment**, set Source to **Deploy from a branch**, Branch to **main** and **/ (root)**, then tap **Save**.
 5. **Wait a minute or two**, then reload the Pages screen. It shows your address, which looks like `https://yourname.github.io/reiimei/`.
@@ -187,7 +194,7 @@ The service worker caches the app files. When you change any file, bump `VERSION
 - **Settings › Log** › Download gives a text log of everything the app did, including sync results and errors.
 - **"Test connection"** in Settings › Sync confirms the URL, key, sign-in, and tables are all correct.
 
-## Known limits in v0.4.1
+## Known limits in v0.5.0
 
 - Images can be linked but not attached
 - Sources belong to one note; there is no shared library yet
