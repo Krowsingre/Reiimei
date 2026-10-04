@@ -12,7 +12,7 @@ import * as codeIntel from './codeintel.js';
 import { isCode } from './code.js';
 import { noteTitle, noteSnippet, sharedFileCheck } from './share.js';
 
-export const APP_VERSION = '0.13.0';
+export const APP_VERSION = '0.13.1';
 export const BUILD_DATE = '2026-10-03';
 
 const $ = (id) => document.getElementById(id);

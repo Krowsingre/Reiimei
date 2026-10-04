@@ -1,6 +1,6 @@
 // Reiimei service worker: caches the app shell so it opens with no connection.
 // Bump VERSION whenever any app file changes so devices pick up the update.
-const VERSION = 'reiimei-v0.13.0';
+const VERSION = 'reiimei-v0.13.1';
 const FONT_CACHE = 'reiimei-fonts';
 const SHELL = [
   './',
@@ -40,7 +40,16 @@ const SHELL = [
 ];
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
+  // Fetch every file past the browser's own HTTP cache ('reload'). Otherwise an update can store
+  // the old copy of a file that the browser still holds, and the new page would run old code.
+  event.waitUntil(
+    caches.open(VERSION)
+      .then((c) => Promise.all(SHELL.map((u) => fetch(new Request(u, { cache: 'reload' })).then((res) => {
+        if (!res.ok) throw new Error(`${u}: ${res.status}`);
+        return c.put(u, res);
+      }))))
+      .then(() => self.skipWaiting()),
+  );
 });
 
 self.addEventListener('activate', (event) => {
