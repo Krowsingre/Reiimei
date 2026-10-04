@@ -3,7 +3,8 @@
 // Underneath, a Text note is kept as Markdown (in the hidden #body text box), so saving, sync,
 // search, citations, sharing, papers and Copy all work exactly as they do for Markdown notes,
 // and a note can switch between Text and Markdown without losing anything.
-import { parseMarkdown, inlineToMarkdown, escapeHtml as esc } from './format.js';
+import { parseMarkdown, inlineToMarkdown, noteToHtml, escapeHtml as esc } from './format.js';
+import { plainText } from './share.js';
 
 const $ = (id) => document.getElementById(id);
 let app = null;
@@ -62,7 +63,7 @@ function blocksHtml(blocks) {
         const cell = (c, t) => `<${t}>${inlineHtml(c)}</${t}>`;
         return `<div class="raw-block" contenteditable="false" data-md="${esc(md)}"><table><tr>${b.head.map((c) => cell(c, 'th')).join('')}</tr>${b.rows.map((r) => `<tr>${r.map((c) => cell(c, 'td')).join('')}</tr>`).join('')}</table></div>`;
       }
-      default: return `<p>${b.lines.map(inlineHtml).join('<br>') || '<br>'}</p>`;
+      default: return b.blank ? '<p><br></p>' : `<p>${b.lines.map(inlineHtml).join('<br>') || '<br>'}</p>`;
     }
   }).join('');
 }
@@ -144,11 +145,16 @@ function blocksMd(parent) {
     else if (t === 'PRE') out.push(`\`\`\`${n.dataset.lang || ''}\n${n.textContent.replace(/\n$/, '')}\n\`\`\``);
     else if (t === 'HR') out.push('---');
     else if (n.querySelector('p,div,h1,h2,h3,h4,h5,h6,ul,ol,blockquote,pre,table')) { const inner = blocksMd(n); if (inner) out.push(inner); }
-    else { const s = paraMd(n); if (s.trim()) out.push(s); }
+    else { const s = paraMd(n); out.push(s.trim() ? s : BLANK_LINE); }
   }
   flushLoose();
+  // A blank line typed on purpose is kept as "&nbsp;" (standard Markdown for an empty paragraph),
+  // except at the very start and end of the note.
+  while (out[0] === BLANK_LINE) out.shift();
+  while (out[out.length - 1] === BLANK_LINE) out.pop();
   return out.join('\n\n');
 }
+const BLANK_LINE = '&nbsp;';
 export const htmlToMarkdown = (el) => blocksMd(el);
 
 // ---- Keeping the page and the text box in step --------------------------------------------
@@ -640,6 +646,40 @@ export function init(hooks) {
     const a = e.target.closest?.('a[href]');
     if (a && (e.ctrlKey || e.metaKey) && /^(https?:|mailto:)/i.test(a.getAttribute('href'))) { e.preventDefault(); window.open(a.href, '_blank', 'noopener'); }
   });
+  // Copy and cut write the clipboard themselves: browsers and apps disagree about the spacing of
+  // paragraphs, so a plain-text paste got doubled or lost blank lines. Plain text gets one blank
+  // line between paragraphs plus each blank line typed; formatted text gets real paragraphs.
+  const copyOut = (e) => {
+    const s = sel();
+    if (!s.rangeCount || s.isCollapsed || !inBox(s.anchorNode) || !e.clipboardData) return;
+    const holder = document.createElement('div');
+    holder.appendChild(s.getRangeAt(0).cloneContents());
+    // A selection inside one list item or heading comes out as bare text; keep its kind.
+    const one = closest(s.getRangeAt(0).commonAncestorContainer, 'li, h1, h2, h3, h4, h5, h6');
+    if (one && !holder.querySelector('li, h1, h2, h3, h4, h5, h6')) { const w = document.createElement(one.tagName === 'LI' ? 'p' : one.tagName); while (holder.firstChild) w.appendChild(holder.firstChild); holder.appendChild(w); }
+    const md = htmlToMarkdown(holder);
+    e.clipboardData.setData('text/plain', plainText({ body: md, format: 'markdown', meta: {} }, {}).replace(/\n/g, '\r\n').replace(/\r\r\n/g, '\r\n'));
+    e.clipboardData.setData('text/html', noteToHtml(md, 'markdown').replace(/<p class="blank">&nbsp;<\/p>/g, '<p><br></p>'));
+    e.preventDefault();
+    if (e.type === 'cut' && box.contentEditable === 'true') {
+      // Take the text out by hand (the browser's delete can try to write inline styles), and join
+      // the two paragraphs the cut began and ended in, as a word processor does.
+      const r = s.getRangeAt(0);
+      const BLK = 'p,div,h1,h2,h3,h4,h5,h6,li,pre';
+      const a = closest(r.startContainer, BLK);
+      const b = closest(r.endContainer, BLK);
+      r.deleteContents();
+      if (a && b && a !== b && a.isConnected && b.isConnected && !b.contains(a)) { while (b.firstChild) a.appendChild(b.firstChild); b.remove(); }
+      for (const el of [...box.querySelectorAll(BLK)]) if (!el.childNodes.length) el.appendChild(document.createElement('br'));
+      tidyBlocks();
+      r.collapse(true);
+      s.removeAllRanges();
+      s.addRange(r);
+      pushToBody();
+    }
+  };
+  box.addEventListener('copy', copyOut);
+  box.addEventListener('cut', copyOut);
   // Pasted text keeps bold, italics, headings and lists, and nothing else.
   box.addEventListener('paste', (e) => {
     const html = e.clipboardData?.getData('text/html');
@@ -654,6 +694,16 @@ export function init(hooks) {
       const blocks = parseMarkdown(htmlToMarkdown(tmp));
       const single = blocks.length === 1 && blocks[0].t === 'p';
       document.execCommand('insertHTML', false, single ? blocks[0].lines.map(inlineHtml).join('<br>') : blocksHtml(blocks));
+    } else if (/\n/.test(text)) {
+      // Plain text over several lines: each line a paragraph. Reiimei shows a gap between
+      // paragraphs, so one blank line between them is just that gap; more blank lines are kept.
+      const parts = text.replace(/\r\n?/g, '\n').replace(/\n+$/, '').split(/(\n+)/);
+      let html = '';
+      for (const part of parts) {
+        if (/^\n+$/.test(part)) { for (let k = 2; k < part.length; k++) html += '<p><br></p>'; continue; }
+        html += `<p>${esc(part) || '<br>'}</p>`;
+      }
+      document.execCommand('insertHTML', false, html);
     } else {
       document.execCommand('insertText', false, text);
     }

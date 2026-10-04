@@ -972,13 +972,17 @@ body { font-synthesis: none; }
 /* The Reiimei name follows the interface font (the definition page keeps Reiimei Display). */
 .brand { font-family: var(--ui); }
 
-/* Folders: a "+" and a chevron at the right of the heading, like the Tags heading's chevron. */
-.side-head { gap: 2px; padding-right: 4px; }
-.side-head .side-toggle { flex: 1; width: auto; padding: 0; font: inherit; letter-spacing: inherit; color: inherit; }
-.side-icon { display: inline-grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 6px; background: none; color: inherit; cursor: pointer; }
-.side-icon:hover { background: var(--paper-3); color: var(--ink); }
-.side-icon svg { width: 16px; height: 16px; transition: transform .15s; }
-.side-chevron[aria-expanded="false"] svg { transform: rotate(-90deg); }
+/* The Folders and Tags headings: one design for both. The name, then plain icons at the right
+   (Folders has a + before its chevron). No boxes; the chevron turns when the list is folded. */
+.side-head { display: flex; align-items: center; gap: 4px; min-height: 26px; padding: 0 6px 4px 8px; }
+.side-head-label {
+  flex: 1; min-width: 0; display: flex; align-items: center; padding: 0; border: 0; background: none; cursor: pointer; text-align: left;
+  color: var(--ink); font: 600 14px/1.2 var(--ui); letter-spacing: .06em; font-variant-caps: small-caps;
+}
+.side-head-icon { display: inline-grid; place-items: center; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 0; background: none; color: var(--ink); cursor: pointer; opacity: .8; }
+.side-head-icon:hover, .side-head-icon:focus-visible { opacity: 1; background: none; }
+.side-head-icon svg { width: 16px; height: 16px; stroke-width: 1.8; transition: transform .15s; }
+.side-head-chevron[aria-expanded="false"] svg { transform: rotate(-90deg); }
 /* Subfolders sit under their folder; a folder with subfolders has a chevron in front of it. */
 #folder-list .side-item { position: relative; padding-left: 20px; }
 #folder-list .side-item.sub { padding-left: 40px; }
@@ -998,7 +1002,7 @@ body { font-synthesis: none; }
   .app[data-rail="on"] .mode-btn { font-size: 0; padding: 6px 0; }
   .app[data-rail="on"] .mode-btn::before { content: attr(data-short); font-size: 13px; }
   .app[data-rail="on"] .side-scroll { padding: 4px 6px 16px; }
-  .app[data-rail="on"] .side-label, .app[data-rail="on"] #tag-section, .app[data-rail="on"] .side-item.sub, .app[data-rail="on"] .side-empty, .app[data-rail="on"] #sync-text { display: none; }
+  .app[data-rail="on"] .side-label, .app[data-rail="on"] .side-head, .app[data-rail="on"] #tag-section, .app[data-rail="on"] .side-item.sub, .app[data-rail="on"] .side-empty, .app[data-rail="on"] #sync-text { display: none; }
   .app[data-rail="on"] .side-item, .app[data-rail="on"] #folder-list .side-item { justify-content: center; padding: 9px 0; }
   .app[data-rail="on"] .side-item .name, .app[data-rail="on"] .side-item .count, .app[data-rail="on"] .side-item .more, .app[data-rail="on"] .sub-toggle { display: none; }
   .app[data-rail="on"] .side-section { margin-top: 10px; }
@@ -1064,3 +1068,41 @@ body { font-synthesis: none; }
 .font-pack .row { margin: 0 0 4px; gap: 10px; }
 .settings-body label.font-pick { display: flex; align-items: center; gap: 8px; margin: 0; padding: 3px 0; font-size: 16px; color: var(--ink); }
 .font-pick input { width: auto; margin: 0; }
+
+/* ---- v0.15.1: Settings pages laid out as groups of rows ---- */
+.set-group { margin: 6px 0 26px; }
+.set-head { margin: 0 0 10px; padding-bottom: 6px; border-bottom: 1px solid var(--rule); font: 400 15px/1.3 var(--head-font); font-variant-caps: small-caps; letter-spacing: .06em; color: var(--ink); }
+.set-row { display: grid; grid-template-columns: 150px minmax(0, 1fr); column-gap: 16px; row-gap: 4px; align-items: center; padding: 8px 0; }
+.set-row + .set-row { border-top: 1px dashed var(--rule); }
+.settings-body .set-row > label { margin: 0; font-size: 14px; color: var(--ink); font-variant-caps: small-caps; letter-spacing: .04em; }
+.settings-body .set-row > select { margin: 0; }
+.set-row > .set-help { grid-column: 2; }
+.settings-body .set-help { margin: 0; font-size: 12.5px; line-height: 1.45; color: var(--ink-3); }
+.set-group > .set-help { margin-bottom: 12px; }
+/* Fonts to offer: one card per pack, the fonts in two columns, each name in its own face. */
+.font-packs { display: grid; gap: 12px; }
+.font-pack { border: 1px solid var(--rule); border-radius: 10px; background: var(--sheet); overflow: hidden; padding: 0; margin: 0; }
+.font-pack-head { display: flex; align-items: baseline; gap: 8px; padding: 8px 12px; background: var(--paper); border-bottom: 1px solid var(--rule); }
+.font-pack-name { font-size: 14px; color: var(--ink); font-variant-caps: small-caps; letter-spacing: .05em; }
+.font-pack-n { font-size: 12px; color: var(--ink-3); }
+.font-pack-head .text-btn { font-size: 12.5px; }
+.font-picks { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 2px 16px; padding: 8px 12px 10px; }
+.settings-body label.font-pick { display: flex; align-items: center; gap: 10px; margin: 0; padding: 5px 0; font-size: 17px; color: var(--ink); cursor: pointer; }
+.settings-body .font-pick input { width: 16px; height: 16px; margin: 0; flex: none; accent-color: var(--accent); }
+/* Reference: three tidy cards. */
+.cheats { grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
+.cheat-card { border: 1px solid var(--rule); border-radius: 10px; padding: 10px 12px 12px; background: var(--sheet); }
+.cheat-card h5 { margin: 0 0 6px; font: 400 14px var(--head-font); font-variant-caps: small-caps; letter-spacing: .05em; color: var(--ink); }
+.cheat th { text-align: left; font-weight: 400; font-size: 11.5px; color: var(--ink-3); padding: 0 6px 4px; border-bottom: 1px solid var(--rule); }
+.cheat td { padding: 5px 6px; }
+.cheat tr:last-child td { border-bottom: 0; }
+.cheat-card .set-help { margin-top: 8px; }
+@media (max-width: 760px) {
+  .set-row { grid-template-columns: 1fr; }
+  .set-row > .set-help { grid-column: 1; }
+  .font-picks { grid-template-columns: 1fr 1fr; }
+}
+
+.cheats { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.cheat-card.wide { grid-column: 1 / -1; }
+.cheat-card.wide .cheat td:first-child { width: 40%; }

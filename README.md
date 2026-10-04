@@ -1,8 +1,21 @@
-# Reiimei v0.15.0
+# Reiimei v0.15.2
 
 *reiimei* (REE-h-may), n. The cold, luminous stillness peculiar to a clear winter night; especially the effect of moonlight upon frost, illuminating the night without dispelling it.
 
 An offline-first notes app for Windows and iPhone, built as a Progressive Web App (PWA). No Mac, no App Store, no developer fee.
+
+## What changed in v0.15.2
+
+- **Copying from a Text note keeps its line spacing.** Copy and Cut now put the text on the clipboard themselves. Pasted as plain text (Notes, Messages, Notepad, an email), each paragraph is followed by one blank line, as it looks in Reiimei, and every extra blank line you typed is kept; list items stay one per line with their bullets or numbers, and checklists show [ ] and [x]. Pasted into Word, Google Docs, Pages or Populi, paragraphs and blank lines arrive as real paragraphs. Fonts set on selected words are left out. **Tools › Copy › Copy as plain text** spaces the text the same way.
+- **Blank lines you type are kept.** Before, an empty line between paragraphs in a Text note disappeared the next time the note was opened. It is now saved (as `&nbsp;`, the usual Markdown way to write an empty paragraph), so it stays in the note, in sharing and in copies.
+- **Pasting text into a Text note keeps its blank lines too:** one blank line between lines becomes the normal gap between paragraphs, and more than one is kept.
+- Still 85 files. No Supabase changes.
+
+## What changed in v0.15.1
+
+- **Settings › Fonts & Styles and Formatting are laid out properly.** Each page has headed groups of rows (the setting's name on the left, the choice on the right, a short line of help under it). Fonts & Styles: **Interface** (Interface font, from every installed font) and **Editor fonts**, which brings the old Fonts to offer and Font for new notes together: tick the fonts a note's Font menu offers (a card for each font pack, each name shown in its own face), and choose the **Default** that new notes start in, from the ticked fonts only. Untick the default and the first ticked font becomes the default (you are told). Formatting: **New notes** (Format, Citation style) and **Reference** (Markdown, Populi and citation cards).
+- **Fixed: the font list in Settings could be empty, and the new-note font could list only one font, on the first launch after an update.** That launch can get the new page with the previous version's scripts. Reiimei now notices this and reloads once, by itself, as soon as the new version is ready, so the page and its scripts always match. The list is also redrawn every time you open Fonts & Styles.
+- One new file, `boot.js`: 85 files now. No Supabase changes.
 
 ## What changed in v0.15.0
 
@@ -227,6 +240,7 @@ Note: a device still on v0.7 would show the hidden cache record in Recently Dele
 | `ReiimeiDisplay-*.woff` | Reiimei Display font (six styles), © Krowsingre Publishing LLC |
 | `Ilunir*.woff` | Ilunir fonts (41 files), © Krowsingre Publishing LLC |
 | `fonts.js` | The list of fonts for the Font menu and the interface font setting |
+| `boot.js` | Start-up check: reloads once if an update left the page and its scripts on different versions |
 | `share.js`, `ui-share.js` | Sharing as text, combined documents, and archives |
 | `format.js` | Markdown and Populi markup engine |
 | `cite.js` | MLA 9 and APA 7 citation rules |
@@ -254,9 +268,9 @@ Then open http://localhost:8000 in Edge or Chrome. Notes work immediately, saved
 
 The iPhone needs an HTTPS address. GitHub Pages hosts the app for free. Only the app's code goes to GitHub; your notes never do.
 
-1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.15.0` folder.
+1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.15.2` folder.
 2. **Create the repository.** In Safari, sign in at github.com, tap **+** › **New repository**. Name it `reiimei`, set it to **Public** (free Pages needs a public repository), and tap **Create repository**.
-3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.15.0` folder, tap **Select**, select all 84 files, and tap **Open**. Scroll down and tap **Commit changes**.
+3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.15.2` folder, tap **Select**, select all 85 files, and tap **Open**. Scroll down and tap **Commit changes**.
    - If you don't see the upload link, tap the **aA** button in Safari's address bar › **Request Desktop Website** and try again.
 4. **Turn on Pages.** In the repository, open **Settings** › **Pages**. Under **Build and deployment**, set Source to **Deploy from a branch**, Branch to **main** and **/ (root)**, then tap **Save**.
 5. **Wait a minute or two**, then reload the Pages screen. It shows your address, which looks like `https://yourname.github.io/reiimei/`.
@@ -361,7 +375,7 @@ The service worker caches the app files. When you change any file, bump `VERSION
 - **Settings › Log** › Download gives a text log of everything the app did, including sync results and errors.
 - **"Test connection"** in Settings › Sync confirms the URL, key, sign-in, and tables are all correct.
 
-## Known limits in v0.15.0
+## Known limits in v0.15.2
 
 - Images can be linked but not attached
 - Sources belong to one note; there is no shared library yet

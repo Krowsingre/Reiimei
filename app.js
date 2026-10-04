@@ -13,7 +13,9 @@ import { isCode } from './code.js';
 import * as fonts from './fonts.js';
 import { noteTitle, noteSnippet, ownTitle, fallbackTitle, sharedFileCheck } from './share.js';
 
-export const APP_VERSION = '0.15.0';
+export const APP_VERSION = '0.15.2';
+// boot.js compares this with the page's version to catch a launch that mixes two releases.
+window.__reiimeiVersion = APP_VERSION;
 export const BUILD_DATE = '2026-10-04';
 
 const $ = (id) => document.getElementById(id);
@@ -421,7 +423,7 @@ function renderSidebar() {
     fresh.addEventListener('click', () => toggleTagFilter(t));
     return fresh;
   }));
-  $('btn-tags-toggle').setAttribute('aria-expanded', String(prefs().tagsOpen !== false));
+  for (const id of ['btn-tags-toggle', 'btn-tags-chevron']) $(id).setAttribute('aria-expanded', String(prefs().tagsOpen !== false));
   el.tagList.hidden = prefs().tagsOpen === false;
   if (!tags.length) el.tagList.innerHTML = '<li class="side-empty">Add tags to a note</li>';
 
@@ -1587,24 +1589,35 @@ function renderDiagnostics() {
 const hiddenFonts = () => (Array.isArray(prefs().hiddenFonts) ? prefs().hiddenFonts.filter((x) => fonts.FONT_IDS.includes(x)) : []);
 function renderFontSettings() {
   const hidden = hiddenFonts();
-  fonts.fillFontSelect($('pref-ui-font'), { hidden, current: fonts.uiFontId(prefs().uiFont) });
+  fonts.fillFontSelect($('pref-ui-font'), { current: fonts.uiFontId(prefs().uiFont) }); // the whole library
   fonts.fillFontSelect($('pref-note-font'), { hidden, current: fonts.fontId(prefs().noteFont) });
+  // Every bundled font is always listed here, whatever was saved before.
   $('font-packs').innerHTML = fonts.PACKS.map((p) => {
     const list = fonts.FONTS.filter((f) => f.pack === p.id);
     const on = list.filter((f) => !hidden.includes(f.id)).length;
-    return `<fieldset class="font-pack"><legend>${esc(p.name)} <span class="n">${on} of ${list.length}</span></legend>
-      <div class="row"><button type="button" class="text-btn" data-pack="${p.id}" data-pack-all="all">All</button><button type="button" class="text-btn" data-pack="${p.id}" data-pack-all="none">None</button></div>
-      ${list.map((f) => `<label class="check font-pick"><input type="checkbox" data-font="${f.id}"${hidden.includes(f.id) ? '' : ' checked'}> <span class="f-run" data-font="${f.id}">${esc(f.name)}</span></label>`).join('')}</fieldset>`;
+    return `<div class="font-pack" role="group" aria-label="${esc(p.name)} fonts">
+      <div class="font-pack-head"><span class="font-pack-name">${esc(p.name)}</span><span class="font-pack-n">${on} of ${list.length}</span><span class="spacer"></span>
+        <button type="button" class="text-btn" data-pack="${p.id}" data-pack-all="all">All</button><button type="button" class="text-btn" data-pack="${p.id}" data-pack-all="none">None</button></div>
+      <div class="font-picks">${list.map((f) => `<label class="font-pick"><input type="checkbox" data-font="${f.id}"${hidden.includes(f.id) ? '' : ' checked'}><span class="f-run" data-font="${f.id}">${esc(f.name.replace(/^Ilunir /, ''))}</span></label>`).join('')}</div></div>`;
   }).join('');
 }
 // Show or leave out fonts. At least one font always stays on offer.
 function setFontShown(ids, show) {
   let hidden = new Set(hiddenFonts());
   ids.forEach((id) => (show ? hidden.delete(id) : hidden.add(id)));
+  let msg = '';
   if (hidden.size >= fonts.FONT_IDS.length) {
     hidden.delete(ids.includes(fonts.DEFAULT_FONT) ? fonts.DEFAULT_FONT : ids[0]);
-    setMsg('fonts-msg', 'At least one font stays on offer.', 'error');
-  } else setMsg('fonts-msg', '');
+    msg = 'At least one font stays ticked.';
+  }
+  // The default for new notes is always a ticked font.
+  const def = fonts.fontId(prefs().noteFont);
+  if (hidden.has(def)) {
+    const next = fonts.FONTS.find((f) => !hidden.has(f.id)).id;
+    setPrefs({ noteFont: next });
+    msg = `${msg ? `${msg} ` : ''}New notes now start in ${fonts.fontName(next)}.`;
+  }
+  setMsg('fonts-msg', msg, msg ? 'ok' : '');
   setPrefs({ hiddenFonts: [...hidden] });
   log.info('prefs', 'Fonts on offer changed', { hidden: hidden.size });
   renderFontSettings();
@@ -1685,6 +1698,7 @@ function showTab(tab) {
   document.querySelectorAll('.tab').forEach((b) => { b.classList.toggle('active', b.dataset.tab === tab); if (b.dataset.tab === tab) $('settings-title').textContent = b.textContent; });
   $('settings-main').querySelector('.settings-body').scrollTop = 0;
   document.querySelectorAll('.tab-panel').forEach((p) => { p.hidden = p.dataset.panel !== tab; });
+  if (tab === 'fonts') renderFontSettings();
   if (tab === 'about') {
     $('about-version').textContent = APP_VERSION;
     $('about-date').textContent = BUILD_DATE;
@@ -1867,7 +1881,7 @@ function bindEvents() {
   });
   for (const t of ['pointerup', 'pointercancel', 'pointermove', 'pointerleave']) el.noteList.addEventListener(t, () => clearTimeout(pressTimer));
   $('tag-filter').addEventListener('click', (e) => { const b = e.target.closest('[data-untag]'); if (b) toggleTagFilter(b.dataset.untag); });
-  $('btn-tags-toggle').addEventListener('click', () => { setPrefs({ tagsOpen: prefs().tagsOpen === false }); renderSidebar(); });
+  for (const id of ['btn-tags-toggle', 'btn-tags-chevron']) $(id).addEventListener('click', () => { setPrefs({ tagsOpen: prefs().tagsOpen === false }); renderSidebar(); });
   $('btn-select').addEventListener('click', () => setSelecting(!state.selecting));
   $('sel-all').addEventListener('click', () => {
     const notes = filteredNotes();

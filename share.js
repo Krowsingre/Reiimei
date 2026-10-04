@@ -10,7 +10,7 @@ import { blocksXml, docxPackage } from './paper.js';
 import { zip } from './zip.js';
 
 // ---- Titles and snippets (used by the note list too) ---------------------
-const lines = (body) => String(body || '').split('\n').map((l) => l.trim()).filter(Boolean);
+const lines = (body) => String(body || '').split('\n').map((l) => l.trim()).filter((l) => l && l !== '&nbsp;');
 function plainLine(line, format) {
   if (!line) return '';
   const b = parseNote(line, format === 'populi' ? 'populi' : 'markdown')[0];
@@ -50,12 +50,14 @@ export function referencesText(note, target) {
   return `\n\n${heading}\n\n${refs.map((r) => r.runs.map((x) => (x.italic ? it(x.text) : x.text)).join('')).join('\n\n')}`;
 }
 
+const BLANK = Symbol('blank line');
 export function plainText(note, ctx = citeContext(note)) {
   const blocks = parseNote(note.body, note.format === 'populi' ? 'populi' : 'markdown');
   const txt = (nodes) => inlineToRuns(nodes, ctx).map((r) => r.text).join('');
   const out = [];
   const walk = (bs, prefix = '') => bs.forEach((b) => {
     if (b.t === 'h') out.push(prefix + txt(b.c));
+    else if (b.t === 'p' && b.blank) out.push(BLANK);
     else if (b.t === 'p') out.push(b.lines.map((l) => prefix + txt(l)).join('\n'));
     else if (b.t === 'list') out.push(b.items.map((i, k) => prefix + '  '.repeat(i.level) + (i.task ? (i.checked ? '[x] ' : '[ ] ') : i.ordered ? `${i.num ?? k + 1}. ` : '• ') + txt(i.c)).join('\n'));
     else if (b.t === 'quote') walk(b.blocks, `${prefix}    `);
@@ -64,7 +66,15 @@ export function plainText(note, ctx = citeContext(note)) {
     else if (b.t === 'hr') out.push('* * *');
   });
   walk(blocks);
-  return out.join('\n\n');
+  // One blank line between paragraphs, plus one more for each blank line typed on purpose.
+  let text = '';
+  let first = true;
+  for (const piece of out) {
+    if (piece === BLANK) { text += '\n'; continue; }
+    text += (first ? '' : '\n\n') + piece;
+    first = false;
+  }
+  return text;
 }
 
 // One note as text. target: 'plain' | 'markdown' | 'populi'

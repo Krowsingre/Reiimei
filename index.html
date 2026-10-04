@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-version="0.15.2">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -35,18 +35,19 @@
       <nav class="side-scroll">
         <ul class="side-list" id="smart-list"></ul>
         <div class="side-section">
-          <div class="side-label side-head">
-            <button class="side-toggle" id="btn-folders-toggle" aria-expanded="true" aria-controls="folder-list"><span id="folders-label">Folders</span></button>
-            <button class="side-icon" id="btn-new-folder" title="New folder" aria-label="New folder"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v12M6 12h12"/></svg></button>
-            <button class="side-icon side-chevron" id="btn-folders-chevron" aria-expanded="true" aria-controls="folder-list" aria-label="Show or hide folders"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+          <!-- Folders and Tags share one heading: the name, then (Folders only) +, then the chevron. -->
+          <div class="side-head">
+            <button class="side-head-label" id="btn-folders-toggle" aria-expanded="true" aria-controls="folder-list"><span id="folders-label">Folders</span></button>
+            <button class="side-head-icon" id="btn-new-folder" title="New folder" aria-label="New folder"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v12M6 12h12"/></svg></button>
+            <button class="side-head-icon side-head-chevron" id="btn-folders-chevron" aria-expanded="true" aria-controls="folder-list" aria-label="Show or hide folders"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
           </div>
           <ul class="side-list" id="folder-list"></ul>
         </div>
         <div class="side-section" id="tag-section">
-          <button class="side-label side-toggle" id="btn-tags-toggle" aria-expanded="true" aria-controls="tag-list">
-            <span>Tags</span>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
-          </button>
+          <div class="side-head">
+            <button class="side-head-label" id="btn-tags-toggle" aria-expanded="true" aria-controls="tag-list"><span>Tags</span></button>
+            <button class="side-head-icon side-head-chevron" id="btn-tags-chevron" aria-expanded="true" aria-controls="tag-list" aria-label="Show or hide tags"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+          </div>
           <ul class="side-list" id="tag-list"></ul>
         </div>
       </nav>
@@ -381,71 +382,103 @@
     </section>
 
     <section class="tab-panel" data-panel="fonts" hidden>
-      <label>Interface font
-        <select id="pref-ui-font"><option value="echolume">Echolume</option></select>
-      </label>
-      <p class="font-choice-sample">Menus, lists, settings and buttons use this font. Notes keep their own Font.</p>
-      <label>Font for new notes
-        <select id="pref-note-font"><option value="display">Reiimei Display</option></select>
-      </label>
-      <h4 class="sec-head">Fonts to offer</h4>
-      <p class="hint">Untick a font to leave it out of each note's Font menu and the lists above. A note or setting that already uses it keeps it. These choices belong to this device.</p>
-      <div class="font-packs" id="font-packs"></div>
-      <p class="msg" id="fonts-msg" role="status"></p>
+      <div class="set-group">
+        <h4 class="set-head">Interface</h4>
+        <div class="set-row">
+          <label for="pref-ui-font">Interface font</label>
+          <select id="pref-ui-font"><option value="echolume">Echolume</option></select>
+          <p class="set-help">Menus, lists, settings and buttons. Any installed font can be chosen.</p>
+        </div>
+      </div>
+      <div class="set-group">
+        <h4 class="set-head">Editor fonts</h4>
+        <p class="set-help">Tick the fonts a note's Font menu offers. A note that already uses an unticked font keeps it. These choices belong to this device.</p>
+        <div class="set-row">
+          <label for="pref-note-font">Default</label>
+          <select id="pref-note-font"><option value="display">Reiimei Display</option></select>
+          <p class="set-help">New notes start in this font. It is always one of the ticked fonts.</p>
+        </div>
+        <div class="font-packs" id="font-packs"></div>
+        <p class="msg" id="fonts-msg" role="status"></p>
+      </div>
     </section>
 
     <section class="tab-panel" data-panel="writing" hidden>
-      <label>New notes use
-        <select id="pref-format">
-          <option value="text">Text</option>
-          <option value="markdown">Markdown</option>
-          <option value="populi">Populi markup</option>
-          <option value="python">Python</option>
-          <option value="html">HTML5</option>
-          <option value="xml">XML</option>
-        </select>
-      </label>
-      <label>Citation style for new notes
-        <select id="pref-style">
-          <option value="apa">APA 7th edition</option>
-          <option value="mla">MLA 9th edition</option>
-        </select>
-      </label>
-      <div class="cheats">
-        <div>
-          <h4 class="sec-head">Markdown</h4>
-          <table class="cheat">
-            <tr><td><code>**bold**</code></td><td><strong>bold</strong></td></tr>
-            <tr><td><code>*italic*</code></td><td><em>italic</em></td></tr>
-            <tr><td><code>++underline++</code></td><td><u>underline</u></td></tr>
-            <tr><td><code>~~strike~~</code></td><td><s>strike</s></td></tr>
-            <tr><td><code>==highlight==</code></td><td><mark>highlight</mark></td></tr>
-            <tr><td><code>x^2^ &nbsp;H~2~O</code></td><td>x<sup>2</sup> H<sub>2</sub>O</td></tr>
-            <tr><td><code># Heading</code></td><td>Heading</td></tr>
-            <tr><td><code>- item</code> / <code>1. item</code></td><td>Lists</td></tr>
-            <tr><td><code>- [ ] task</code></td><td>Checklist</td></tr>
-            <tr><td><code>&gt; quote</code></td><td>Block quote</td></tr>
-            <tr><td><code>[text](https://…)</code></td><td>Link</td></tr>
-          </table>
+      <div class="set-group">
+        <h4 class="set-head">New notes</h4>
+        <div class="set-row">
+          <label for="pref-format">Format</label>
+          <select id="pref-format">
+            <optgroup label="Writing">
+              <option value="text">Text</option>
+              <option value="markdown">Markdown</option>
+              <option value="populi">Populi markup</option>
+            </optgroup>
+            <optgroup label="Code">
+              <option value="python">Python</option>
+              <option value="html">HTML5</option>
+              <option value="xml">XML</option>
+              <option value="javascript">JavaScript</option>
+              <option value="css">CSS</option>
+              <option value="json">JSON</option>
+              <option value="sql">SQL</option>
+            </optgroup>
+          </select>
+          <p class="set-help">Text shows formatting as you write. Markdown and Populi use the symbols below. Coding mode starts its notes as code.</p>
         </div>
-        <div>
-          <h4 class="sec-head">Populi</h4>
-          <table class="cheat">
-            <tr><td><code>*bold*</code></td><td><strong>bold</strong></td></tr>
-            <tr><td><code>_italic_</code></td><td><em>italic</em></td></tr>
-            <tr><td><code>#underline#</code></td><td><u>underline</u></td></tr>
-            <tr><td><code>^super^</code></td><td><sup>super</sup></td></tr>
-            <tr><td><code>~sub~</code></td><td><sub>sub</sub></td></tr>
-            <tr><td><code>+highlight+</code></td><td><mark>highlight</mark></td></tr>
-            <tr><td><code>:smile:</code></td><td>Emoji</td></tr>
-            <tr><td>A web address</td><td>Link or embed</td></tr>
-          </table>
-          <h4 class="sec-head">Citations (both formats)</h4>
-          <table class="cheat">
-            <tr><td><code>[@smith2020, 42]</code></td><td>(Smith 42) or (Smith, 2020, p. 42)</td></tr>
-            <tr><td><code>[@a; @b]</code></td><td>Two sources at once</td></tr>
-            <tr><td><code>@smith2020</code></td><td>Smith, or Smith (2020)</td></tr>
-          </table>
+        <div class="set-row">
+          <label for="pref-style">Citation style</label>
+          <select id="pref-style">
+            <option value="apa">APA 7th edition</option>
+            <option value="mla">MLA 9th edition</option>
+          </select>
+          <p class="set-help">How citations and reference lists look. Each note can switch in Sources.</p>
+        </div>
+      </div>
+      <div class="set-group">
+        <h4 class="set-head">Reference</h4>
+        <p class="set-help">What to type in Markdown and Populi notes. Text notes need none of it: use the toolbar.</p>
+        <div class="cheats">
+          <div class="cheat-card">
+            <h5>Markdown</h5>
+            <table class="cheat">
+              <tr><th>You type</th><th>You get</th></tr>
+              <tr><td><code>**bold**</code></td><td><strong>bold</strong></td></tr>
+              <tr><td><code>*italic*</code></td><td><em>italic</em></td></tr>
+              <tr><td><code>++underline++</code></td><td><u>underline</u></td></tr>
+              <tr><td><code>~~strike~~</code></td><td><s>strike</s></td></tr>
+              <tr><td><code>==highlight==</code></td><td><mark>highlight</mark></td></tr>
+              <tr><td><code>x^2^</code> <code>H~2~O</code></td><td>x<sup>2</sup> H<sub>2</sub>O</td></tr>
+              <tr><td><code># Heading</code></td><td>Heading</td></tr>
+              <tr><td><code>- item</code> <code>1. item</code></td><td>Lists</td></tr>
+              <tr><td><code>- [ ] task</code></td><td>Checklist</td></tr>
+              <tr><td><code>&gt; quote</code></td><td>Block quote</td></tr>
+              <tr><td><code>[text](https://…)</code></td><td>Link</td></tr>
+            </table>
+          </div>
+          <div class="cheat-card">
+            <h5>Populi</h5>
+            <table class="cheat">
+              <tr><th>You type</th><th>You get</th></tr>
+              <tr><td><code>*bold*</code></td><td><strong>bold</strong></td></tr>
+              <tr><td><code>_italic_</code></td><td><em>italic</em></td></tr>
+              <tr><td><code>#underline#</code></td><td><u>underline</u></td></tr>
+              <tr><td><code>+highlight+</code></td><td><mark>highlight</mark></td></tr>
+              <tr><td><code>^super^</code> <code>~sub~</code></td><td><sup>super</sup> <sub>sub</sub></td></tr>
+              <tr><td><code>:smile:</code></td><td>Emoji</td></tr>
+              <tr><td>A web address</td><td>Link or embed</td></tr>
+            </table>
+          </div>
+          <div class="cheat-card wide">
+            <h5>Citations</h5>
+            <table class="cheat">
+              <tr><th>You type</th><th>You get</th></tr>
+              <tr><td><code>[@smith2020, 42]</code></td><td>(Smith 42) or (Smith, 2020, p. 42)</td></tr>
+              <tr><td><code>[@a; @b]</code></td><td>Two sources at once</td></tr>
+              <tr><td><code>@smith2020</code></td><td>Smith, or Smith (2020)</td></tr>
+            </table>
+            <p class="set-help">In every format, Text included. Add sources from Insert › Sources.</p>
+          </div>
         </div>
       </div>
     </section>
@@ -897,5 +930,6 @@
   </div>
 
   <script type="module" src="app.js"></script>
+  <script defer src="boot.js"></script>
 </body>
 </html>

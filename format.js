@@ -183,8 +183,10 @@ export function parseMarkdown(text) {
       blocks.push({ t: 'table', head, align, rows });
       continue;
     }
+    // An empty line kept on purpose (a blank line typed in a Text note) is written "&nbsp;".
+    if (line.trim() === '&nbsp;') { blocks.push({ t: 'p', lines: [], blank: true }); i++; continue; }
     const para = [];
-    while (i < lines.length && lines[i].trim() && !/^(#{1,6})\s/.test(lines[i]) && !/^\s*>/.test(lines[i]) &&
+    while (i < lines.length && lines[i].trim() && lines[i].trim() !== '&nbsp;' && !/^(#{1,6})\s/.test(lines[i]) && !/^\s*>/.test(lines[i]) &&
       !LIST_RE.test(lines[i]) && !/^\s*```/.test(lines[i])) {
       para.push(parseInlineMarkdown(lines[i++]));
     }
@@ -290,7 +292,7 @@ export function blocksToHtml(blocks, ctx = {}) {
         const rows = b.rows.map((r) => `<tr>${r.map((c, k) => `<td class="${al(k)}">${inlineToHtml(c, ctx)}</td>`).join('')}</tr>`).join('');
         return `<div class="table-wrap"><table><thead><tr>${th}</tr></thead><tbody>${rows}</tbody></table></div>`;
       }
-      default: return `<p>${b.lines.map((l) => inlineToHtml(l, ctx)).join('<br>')}</p>`;
+      default: return b.blank ? '<p class="blank">&nbsp;</p>' : `<p>${b.lines.map((l) => inlineToHtml(l, ctx)).join('<br>')}</p>`;
     }
   }).join('\n');
 }
