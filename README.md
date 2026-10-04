@@ -1,8 +1,14 @@
-# Reiimei v0.14.5
+# Reiimei v0.14.6
 
 *reiimei* (REE-h-may), n. The cold, luminous stillness peculiar to a clear winter night; especially the effect of moonlight upon frost, illuminating the night without dispelling it.
 
 An offline-first notes app for Windows and iPhone, built as a Progressive Web App (PWA). No Mac, no App Store, no developer fee.
+
+## What changed in v0.14.6
+
+- **Ilunir replaces Lunarian.** The Ilunir family (Flow, Flow New Moon, Flow Eclipse, Flow Codex and Flow Sigil in seven styles each, plus Moonlit Hand, Cipher Hand, Chancery, Earthshine, Phase Line and Codex Capitals) takes the Lunarian fonts' place in each note's Font menu and in Settings › Writing › Interface font. Notes and settings that used a Lunarian font now show the matching Ilunir font. The Lunarian files are gone.
+- **Echolume is the interface font.** Menus, lists, settings and buttons use Echolume unless you choose another in Settings › Writing › Interface font (a choice you made before is kept). The Reiimei name and the definition page stay in Reiimei Display, and new notes still start in Reiimei Display.
+- Still 84 files (41 Ilunir fonts in place of 41 Lunarian fonts). Upload them all, and delete the old `Lunarian*.woff` files from the repository if you like; nothing uses them now. No Supabase changes.
 
 ## What changed in v0.14.5
 
@@ -203,7 +209,7 @@ Note: a device still on v0.7 would show the hidden cache record in Recently Dele
 | `render.html`, `render.js` | The sealed-off frame that renders HTML notes |
 | `Echolume-VF.woff2`, `Echolume-Italic-VF.woff2` | Echolume font (variable weight), © Krowsingre Publishing LLC |
 | `ReiimeiDisplay-*.woff` | Reiimei Display font (six styles), © Krowsingre Publishing LLC |
-| `Lunarian*.woff` | Lunarian fonts (41 files), © Krowsingre Publishing LLC |
+| `Ilunir*.woff` | Ilunir fonts (41 files), © Krowsingre Publishing LLC |
 | `fonts.js` | The list of fonts for the Font menu and the interface font setting |
 | `share.js`, `ui-share.js` | Sharing as text, combined documents, and archives |
 | `format.js` | Markdown and Populi markup engine |
@@ -232,9 +238,9 @@ Then open http://localhost:8000 in Edge or Chrome. Notes work immediately, saved
 
 The iPhone needs an HTTPS address. GitHub Pages hosts the app for free. Only the app's code goes to GitHub; your notes never do.
 
-1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.14.5` folder.
+1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.14.6` folder.
 2. **Create the repository.** In Safari, sign in at github.com, tap **+** › **New repository**. Name it `reiimei`, set it to **Public** (free Pages needs a public repository), and tap **Create repository**.
-3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.14.5` folder, tap **Select**, select all 84 files, and tap **Open**. Scroll down and tap **Commit changes**.
+3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.14.6` folder, tap **Select**, select all 84 files, and tap **Open**. Scroll down and tap **Commit changes**.
    - If you don't see the upload link, tap the **aA** button in Safari's address bar › **Request Desktop Website** and try again.
 4. **Turn on Pages.** In the repository, open **Settings** › **Pages**. Under **Build and deployment**, set Source to **Deploy from a branch**, Branch to **main** and **/ (root)**, then tap **Save**.
 5. **Wait a minute or two**, then reload the Pages screen. It shows your address, which looks like `https://yourname.github.io/reiimei/`.
@@ -339,7 +345,7 @@ The service worker caches the app files. When you change any file, bump `VERSION
 - **Settings › Log** › Download gives a text log of everything the app did, including sync results and errors.
 - **"Test connection"** in Settings › Sync confirms the URL, key, sign-in, and tables are all correct.
 
-## Known limits in v0.14.5
+## Known limits in v0.14.6
 
 - Images can be linked but not attached
 - Sources belong to one note; there is no shared library yet

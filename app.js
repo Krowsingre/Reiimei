@@ -13,7 +13,7 @@ import { isCode } from './code.js';
 import * as fonts from './fonts.js';
 import { noteTitle, noteSnippet, ownTitle, fallbackTitle, sharedFileCheck } from './share.js';
 
-export const APP_VERSION = '0.14.5';
+export const APP_VERSION = '0.14.6';
 export const BUILD_DATE = '2026-10-04';
 
 const $ = (id) => document.getElementById(id);
@@ -1527,7 +1527,7 @@ function openSettings(tab = 'sync', explicitTab = tab !== 'sync') {
   security.renderSettings();
   $('pref-format').value = prefs().format;
   $('pref-style').value = prefs().style;
-  $('pref-ui-font').value = fonts.fontId(prefs().uiFont);
+  $('pref-ui-font').value = fonts.uiFontId(prefs().uiFont);
   renderDiagnostics();
   $('log-view').textContent = log.exportText() || '(empty)';
   showTab(tab);
