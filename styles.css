@@ -783,11 +783,11 @@ body { font-synthesis: none; }
   .folder-btn { font-size: 15px; }
 
   /* Ribbon: one scrolling row of chips at the foot of the editor; a section opens as a sheet above it. */
-  .editor > .toolbar {
+  .editor .toolbar {
     order: 10; flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 0;
     padding: 0 0 env(safe-area-inset-bottom); border-bottom: 0; border-top: 1px solid var(--rule); background: var(--sheet);
   }
-  :root[data-kb="open"] .editor > .toolbar { padding-bottom: 0; }
+  :root[data-kb="open"] .editor .toolbar { padding-bottom: 0; }
   .rb-chips { flex-wrap: nowrap; overflow-x: auto; gap: 6px; margin: 0; padding: 7px 12px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
   .rb-chips::-webkit-scrollbar { display: none; }
   .rb-chip { flex: none; white-space: nowrap; }
@@ -1106,3 +1106,115 @@ body { font-synthesis: none; }
 .cheats { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
 .cheat-card.wide { grid-column: 1 / -1; }
 .cheat-card.wide .cheat td:first-child { width: 40%; }
+
+/* ---- v0.16.0: focus mode, and a note list whose width can be dragged ---- */
+.list-narrow-only { display: none; }
+#btn-focus .i-collapse { display: none; }
+#btn-focus[aria-pressed="true"] .i-expand { display: none; }
+#btn-focus[aria-pressed="true"] .i-collapse { display: block; }
+@media (min-width: 761px) {
+  .app { grid-template-columns: 230px var(--list-w, 320px) 1fr; }
+  .app[data-rail="on"] { grid-template-columns: 58px var(--list-w, 320px) 1fr; }
+  /* Settings use the full width of the list's column. */
+  .app[data-settings="on"] { grid-template-columns: 230px 320px 1fr; }
+  .app[data-settings="on"][data-rail="on"] { grid-template-columns: 58px 320px 1fr; }
+  .pane.list { position: relative; }
+  .list-resizer { position: absolute; top: 0; bottom: 0; right: -4px; width: 8px; z-index: 6; cursor: col-resize; touch-action: none; }
+  .list-resizer::after { content: ""; position: absolute; top: 0; bottom: 0; left: 3px; width: 2px; background: transparent; transition: background .15s; }
+  .list-resizer:hover::after, .list-resizer:focus-visible::after, .app[data-resizing="on"] .list-resizer::after { background: var(--accent); }
+  .list-resizer:focus-visible { outline: none; }
+  .app[data-resizing="on"] { cursor: col-resize; user-select: none; }
+  /* A narrow list: the title shortens, the extra details go, and Sort, Select and Share move into ⋯. */
+  .app[data-list-narrow="on"] .list .pane-head { gap: 2px; padding-left: 8px; padding-right: 6px; }
+  .app[data-list-narrow="on"] #btn-view, .app[data-list-narrow="on"] #btn-select, .app[data-list-narrow="on"] #btn-share-list { display: none; }
+  .app[data-list-narrow="on"] #btn-list-more { display: inline-grid; }
+  .app[data-list-narrow="on"] .list .icon-btn { width: 30px; height: 30px; flex: none; }
+  .app[data-list-narrow="on"] #list-title { font-size: 15px; min-width: 0; }
+  .app[data-list-narrow="on"] .search-wrap { padding-left: 8px; padding-right: 8px; }
+  .app[data-list-narrow="on"] #search { min-width: 0; width: 100%; padding-left: 8px; padding-right: 4px; }
+  .app[data-list-narrow="on"] .note-item { padding: 9px 8px; }
+  .app[data-list-narrow="on"] .note-item .meta, .app[data-list-narrow="on"] .note-item .tags { display: none; }
+  .app[data-list-narrow="on"] .mode-all { width: calc(100% - 16px); margin: 0 8px 8px; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .app[data-list-narrow="on"] .select-bar { flex-wrap: wrap; padding: 6px 8px; }
+  /* Focus: only the note, filling the window, its text in one comfortable centred column. */
+  .app[data-focus="on"] { grid-template-columns: 1fr; }
+  .app[data-focus="on"] .sidebar, .app[data-focus="on"] .list { display: none; }
+  .app[data-focus="on"] .editor { --col: max(24px, calc((100% - 780px) / 2)); }
+  .app[data-focus="on"] .editor-head { padding-left: max(12px, calc(var(--col) - 12px)); padding-right: max(12px, calc(var(--col) - 12px)); border-bottom-color: transparent; }
+  .app[data-focus="on"] .title-row, .app[data-focus="on"] .tag-row, .app[data-focus="on"] .toolbar, .app[data-focus="on"] .trash-bar,
+  .app[data-focus="on"] .editor-area:not(.code) > #body, .app[data-focus="on"] .rich, .app[data-focus="on"] .preview { padding-left: var(--col); padding-right: var(--col); }
+  .app[data-focus="on"] .tag-row, .app[data-focus="on"] .toolbar { border-bottom-color: transparent; }
+  .app[data-focus="on"] #btn-close-note { display: none; }
+}
+@media (min-width: 761px) and (max-width: 1000px) {
+  .app { grid-template-columns: 200px var(--list-w, 270px) 1fr; }
+  .app[data-rail="on"] { grid-template-columns: 58px var(--list-w, 270px) 1fr; }
+  .app[data-settings="on"] { grid-template-columns: 200px 270px 1fr; }
+  .app[data-settings="on"][data-rail="on"] { grid-template-columns: 58px 270px 1fr; }
+  .app[data-focus="on"] { grid-template-columns: 1fr; }
+}
+
+/* ---- v0.16.0: spacing, brackets, and folding Title, Tags, Formatting and button groups ---- */
+:root { --bracket-bg: rgba(61, 109, 156, .11); }
+@media (prefers-color-scheme: dark) { :root { --bracket-bg: rgba(140, 180, 225, .16); } }
+/* Spacing for the note's text (set per note, or the defaults in Settings). */
+#editor .editor-area .rich, #editor .editor-area .preview, #editor .editor-area:not(.code) > #body, #editor .bracket-layer {
+  line-height: var(--lh, 1.7); letter-spacing: var(--ls, .01em); word-spacing: var(--ws, 0);
+}
+/* Brackets: [labels] drawn as notes in the background. */
+::highlight(rm-brackets) { background-color: var(--bracket-bg); color: var(--ink-3); }
+.bracket-layer {
+  position: absolute; inset: 0; margin: 0; overflow-y: scroll; overflow-x: hidden; pointer-events: none; z-index: 0;
+  white-space: pre-wrap; overflow-wrap: break-word; word-break: normal; color: transparent; scrollbar-width: none;
+}
+.bracket-layer::-webkit-scrollbar { display: none; }
+.bracket-layer mark { background: var(--bracket-bg); color: transparent; border-radius: 3px; }
+#body.with-brackets { position: relative; z-index: 1; overflow-y: scroll; }
+/* An on/off switch. */
+input.switch { appearance: none; -webkit-appearance: none; position: relative; width: 36px; height: 20px; margin: 0; border-radius: 999px; background: var(--paper-3); border: 1px solid var(--rule); cursor: pointer; flex: none; transition: background .15s; }
+input.switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--sheet); box-shadow: 0 1px 2px rgba(0, 0, 0, .2); transition: transform .15s; }
+input.switch:checked { background: var(--accent); border-color: var(--accent); }
+input.switch:checked::after { transform: translateX(16px); }
+input.switch:disabled { opacity: .5; cursor: default; }
+.toolbar .rb-row.rb-small { flex: 0 0 auto; grid-template-columns: auto auto; }
+.spacing-btn.own { color: var(--accent); }
+/* The spacing panel. */
+.spacing-sheet { width: min(360px, calc(100vw - 16px)); padding: 10px 14px 12px; }
+.sp-row { display: grid; grid-template-columns: 86px minmax(0, 1fr) 46px; align-items: center; gap: 10px; margin: 6px 0; font-size: 14px; }
+.sp-row input[type="range"], .range-wrap input[type="range"] { width: 100%; accent-color: var(--accent); }
+.sp-row output, .range-wrap output { font-size: 13px; color: var(--ink-2); text-align: right; font-variant-numeric: tabular-nums; }
+.sp-actions { margin: 10px 0 6px; }
+.range-wrap { display: grid; grid-template-columns: minmax(0, 1fr) 64px; align-items: center; gap: 10px; }
+/* Folding (computer only; the phone keeps its own layout). */
+.ed-head, .rb-label { display: none; }
+@media (max-width: 760px) { .ed-top { display: contents; } }
+@media (min-width: 761px) {
+  .ed-top { display: flex; flex-wrap: wrap; align-items: stretch; border-bottom: 1px solid var(--rule); }
+  .ed-top > .ed-part { flex: 1 0 100%; min-width: 0; }
+  .ed-top > .tag-row { border-bottom: 0; }
+  .ed-top > .toolbar { border-bottom: 0; border-top: 1px solid var(--rule); }
+  .ed-head {
+    display: inline-flex; align-items: center; gap: 3px; padding: 0; margin: 0 0 4px; border: 0; background: none; cursor: pointer;
+    color: var(--ink-3); font: 600 11px/1.2 var(--ui); letter-spacing: .12em; font-variant-caps: all-small-caps;
+  }
+  .ed-head:hover { color: var(--ink); }
+  .ed-head svg { width: 12px; height: 12px; transition: transform .15s; }
+  .tag-row > .ed-head, .toolbar > .ed-head { flex-basis: 100%; justify-content: flex-start; }
+  .ed-part.closed { flex: 0 0 auto; padding: 8px 4px 8px 20px; border-top: 0 !important; }
+  .ed-part.closed + .ed-part.closed { padding-left: 14px; }
+  .ed-part.closed > :not(.ed-head) { display: none !important; }
+  .ed-part.closed > .ed-head { margin: 0; flex-basis: auto; }
+  .ed-part.closed > .ed-head svg { transform: rotate(-90deg); }
+  /* A group of buttons folds to just its name, as wide as the name. */
+  .rb-sec[data-label]::before { content: none; }
+  .rb-label {
+    display: block; position: absolute; top: calc(4px * var(--tb)); left: 0; right: 0; padding: 0; border: 0; background: none; cursor: pointer;
+    text-align: center; color: var(--ink-3); font: 400 calc(11px * var(--tb))/1.2 var(--ui); letter-spacing: .12em; font-variant-caps: all-small-caps;
+  }
+  .rb-label:hover { color: var(--ink); }
+  .rb-sec.closed { padding: calc(6px * var(--tb)) calc(10px * var(--tb)); }
+  .rb-sec.closed > :not(.rb-label) { display: none !important; }
+  .rb-sec.closed > .rb-label { position: static; }
+}
+.toolbar .spacing-btn { height: auto; min-height: 32px; padding: 6px 12px; border: 1px solid var(--rule); border-radius: 8px; background: var(--paper); color: var(--ink); font-size: 14px; }
+.toolbar .spacing-btn:hover { background: var(--paper-3); }

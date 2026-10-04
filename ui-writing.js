@@ -14,6 +14,7 @@ import * as codingUi from './ui-coding.js';
 import * as modes from './modes.js';
 import * as rich from './ui-rich.js';
 import * as fonts from './fonts.js';
+import * as brackets from './brackets.js';
 
 const $ = (id) => document.getElementById(id);
 let app = null; // hooks supplied by app.js
@@ -110,7 +111,96 @@ export function renderToolbar(note) {
   fs.disabled = ro;
   fonts.fillFontSelect(fs, { hidden: app.prefs().hiddenFonts || [], current: fonts.fontId(note.meta?.font) });
   rich.render(note);
+  // Brackets and Spacing belong to writing notes.
+  $('note-brackets-row').hidden = code;
+  $('note-spacing-row').hidden = code;
+  $('note-brackets').checked = !!note.meta?.brackets;
+  $('note-brackets').disabled = ro;
+  applySpacing(note);
+  paintBrackets();
   syncRibbon();
+  applyParts();
+}
+
+// ---- Spacing ---------------------------------------------------------------------
+// Line height, letter spacing and word spacing for the whole note (meta.lh, meta.ls, meta.ws), or
+// the defaults from Settings › Fonts & Styles when the note has not set its own.
+export const SPACING_DEFAULT = { lh: 1.7, ls: 0.01, ws: 0 };
+const num = (v, d) => (Number.isFinite(Number(v)) && v !== null && v !== '' ? Number(v) : d);
+export function spacingOf(note) {
+  const p = app.prefs();
+  const d = { lh: num(p.lh, SPACING_DEFAULT.lh), ls: num(p.ls, SPACING_DEFAULT.ls), ws: num(p.ws, SPACING_DEFAULT.ws) };
+  const m = note?.meta || {};
+  return { lh: num(m.lh, d.lh), ls: num(m.ls, d.ls), ws: num(m.ws, d.ws), own: ['lh', 'ls', 'ws'].some((k) => m[k] !== undefined && m[k] !== null) };
+}
+const fmt = { lh: (v) => v.toFixed(2).replace(/0$/, ''), ls: (v) => `${v >= 0 ? '' : '−'}${Math.abs(v).toFixed(2)}`, ws: (v) => `${v >= 0 ? '' : '−'}${Math.abs(v).toFixed(2)}` };
+export function applySpacing(note, live = null) {
+  const s = live || spacingOf(note);
+  const ed = $('editor');
+  ed.style.setProperty('--lh', String(s.lh));
+  ed.style.setProperty('--ls', `${s.ls}em`);
+  ed.style.setProperty('--ws', `${s.ws}em`);
+  $('btn-spacing').textContent = `Line ${fmt.lh(s.lh)}`;
+  $('btn-spacing').classList.toggle('own', !!s.own);
+}
+let spacingTimer = null;
+function openSpacing(anchor) {
+  const note = app.note();
+  if (!note || note.deleted) return;
+  const dlg = $('spacing-dialog');
+  const s = spacingOf(note);
+  for (const k of ['lh', 'ls', 'ws']) { $(`sp-${k}`).value = String(s[k]); $(`sp-${k}-v`).textContent = fmt[k](s[k]); }
+  dlg.style.top = '';
+  dlg.style.left = '';
+  dlg.showModal();
+  if (!isPhone()) {
+    const r = anchor.getBoundingClientRect();
+    dlg.style.top = `${Math.round(Math.max(8, Math.min(r.bottom + 4, window.innerHeight - dlg.offsetHeight - 8)))}px`;
+    dlg.style.left = `${Math.round(Math.max(8, Math.min(r.left, window.innerWidth - dlg.offsetWidth - 8)))}px`;
+  }
+}
+function spacingInput() {
+  const v = { lh: Number($('sp-lh').value), ls: Number($('sp-ls').value), ws: Number($('sp-ws').value), own: true };
+  for (const k of ['lh', 'ls', 'ws']) $(`sp-${k}-v`).textContent = fmt[k](v[k]);
+  applySpacing(app.note(), v);
+  clearTimeout(spacingTimer);
+  spacingTimer = setTimeout(() => { const n = app.note(); if (n) app.update({ meta: { ...(n.meta || {}), lh: v.lh, ls: v.ls, ws: v.ws } }); }, 300);
+}
+
+// ---- Brackets --------------------------------------------------------------------
+let bracketTimer = null;
+export function paintBrackets() {
+  const note = app.note();
+  const on = !!note && !isCodeNote(note) && !!note.meta?.brackets;
+  const pv = $('preview');
+  if (rich.active()) brackets.paint('rm-brackets', $('rich'), on);
+  else if (!pv.hidden) brackets.paint('rm-brackets', pv, on);
+  else brackets.paint('rm-brackets', null, false);
+  brackets.paintBehind($('bracket-layer'), $('body'), on && !rich.active() && !$('body').hidden && pv.hidden);
+}
+
+// ---- Folding: Title, Tags and Formatting, and each group of buttons (computer) --------------
+const closedParts = () => (Array.isArray(app.prefs().closedParts) ? app.prefs().closedParts : []);
+const closedGroups = () => (Array.isArray(app.prefs().closedGroups) ? app.prefs().closedGroups : []);
+function applyParts() {
+  const parts = closedParts();
+  const groups = closedGroups();
+  document.querySelectorAll('.ed-part').forEach((p) => {
+    const closed = parts.includes(p.dataset.part);
+    p.classList.toggle('closed', closed);
+    p.querySelector(':scope > .ed-head')?.setAttribute('aria-expanded', String(!closed));
+  });
+  document.querySelectorAll('#rb-panels .rb-sec[data-label]').forEach((sec) => {
+    const closed = groups.includes(sec.dataset.label);
+    sec.classList.toggle('closed', closed);
+    sec.querySelector(':scope > .rb-label')?.setAttribute('aria-expanded', String(!closed));
+  });
+  fitToolbar();
+}
+function toggleIn(key, value) {
+  const list = Array.isArray(app.prefs()[key]) ? app.prefs()[key] : [];
+  app.setPrefs({ [key]: list.includes(value) ? list.filter((x) => x !== value) : [...list, value] });
+  applyParts();
 }
 
 let lastRendered = null;
@@ -141,6 +231,7 @@ function renderPreview(note) {
     html += `<section class="refs"><h2>${C.referenceHeading(styleOf(note))}</h2>${refs.map((r) => `<p>${r.runs.map((x) => (x.italic ? `<em>${F.escapeHtml(x.text)}</em>` : F.escapeHtml(x.text))).join('')}</p>`).join('')}</section>`;
   }
   pv.innerHTML = html || '<p class="hint">Nothing to preview yet.</p>';
+  paintBrackets();
 }
 
 // Replace the text with `value` the way typing would, so Ctrl+Z / Undo still works.
@@ -630,6 +721,43 @@ export function init(hooks) {
   codingUi.init(hooks);
   research.init(hooks, { renderSources, saveMeta, insertText: (t) => insertAtCaret(t), sourcesOf, styleOf, citerFor });
 
+  // Each labelled group gets its name as a button that folds it to just that name.
+  document.querySelectorAll('#rb-panels .rb-sec[data-label]').forEach((sec) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'rb-label';
+    b.textContent = sec.dataset.label;
+    b.title = `Show or hide the ${sec.dataset.label} buttons`;
+    b.setAttribute('aria-expanded', 'true');
+    b.addEventListener('click', () => toggleIn('closedGroups', sec.dataset.label));
+    sec.prepend(b);
+  });
+  document.querySelectorAll('.ed-head').forEach((h) => h.addEventListener('click', () => toggleIn('closedParts', h.dataset.part)));
+  $('note-brackets').addEventListener('change', (e) => {
+    const note = app.note();
+    if (!note) return;
+    app.update({ meta: { ...(note.meta || {}), brackets: e.target.checked } });
+    log.info('format', 'Brackets', { on: e.target.checked });
+  });
+  $('body').addEventListener('input', () => { clearTimeout(bracketTimer); bracketTimer = setTimeout(paintBrackets, 80); });
+  $('body').addEventListener('scroll', () => { $('bracket-layer').scrollTop = $('body').scrollTop; });
+  $('btn-spacing').addEventListener('click', (e) => openSpacing(e.currentTarget));
+  for (const k of ['lh', 'ls', 'ws']) $(`sp-${k}`).addEventListener('input', spacingInput);
+  $('sp-reset').addEventListener('click', async () => {
+    clearTimeout(spacingTimer);
+    const n = app.note();
+    if (!n) return;
+    const meta = { ...(n.meta || {}) };
+    delete meta.lh; delete meta.ls; delete meta.ws;
+    await app.update({ meta });
+    const s = spacingOf(app.note());
+    for (const k of ['lh', 'ls', 'ws']) { $(`sp-${k}`).value = String(s[k]); $(`sp-${k}-v`).textContent = fmt[k](s[k]); }
+  });
+  $('sp-done').addEventListener('click', () => $('spacing-dialog').close());
+  $('spacing-dialog').addEventListener('click', (e) => {
+    const d = e.currentTarget; const r = d.getBoundingClientRect();
+    if (e.target === d && (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom)) d.close();
+  });
   $('rb-chips').addEventListener('click', (e) => {
     const chip = e.target.closest('.rb-chip');
     if (!chip) return;
@@ -642,6 +770,7 @@ export function init(hooks) {
   // Buttons in the ribbon keep the text box focused, so a phone keeps its keyboard up.
   $('toolbar').addEventListener('pointerdown', (e) => { if (e.pointerType !== 'mouse' && e.target.closest('.tool, .rb-chip') && (document.activeElement === $('body') || document.activeElement === $('rich'))) e.preventDefault(); });
   $('toolbar').addEventListener('mousedown', (e) => { if (e.target.closest('.tool, .rb-chip') && (document.activeElement === $('body') || document.activeElement === $('rich'))) e.preventDefault(); });
+  $('toolbar').addEventListener('mousedown', (e) => { if (e.target.closest('.rb-label, .ed-head') && document.activeElement === $('rich')) e.preventDefault(); });
   // With words selected, the Font menu sets the font of those words only (Text and Markdown notes);
   // with nothing selected it sets the font of the whole note.
   $('note-font').addEventListener('change', async (e) => {
@@ -808,6 +937,6 @@ export function resetView() {
   previewOn = false;
 }
 export const isPreview = () => previewOn;
-export const newNoteMeta = (prefs) => ({ style: prefs.style, ...(fonts.fontId(prefs.noteFont) !== fonts.DEFAULT_FONT ? { font: fonts.fontId(prefs.noteFont) } : {}) });
+export const newNoteMeta = (prefs) => ({ style: prefs.style, ...(fonts.fontId(prefs.noteFont) !== fonts.DEFAULT_FONT ? { font: fonts.fontId(prefs.noteFont) } : {}), ...(prefs.brackets ? { brackets: true } : {}) });
 // Notes without a saved style use the preferred style everywhere, including sharing.
 export const setStyleDefault = (fn) => S.setDefaultStyle(fn);

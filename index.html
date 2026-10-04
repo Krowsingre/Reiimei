@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-version="0.15.2">
+<html lang="en" data-version="0.16.0">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -68,6 +68,7 @@
         <button class="icon-btn" id="btn-view" title="Sort and show" aria-label="Sort and show notes"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 12h4M12 12h8M4 17h12M20 17h0"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="17" r="2"/></svg><i class="view-dot" id="view-dot" hidden></i></button>
         <button class="text-btn" id="btn-select" title="Select several notes">Select</button>
         <button class="icon-btn" id="btn-share-list" title="Share notes in this list" aria-label="Share notes in this list"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M5 12v7h14v-7"/></svg></button>
+        <button class="icon-btn list-narrow-only" id="btn-list-more" title="Sort, select and share" aria-label="List menu" aria-haspopup="dialog"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/></svg></button>
         <button class="icon-btn accent" id="btn-new-note" title="New note" aria-label="New note">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
         </button>
@@ -86,6 +87,8 @@
       </div>
       <button class="mode-all" id="mode-all" type="button" hidden></button>
       <ul class="note-list" id="note-list"></ul>
+      <!-- Drag to make the list narrower (down to about an inch) or back to its full width. -->
+      <div class="list-resizer desktop-only" id="list-resizer" role="separator" aria-orientation="vertical" aria-label="Width of the note list" tabindex="0" title="Drag to change the width of the note list. Double-click to reset."></div>
     </section>
 
     <!-- Editor -->
@@ -100,19 +103,26 @@
         <button type="button" class="folder-btn" id="note-folder" aria-haspopup="dialog" title="Folder"><span id="note-folder-name"></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
         <span class="spacer"></span>
         <span class="save-state" id="save-state" role="status"></span>
+        <button class="icon-btn desktop-only" id="btn-focus" title="Focus: the note fills the window (Ctrl+Shift+F)" aria-label="Focus on this note" aria-pressed="false"><svg class="i-expand" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg><svg class="i-collapse" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg></button>
         <button class="icon-btn" id="btn-note-menu" title="Share, pin or delete" aria-label="Note menu" aria-haspopup="dialog"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/></svg><i class="pin-dot" id="pin-dot" hidden></i></button>
       </header>
-      <div class="title-row" id="title-row">
+      <!-- Title, Tags and Formatting: on a computer each can be folded to just its name, and
+           folded ones sit side by side. -->
+      <div class="ed-top" id="ed-top">
+      <div class="title-row ed-part" id="title-row" data-part="title">
+        <button type="button" class="ed-head" data-part="title" aria-expanded="true" aria-controls="note-title"><span>Title</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
         <textarea id="note-title" rows="1" maxlength="200" placeholder="Title" aria-label="Title" autocomplete="off" spellcheck="true"></textarea>
       </div>
-      <div class="tag-row" id="tag-row">
+      <div class="tag-row ed-part" id="tag-row" data-part="tags">
+        <button type="button" class="ed-head" data-part="tags" aria-expanded="true" aria-controls="tag-input"><span>Tags</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
         <div class="chips" id="chips"></div>
         <input id="tag-input" placeholder="Add tag" autocomplete="off" autocapitalize="off" aria-label="Add tag" list="tag-suggest">
         <datalist id="tag-suggest"></datalist>
       </div>
       <!-- Formatting. On a computer every group is shown, each in its own labelled box. On a phone
            the chips open one section at a time (data-sec says which chip a group belongs to). -->
-      <div class="toolbar" id="toolbar" role="toolbar" aria-label="Formatting">
+      <div class="toolbar ed-part" id="toolbar" role="toolbar" aria-label="Formatting" data-part="format">
+        <button type="button" class="ed-head" data-part="format" aria-expanded="true" aria-controls="rb-panels"><span>Formatting</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
         <div class="rb-chips" id="rb-chips" role="group" aria-label="Toolbar sections">
           <button class="rb-chip" data-sec="text" aria-expanded="false" hidden>Text</button>
           <button class="rb-chip" data-sec="para" aria-expanded="false" hidden>Paragraph</button>
@@ -210,9 +220,16 @@
                   </optgroup>
                 </select>
               </label>
+              <label class="rb-row rb-small" id="note-brackets-row" title="Show [section labels] such as [Verse 1] or [Chorus] as notes in the background"><span>Brackets</span>
+                <input type="checkbox" class="switch" id="note-brackets" role="switch">
+              </label>
+              <div class="rb-row rb-small" id="note-spacing-row"><span>Spacing</span>
+                <button type="button" class="tool spacing-btn" id="btn-spacing" aria-haspopup="dialog" title="Line height, letter spacing and word spacing for this note">Line 1.7</button>
+              </div>
             </div>
           </div>
         </div>
+      </div>
       </div>
       <div class="trash-bar" id="trash-bar" hidden>
         This note is in Recently Deleted.
@@ -245,6 +262,7 @@
         <div class="gutter" id="gutter" hidden aria-hidden="true"></div>
         <pre class="code-layer" id="code-layer" hidden aria-hidden="true"><code id="code-hl"></code></pre>
         <pre class="code-layer mark-layer" id="mark-layer" hidden aria-hidden="true"></pre>
+        <div class="bracket-layer" id="bracket-layer" hidden aria-hidden="true"></div>
         <textarea id="body" placeholder="Begin writing." spellcheck="true"></textarea>
         <div class="rich" id="rich" role="textbox" aria-multiline="true" aria-label="Note text" spellcheck="true" hidden></div>
         <article class="preview" id="preview" hidden></article>
@@ -391,6 +409,14 @@
         </div>
       </div>
       <div class="set-group">
+        <h4 class="set-head">Spacing</h4>
+        <p class="set-help">For every note that has not set its own (use Spacing in a note's toolbar for one note).</p>
+        <div class="set-row"><label for="pref-lh">Line height</label><span class="range-wrap"><input type="range" id="pref-lh" min="1" max="2.6" step="0.05"><output id="pref-lh-v"></output></span></div>
+        <div class="set-row"><label for="pref-ls">Letters</label><span class="range-wrap"><input type="range" id="pref-ls" min="-0.05" max="0.3" step="0.01"><output id="pref-ls-v"></output></span></div>
+        <div class="set-row"><label for="pref-ws">Words</label><span class="range-wrap"><input type="range" id="pref-ws" min="-0.1" max="1" step="0.05"><output id="pref-ws-v"></output></span></div>
+        <div class="set-row"><span></span><span><button type="button" class="text-btn" id="pref-spacing-reset">Back to the usual spacing</button></span></div>
+      </div>
+      <div class="set-group">
         <h4 class="set-head">Editor fonts</h4>
         <p class="set-help">Tick the fonts a note's Font menu offers. A note that already uses an unticked font keeps it. These choices belong to this device.</p>
         <div class="set-row">
@@ -433,6 +459,11 @@
             <option value="mla">MLA 9th edition</option>
           </select>
           <p class="set-help">How citations and reference lists look. Each note can switch in Sources.</p>
+        </div>
+        <div class="set-row">
+          <label for="pref-brackets">Brackets</label>
+          <span><input type="checkbox" class="switch" id="pref-brackets" role="switch"></span>
+          <p class="set-help">Start new notes with Brackets on: [Verse 1], [Chorus] and other [labels] show as notes in the background. Each note can switch it in its toolbar.</p>
         </div>
       </div>
       <div class="set-group">
@@ -520,6 +551,16 @@
   <dialog id="menu-sheet" class="menu-sheet" aria-labelledby="menu-title">
     <p class="ms-title" id="menu-title"></p>
     <div class="ms-items" id="menu-items" role="menu"></div>
+  </dialog>
+
+  <!-- Spacing for one note -->
+  <dialog id="spacing-dialog" class="menu-sheet spacing-sheet" aria-labelledby="spacing-title">
+    <p class="ms-title" id="spacing-title">Spacing for this note</p>
+    <label class="sp-row"><span>Line height</span><input type="range" id="sp-lh" min="1" max="2.6" step="0.05"><output id="sp-lh-v"></output></label>
+    <label class="sp-row"><span>Letters</span><input type="range" id="sp-ls" min="-0.05" max="0.3" step="0.01"><output id="sp-ls-v"></output></label>
+    <label class="sp-row"><span>Words</span><input type="range" id="sp-ws" min="-0.1" max="1" step="0.05"><output id="sp-ws-v"></output></label>
+    <div class="row sp-actions"><button type="button" class="text-btn" id="sp-reset">Use the defaults</button><span class="spacer"></span><button type="button" class="btn small" id="sp-done">Done</button></div>
+    <p class="set-help">Applies to the whole note. Defaults are in Settings › Fonts &amp; Styles.</p>
   </dialog>
 
   <!-- Generic prompt dialog -->

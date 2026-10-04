@@ -13,7 +13,7 @@ import { isCode } from './code.js';
 import * as fonts from './fonts.js';
 import { noteTitle, noteSnippet, ownTitle, fallbackTitle, sharedFileCheck } from './share.js';
 
-export const APP_VERSION = '0.15.2';
+export const APP_VERSION = '0.16.0';
 // boot.js compares this with the page's version to catch a launch that mixes two releases.
 window.__reiimeiVersion = APP_VERSION;
 export const BUILD_DATE = '2026-10-04';
@@ -257,6 +257,78 @@ function groupLabel(n) {
   if (sort === 'tag') return firstTag(n) ? `#${firstTag(n)}` : 'No tag';
   if (sort === 'device' && state.filter.type === 'all') return deviceOf(n).name;
   return null;
+}
+
+// ---- Focus mode and the width of the note list (computer) -----------------------------
+// Focus: the open note fills the whole window (the sidebar and the list step aside, and come back
+// exactly as they were). It always starts off. The list's width can be dragged from its right
+// edge, from its full width down to about an inch; each device remembers it.
+const focusOn = () => el.app.dataset.focus === 'on';
+function setFocus(on) {
+  on = !!on && !!currentNote() && !isPhone();
+  if (on === focusOn()) return;
+  el.app.dataset.focus = on ? 'on' : 'off';
+  const b = $('btn-focus');
+  b.setAttribute('aria-pressed', String(on));
+  b.title = on ? 'Leave focus (Esc or Ctrl+Shift+F)' : 'Focus: the note fills the window (Ctrl+Shift+F)';
+  b.setAttribute('aria-label', on ? 'Leave focus' : 'Focus on this note');
+  log.debug('focus', on ? 'On' : 'Off');
+  writing.fitToolbar();
+}
+const LIST_MIN = 108; // just over an inch
+const listMax = () => (window.matchMedia('(max-width: 1000px)').matches ? 270 : 320);
+function applyListWidth(w = prefs().listW) {
+  const max = listMax();
+  const width = Math.round(Math.max(LIST_MIN, Math.min(max, Number(w) || max)));
+  el.app.style.setProperty('--list-w', `${width}px`);
+  el.app.dataset.listNarrow = width < 230 ? 'on' : 'off';
+  const r = $('list-resizer');
+  r.setAttribute('aria-valuemin', String(LIST_MIN));
+  r.setAttribute('aria-valuemax', String(max));
+  r.setAttribute('aria-valuenow', String(width));
+  writing.fitToolbar();
+  return width;
+}
+function bindFocusAndWidth() {
+  const b = $('btn-focus');
+  b.addEventListener('mousedown', (e) => e.preventDefault()); // keep the caret where it is
+  b.addEventListener('click', () => setFocus(!focusOn()));
+  document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey && e.key.toLowerCase() === 'f' && !document.querySelector('dialog[open]')) { e.preventDefault(); setFocus(!focusOn()); }
+  });
+  const r = $('list-resizer');
+  let drag = null;
+  r.addEventListener('pointerdown', (e) => {
+    drag = { x: e.clientX, w: $('note-list').closest('.list').getBoundingClientRect().width };
+    r.setPointerCapture(e.pointerId);
+    el.app.dataset.resizing = 'on';
+    e.preventDefault();
+  });
+  r.addEventListener('pointermove', (e) => { if (drag) applyListWidth(drag.w + e.clientX - drag.x); });
+  const end = () => { if (!drag) return; drag = null; el.app.dataset.resizing = 'off'; setPrefs({ listW: applyListWidth(parseFloat(getComputedStyle(el.app).getPropertyValue('--list-w'))) }); };
+  r.addEventListener('pointerup', end);
+  r.addEventListener('pointercancel', end);
+  r.addEventListener('dblclick', () => { setPrefs({ listW: null }); applyListWidth(); });
+  r.addEventListener('keydown', (e) => {
+    const step = e.shiftKey ? 48 : 16;
+    const now = parseFloat(getComputedStyle(el.app).getPropertyValue('--list-w')) || listMax();
+    let next = null;
+    if (e.key === 'ArrowLeft') next = now - step;
+    else if (e.key === 'ArrowRight') next = now + step;
+    else if (e.key === 'Home') next = LIST_MIN;
+    else if (e.key === 'End') next = listMax();
+    if (next === null) return;
+    e.preventDefault();
+    setPrefs({ listW: applyListWidth(next) });
+  });
+  window.addEventListener('resize', () => applyListWidth());
+  // When the list is narrow, Sort and show, Select and Share move into one ⋯ menu.
+  $('btn-list-more').addEventListener('click', (e) => openMenu(e.currentTarget, listTitle(), [
+    { label: 'Sort and show…', run: () => $('btn-view').click() },
+    { label: state.selecting ? 'Done selecting' : 'Select several notes', run: () => $('btn-select').click() },
+    { label: 'Share notes in this list…', run: () => $('btn-share-list').click() },
+  ]));
+  applyListWidth();
 }
 
 function applyRail() {
@@ -910,6 +982,7 @@ async function emptyTrash() {
 
 // Close the open note and show the Reiimei page.
 async function closeNote() {
+  setFocus(false);
   await flushSave();
   if (state.currentId) await discardIfBlank(state.currentId);
   state.currentId = null;
@@ -1586,6 +1659,11 @@ function renderDiagnostics() {
 }
 
 // ---- Settings › Fonts & Styles -----------------------------------------------
+function renderSpacingSettings() {
+  const d = writing.SPACING_DEFAULT;
+  const v = { lh: prefs().lh ?? d.lh, ls: prefs().ls ?? d.ls, ws: prefs().ws ?? d.ws };
+  for (const k of ['lh', 'ls', 'ws']) { $(`pref-${k}`).value = String(v[k]); $(`pref-${k}-v`).textContent = k === 'lh' ? Number(v[k]).toFixed(2).replace(/0$/, '') : `${Number(v[k]).toFixed(2)} em`; }
+}
 const hiddenFonts = () => (Array.isArray(prefs().hiddenFonts) ? prefs().hiddenFonts.filter((x) => fonts.FONT_IDS.includes(x)) : []);
 function renderFontSettings() {
   const hidden = hiddenFonts();
@@ -1667,10 +1745,14 @@ function openSettings(tab = 'sync', explicitTab = tab !== 'sync') {
   $('pref-format').value = prefs().format;
   $('pref-style').value = prefs().style;
   renderFontSettings();
+  renderSpacingSettings();
+  $('pref-brackets').checked = !!prefs().brackets;
   renderDiagnostics();
   $('log-view').textContent = log.exportText() || '(empty)';
   showTab(tab);
   state.settingsOpen = true;
+  setFocus(false);
+  el.app.dataset.settings = 'on';
   state.prevMobileView = el.app.dataset.mobileView === 'settings-list' || el.app.dataset.mobileView === 'settings-detail' ? state.prevMobileView : el.app.dataset.mobileView;
   flushSave();
   document.querySelector('.list').hidden = true;
@@ -1686,6 +1768,7 @@ function openSettings(tab = 'sync', explicitTab = tab !== 'sync') {
 function closeSettings() {
   if (!state.settingsOpen) return;
   state.settingsOpen = false;
+  el.app.dataset.settings = 'off';
   document.querySelector('.list').hidden = false;
   document.querySelector('.editor').hidden = false;
   $('settings-list').hidden = true;
@@ -1833,6 +1916,9 @@ function bindEvents() {
   });
   $('pref-format').addEventListener('change', (e) => { setPrefs({ format: e.target.value }); log.info('prefs', 'Default format changed', { format: e.target.value }); });
   $('pref-style').addEventListener('change', (e) => { setPrefs({ style: e.target.value }); log.info('prefs', 'Default citation style changed', { style: e.target.value }); });
+  for (const k of ['lh', 'ls', 'ws']) $(`pref-${k}`).addEventListener('input', (e) => { setPrefs({ [k]: Number(e.target.value) }); renderSpacingSettings(); writing.applySpacing(currentNote()); });
+  $('pref-spacing-reset').addEventListener('click', () => { setPrefs({ lh: null, ls: null, ws: null }); renderSpacingSettings(); writing.applySpacing(currentNote()); });
+  $('pref-brackets').addEventListener('change', (e) => setPrefs({ brackets: e.target.checked }));
   $('pref-note-font').addEventListener('change', (e) => { setPrefs({ noteFont: e.target.value }); log.info('prefs', 'Font for new notes changed', { font: e.target.value }); });
   $('font-packs').addEventListener('change', (e) => { const id = e.target.dataset?.font; if (id) setFontShown([id], e.target.checked); });
   $('font-packs').addEventListener('click', (e) => {
@@ -1848,6 +1934,7 @@ function bindEvents() {
   $('btn-new-note').addEventListener('click', newNote);
   $('btn-new-folder').addEventListener('click', () => newFolder());
   for (const id of ['btn-folders-toggle', 'btn-folders-chevron']) $(id).addEventListener('click', () => { setPrefs({ foldersOpen: prefs().foldersOpen === false }); renderSidebar(); });
+  bindFocusAndWidth();
   // The sidebar folds to a narrow rail of icons on a computer (remembered on this device).
   $('btn-rail').addEventListener('click', () => { setPrefs({ rail: !prefs().rail }); applyRail(); });
   $('btn-back-sidebar').addEventListener('click', () => setMobileView('sidebar'));
@@ -1922,6 +2009,7 @@ function bindEvents() {
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape' || document.querySelector('dialog[open]')) return;
     if (splashOpen()) { closeSplash(); return; }
+    if (focusOn()) { setFocus(false); return; }
     if (state.settingsOpen) { if (!['TEXTAREA', 'INPUT', 'SELECT'].includes(document.activeElement?.tagName)) closeSettings(); return; }
     if (state.selecting) { setSelecting(false); return; }
     if (state.currentId && !['TEXTAREA', 'INPUT', 'SELECT'].includes(document.activeElement?.tagName) && !document.activeElement?.isContentEditable) closeNote();

@@ -108,8 +108,18 @@ function inlineMd(node, font = null) {
 const escLineStart = (line) => line.replace(/^(\s*)(#|>|[-*+](?=\s)|\d+[.)](?=\s))/, '$1\\$2');
 const dropEmptyRuns = (s) => s.replace(/\[\[f:[a-z][a-z0-9-]*\]\]\[\[\/f\]\]/g, '');
 function paraMd(el) {
-  const text = dropEmptyRuns(inlineMd(el)).replace(/\n+$/, '');
-  return text.split('\n').map((l) => escLineStart(l.replace(/\s+$/, ''))).join('\n');
+  const lines = dropEmptyRuns(inlineMd(el)).replace(/\n+$/, '').split('\n').map((l) => escLineStart(l.replace(/\s+$/, '')));
+  // An empty line inside a paragraph (two line breaks in a row: Shift+Enter twice, typing on an
+  // iPhone, pasted text) is a blank line kept on purpose, just like an empty paragraph.
+  const out = [];
+  let cur = [];
+  for (const l of lines) {
+    if (l.trim()) { cur.push(l); continue; }
+    if (cur.length) { out.push(cur.join('\n')); cur = []; }
+    out.push(BLANK_LINE);
+  }
+  if (cur.length) out.push(cur.join('\n'));
+  return out.join('\n\n');
 }
 function listMd(list, level, out) {
   let n = 0;
