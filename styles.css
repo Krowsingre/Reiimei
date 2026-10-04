@@ -1244,3 +1244,9 @@ input.switch:disabled { opacity: .5; cursor: default; }
   .splash .definition > .def-gap.mid { flex: 0 0 0; min-height: 0; }
   .splash .definition > .def-gap.end { flex: 1 1 0; }
 }
+
+/* ---- v0.16.3: the phone's Reiimei page is centred line by line ---- */
+@media (max-width: 760px) {
+  .splash .definition { text-align: center; align-items: center; }
+  .splash .definition > p { max-width: 30rem; }
+}
