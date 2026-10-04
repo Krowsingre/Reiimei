@@ -12,7 +12,7 @@ import * as codeIntel from './codeintel.js';
 import { isCode } from './code.js';
 import { noteTitle, noteSnippet, ownTitle, fallbackTitle, sharedFileCheck } from './share.js';
 
-export const APP_VERSION = '0.14.1';
+export const APP_VERSION = '0.14.2';
 export const BUILD_DATE = '2026-10-04';
 
 const $ = (id) => document.getElementById(id);
@@ -1179,8 +1179,10 @@ function openNoteMenu() {
 }
 
 // ---- Splash: the Reiimei page --------------------------------------------------------
-// Hidden until the Reiimei name is tapped; tapping the name again hides it. Tapping anywhere
-// on it starts a new note in the current mode and folder.
+// On a computer it is hidden until the Reiimei name is clicked, and clicking anywhere on it starts
+// a new note in the current mode and folder. On a phone it is the home page the app opens on, and
+// tapping it goes on to the notes. Either way, the Reiimei name shows it again (and hides it).
+// The instruction line has a computer and a phone wording; styles.css shows the right one.
 const splashOpen = () => !$('splash').hidden;
 function setSplash(open) {
   $('splash').hidden = !open;
@@ -1190,7 +1192,11 @@ function setSplash(open) {
 function closeSplash() { if (splashOpen()) setSplash(false); }
 function bindSplash() {
   const splash = $('splash');
-  splash.append(el.emptyEditor.querySelector('.definition').cloneNode(true));
+  const def = el.emptyEditor.querySelector('.definition').cloneNode(true);
+  const hint = def.querySelector('.hint-line');
+  hint.innerHTML = '<span class="hint-wide"></span><span class="hint-phone">Click here to get started.</span>';
+  hint.firstChild.textContent = el.emptyEditor.querySelector('.hint-line').textContent;
+  splash.append(def);
   $('btn-brand').addEventListener('click', () => {
     const open = !splashOpen();
     if (open) closeSettings();
@@ -1200,6 +1206,7 @@ function bindSplash() {
   const start = (e) => {
     if (e.type === 'keydown' && e.key !== 'Enter' && e.key !== ' ') return;
     e.preventDefault();
+    if (e.currentTarget === splash && isPhone()) { closeSplash(); setMobileView('list'); return; }
     newNote();
   };
   for (const box of [splash, el.emptyEditor]) { box.addEventListener('click', start); box.addEventListener('keydown', start); }
@@ -1843,6 +1850,7 @@ async function boot() {
     }
     await loadData();
     setMobileView('list');
+    if (isPhone()) setSplash(true); // a phone opens on the Reiimei page
     offerDeviceSetup();
     log.info('boot', `UI ready in ${Math.round(performance.now() - t0)} ms`, { notes: state.notes.length, folders: state.folders.length });
   } catch (e) {

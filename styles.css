@@ -846,3 +846,10 @@ body { font-synthesis: none; }
 .rich th, .rich td { border: 1px solid var(--rule); padding: 3px 8px; text-align: left; }
 #editor[data-font="display"] .rich { letter-spacing: .01em; }
 @media (max-width: 760px) { .rich { padding: 18px 16px 40vh; font-size: 17px; } }
+
+/* ---- v0.14.2: the splash is the phone's home page ---- */
+.splash .hint-phone { display: none; }
+@media (max-width: 760px) {
+  .splash .hint-wide { display: none; }
+  .splash .hint-phone { display: inline; }
+}
