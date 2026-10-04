@@ -23,7 +23,7 @@ export function renderToolbar(note, code = false, previewOn = false) {
   if (show) {
     $('body').hidden = true;
     $('btn-preview').hidden = true;
-    $('tool-buttons').querySelectorAll('.tool').forEach((b) => { b.disabled = true; });
+    $('rb-panels').querySelectorAll('[data-tool]').forEach((b) => { b.disabled = true; });
     renderBoard();
   } else if (note && !previewOn && !code) {
     // Back to text: the textarea is shown again by the normal editor.

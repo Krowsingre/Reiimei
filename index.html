@@ -105,6 +105,8 @@
         <input id="tag-input" placeholder="Add tag" autocomplete="off" autocapitalize="off" aria-label="Add tag" list="tag-suggest">
         <datalist id="tag-suggest"></datalist>
       </div>
+      <!-- Formatting. On a computer every group is shown, each in its own labelled box. On a phone
+           the chips open one section at a time (data-sec says which chip a group belongs to). -->
       <div class="toolbar" id="toolbar" role="toolbar" aria-label="Formatting">
         <div class="rb-chips" id="rb-chips" role="group" aria-label="Toolbar sections">
           <button class="rb-chip" data-sec="text" aria-expanded="false" hidden>Text</button>
@@ -117,36 +119,59 @@
           <button class="rb-chip" data-sec="note" aria-expanded="false" hidden>Note</button>
         </div>
         <div class="rb-panels" id="rb-panels">
-          <div class="rb-group" id="tool-buttons"></div>
+          <div class="rb-group" id="tool-buttons">
+            <div class="rb-sec" data-sec="text" data-label="Text" hidden>
+              <button class="tool t-b" data-tool="b" title="Bold (Ctrl+B)" aria-label="Bold">B</button>
+              <button class="tool t-i" data-tool="i" title="Italic (Ctrl+I)" aria-label="Italic">I</button>
+              <button class="tool t-u" data-tool="u" title="Underline (Ctrl+U)" aria-label="Underline">U</button>
+              <button class="tool t-s" data-tool="s" title="Strikethrough" aria-label="Strikethrough">S</button>
+              <button class="tool t-mark" data-tool="mark" title="Highlight" aria-label="Highlight"><span>H</span></button>
+            </div>
+            <div class="rb-sec" data-sec="text" data-label="Headings" hidden>
+              <button class="tool t-h" data-tool="h" title="Heading (steps through Heading 1, 2, 3 and normal text)" aria-label="Heading">H</button>
+              <button class="tool" data-tool="sup" title="Superscript" aria-label="Superscript">x²</button>
+              <button class="tool" data-tool="sub" title="Subscript" aria-label="Subscript">x₂</button>
+            </div>
+            <div class="rb-sec" data-sec="para" data-label="Lists" hidden>
+              <button class="tool" data-tool="ul" title="Bulleted list (Ctrl+Shift+8)" aria-label="Bulleted list">•</button>
+              <button class="tool" data-tool="ol" title="Numbered list (Ctrl+Shift+7)" aria-label="Numbered list">1.</button>
+              <button class="tool" data-tool="task" title="Checklist" aria-label="Checklist">☐</button>
+            </div>
+            <div class="rb-sec" data-sec="para" data-label="Indent" hidden>
+              <button class="tool" data-tool="outdent" title="Move list item out (Shift+Tab)" aria-label="Move list item out">⇤</button>
+              <button class="tool" data-tool="indent" title="Move list item in (Tab)" aria-label="Move list item in">⇥</button>
+            </div>
+          </div>
           <div class="rb-group" id="code-tools" hidden>
-            <div class="rb-sec" data-sec="edit" hidden>
+            <div class="rb-sec" data-sec="edit" data-label="Edit" hidden>
               <button class="tool" data-code="tidy" title="Fix indentation and spacing">Tidy</button>
               <button class="tool" data-code="indent" title="Indent (Tab)">Indent</button>
               <button class="tool" data-code="outdent" title="Outdent (Shift+Tab)">Outdent</button>
               <button class="tool" data-code="comment" title="Comment or uncomment (Ctrl+/)">Comment</button>
             </div>
-            <div class="rb-sec" data-sec="nav" hidden>
+            <div class="rb-sec" data-sec="nav" data-label="Navigate" hidden>
               <button class="tool" id="btn-find" aria-pressed="false" title="Find and replace (Ctrl+F)">Find</button>
               <button class="tool" id="btn-snippets" title="Snippets saved in this project">Snippets</button>
-            </div>
-            <div class="rb-sec" data-sec="view" hidden>
               <button class="tool" id="btn-code-outline" aria-pressed="false" title="Outline of functions, classes, headings">Outline</button>
             </div>
           </div>
           <div class="rb-group">
-            <div class="rb-sec" data-sec="insert" hidden>
+            <div class="rb-sec" data-sec="insert" data-label="Insert" hidden>
+              <button class="tool" data-tool="quote" title="Quote" aria-label="Quote">❝</button>
+              <button class="tool" data-tool="code" title="Code" aria-label="Code">{ }</button>
+              <button class="tool" data-tool="link" title="Link" aria-label="Link">Link</button>
               <button class="tool" id="btn-sources" title="Sources and citations">Sources</button>
               <button class="tool research-only" id="btn-quote" title="Quote a source" hidden>Quote</button>
+              <button class="tool" id="btn-paper" title="Format as an MLA or APA paper">Paper</button>
             </div>
-            <div class="rb-sec" data-sec="view" hidden>
+            <div class="rb-sec" data-sec="view" data-label="View" hidden>
               <button class="tool" id="btn-preview" aria-pressed="false" title="Preview">Preview</button>
               <button class="tool research-only" id="btn-outline" aria-pressed="false" title="Outline of headings" hidden>Outline</button>
               <button class="tool story-only" id="btn-board" aria-pressed="true" title="Switch between scene cards and text" hidden>Board</button>
             </div>
-            <div class="rb-sec" data-sec="tools" hidden>
+            <div class="rb-sec" data-sec="tools" data-label="Tools" hidden>
               <button class="tool story-only" id="btn-registers" title="Characters, locations, items and settings for this project" hidden>Registers</button>
               <button class="tool story-only" id="btn-continuity" title="Check this story against its registers" hidden>Continuity</button>
-              <button class="tool" id="btn-paper" title="Format as an MLA or APA paper">Paper</button>
               <button class="tool" id="btn-copy" title="Copy for Populi or as Markdown">Copy</button>
             </div>
             <div class="rb-sec rb-rows" data-sec="note" hidden>

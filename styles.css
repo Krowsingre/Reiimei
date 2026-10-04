@@ -718,8 +718,6 @@ body { font-synthesis: none; }
 .empty-editor { cursor: pointer; }
 .empty-editor:focus-visible { outline-offset: -6px; }
 .splash { position: fixed; inset: 0; z-index: 20; padding: calc(72px + env(safe-area-inset-top)) 32px calc(32px + env(safe-area-inset-bottom)); }
-/* The Reiimei name (and Settings) stay above the splash so the name can close it again. */
-.app[data-splash="on"] .sidebar > .pane-head { position: relative; z-index: 21; }
 
 /* Editor header: back, the note's folder, and one menu. */
 .folder-btn {
@@ -848,8 +846,43 @@ body { font-synthesis: none; }
 @media (max-width: 760px) { .rich { padding: 18px 16px 40vh; font-size: 17px; } }
 
 /* ---- v0.14.2: the splash is the phone's home page ---- */
-.splash .hint-phone { display: none; }
+/* On a computer the splash is the definition alone; a phone adds "Click here to get started." */
+@media (min-width: 761px) { .splash .hint-line { display: none; } }
+
+/* ---- v0.14.3: formatting groups on a computer, title alignment ---- */
+@media (min-width: 761px) {
+  .rb-chips { display: none; }
+  .toolbar { padding: 10px 20px 12px; }
+  .rb-panels { gap: 8px; align-items: stretch; }
+  .rb-sec[data-label] {
+    position: relative; gap: 4px; padding: 19px 6px 6px;
+    border: 1px solid var(--rule); border-radius: 12px; background: var(--sheet);
+  }
+  .rb-sec[data-label]::before {
+    content: attr(data-label); position: absolute; top: 4px; left: 0; right: 0; text-align: center;
+    font-size: 11px; line-height: 1.2; letter-spacing: .12em; color: var(--ink-3); font-variant-caps: all-small-caps;
+  }
+  .rb-sec[data-label] .tool { min-width: 34px; height: 32px; border: 1px solid var(--rule); border-radius: 9px; background: var(--paper); }
+  .rb-sec[data-label] .tool:hover { background: var(--paper-3); }
+  .rb-sec[data-label] .tool[aria-pressed="true"] { background: var(--accent-soft); }
+  .rb-rows { flex-direction: row; flex-wrap: wrap; gap: 8px 28px; padding: 2px 0 0; }
+  .rb-row { flex: 1 1 260px; max-width: none; grid-template-columns: auto minmax(0, 1fr); gap: 12px; }
+  /* The title lines up with the tags and the rest of the note header. */
+  .title-row { padding: 16px 20px 2px; }
+  #note-title { font-size: 19px; }
+}
+
+/* ---- v0.14.3: swipe a note to show its actions (phone) ---- */
+.swipe-actions { display: none; }
 @media (max-width: 760px) {
-  .splash .hint-wide { display: none; }
-  .splash .hint-phone { display: inline; }
+  .note-item { overflow: hidden; touch-action: pan-y; }
+  .note-item > :not(.swipe-actions) { transform: translateX(var(--sx, 0px)); transition: transform .2s ease; }
+  .swipe-actions {
+    display: flex; position: absolute; top: 0; bottom: 0; right: 0; width: 150px;
+    transform: translateX(calc(150px + var(--sx, 0px))); transition: transform .2s ease;
+  }
+  .note-item.swiping > *, .note-item.swiping .swipe-actions { transition: none; }
+  .note-item:not(.swiped):not(.swiping) .swipe-actions { visibility: hidden; }
+  .swipe-actions button { flex: 1; border: 0; font: inherit; font-size: 14px; color: #ffffff; background: var(--accent); cursor: pointer; }
+  .swipe-actions button.danger { background: var(--danger); }
 }

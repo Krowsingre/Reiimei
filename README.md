@@ -1,8 +1,17 @@
-# Reiimei v0.14.2
+# Reiimei v0.14.3
 
 *reiimei* (REE-h-may), n. The cold, luminous stillness peculiar to a clear winter night; especially the effect of moonlight upon frost, illuminating the night without dispelling it.
 
 An offline-first notes app for Windows and iPhone, built as a Progressive Web App (PWA). No Mac, no App Store, no developer fee.
+
+## What changed in v0.14.3
+
+- **Formatting on a computer is laid out in labelled groups**, all shown at once: Text (bold, italic, underline, strikethrough, highlight), Headings (heading, superscript, subscript), Lists (bullets, numbers, checklist), Indent (move out, move in), Insert (quote, code, link, Sources, Paper), Tools (Copy, plus Registers and Continuity in Storyboard), and View where a note has one (Preview, Outline, Board, Run). Format and Font sit side by side underneath. A phone, or a narrow window, keeps the row of section chips.
+- **Paragraph tools fixed in Text notes.** Numbered lists, Move in, Move out and Quote now work, also on several selected paragraphs, and none of them can freeze the app any more. Move in works on the first item of a list too. On a plain paragraph, Move in says it works on list items.
+- **Typing "1. " starts a numbered list**, and "- " or "* " a bulleted one, as in a word processor.
+- **Swipes on a phone.** Swipe in from the left edge to go back a screen. Swipe a note to the left in the list to show Pin and Delete (Restore and Delete in Recently Deleted); Delete offers Undo. Swipe back, or tap the note, to hide them.
+- **The Reiimei page.** It now covers the whole screen. On a phone it opens with the app and says "Click here to get started."; tapping it goes to the home page with all your folders and tags. On a computer, clicking **Reiimei** shows the definition alone, and clicking it goes back to where you were.
+- **On a computer the title lines up with the tags** and is a little smaller.
 
 ## What changed in v0.14.2
 
@@ -209,9 +218,9 @@ Then open http://localhost:8000 in Edge or Chrome. Notes work immediately, saved
 
 The iPhone needs an HTTPS address. GitHub Pages hosts the app for free. Only the app's code goes to GitHub; your notes never do.
 
-1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.14.2` folder.
+1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.14.3` folder.
 2. **Create the repository.** In Safari, sign in at github.com, tap **+** › **New repository**. Name it `reiimei`, set it to **Public** (free Pages needs a public repository), and tap **Create repository**.
-3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.14.2` folder, tap **Select**, select all 42 files, and tap **Open**. Scroll down and tap **Commit changes**.
+3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.14.3` folder, tap **Select**, select all 42 files, and tap **Open**. Scroll down and tap **Commit changes**.
    - If you don't see the upload link, tap the **aA** button in Safari's address bar › **Request Desktop Website** and try again.
 4. **Turn on Pages.** In the repository, open **Settings** › **Pages**. Under **Build and deployment**, set Source to **Deploy from a branch**, Branch to **main** and **/ (root)**, then tap **Save**.
 5. **Wait a minute or two**, then reload the Pages screen. It shows your address, which looks like `https://yourname.github.io/reiimei/`.
@@ -316,7 +325,7 @@ The service worker caches the app files. When you change any file, bump `VERSION
 - **Settings › Log** › Download gives a text log of everything the app did, including sync results and errors.
 - **"Test connection"** in Settings › Sync confirms the URL, key, sign-in, and tables are all correct.
 
-## Known limits in v0.14.2
+## Known limits in v0.14.3
 
 - Images can be linked but not attached
 - Sources belong to one note; there is no shared library yet

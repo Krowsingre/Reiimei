@@ -34,8 +34,8 @@ async function saveMeta(patch) {
 }
 
 // ---- Toolbar -------------------------------------------------------------
-// The formatting buttons are sectioned by kind; each section opens from a chip in the toolbar.
-const SECTIONS = { text: ['b', 'i', 'u', 's', 'mark', 'sup', 'sub'], para: ['h', 'ul', 'ol', 'task', 'outdent', 'indent', 'quote'], insert: ['code', 'link'] };
+// The buttons are in labelled groups (index.html). On a computer every group that applies to the
+// note is shown. On a phone each group belongs to a chip, and a chip opens its groups as a sheet.
 const ribbonOpen = new Set(); // sections open now; every section starts closed
 // On a phone the ribbon is one scrolling row of chips, and one section at a time opens as a sheet.
 const isPhone = () => window.matchMedia('(max-width: 760px)').matches;
@@ -45,13 +45,12 @@ function syncRibbon() {
     const secs = [...panels.querySelectorAll(`.rb-sec[data-sec="${chip.dataset.sec}"]`)];
     const live = secs.filter((x) => !x.parentElement.hidden && [...x.querySelectorAll('.tool, .rb-row')].some((b) => !b.hidden));
     chip.hidden = !live.length;
-    const open = !!live.length && (ribbonOpen.has(chip.dataset.sec) || (chip.dataset.sec === 'view' && previewOn && !isPhone()));
+    const open = !!live.length && (!isPhone() || ribbonOpen.has(chip.dataset.sec));
     chip.setAttribute('aria-expanded', String(open));
     secs.forEach((x) => { x.hidden = !(open && live.includes(x)); });
   });
   $('toolbar').dataset.open = String(!!panels.querySelector('.rb-sec:not([hidden])'));
 }
-const LABELS = { b: 'B', i: 'I', u: 'U', s: 'S', mark: '<span>H</span>', sup: 'x²', sub: 'x₂', h: 'H', ul: '•', ol: '1.', task: '☐', outdent: '⇤', indent: '⇥', quote: '❝', code: '{ }', link: 'Link' };
 
 export function renderToolbar(note) {
   const bar = $('toolbar');
@@ -74,17 +73,9 @@ export function renderToolbar(note) {
   $('btn-preview').hidden = !pl;
   if (!pl) previewOn = false;
   codeUi.render(note);
-  const tools = F.TOOLBAR[format];
-  const holder = $('tool-buttons');
-  if (holder.dataset.format !== format) {
-    holder.dataset.format = format;
-    const btn = (t) => `<button class="tool t-${t.id}" data-tool="${t.id}" title="${t.label}${t.key ? ` (Ctrl+${t.key.toUpperCase()})` : ''}" aria-label="${t.label}">${LABELS[t.id] || t.label}</button>`;
-    holder.innerHTML = Object.entries(SECTIONS).map(([sec, ids]) => {
-      const mine = tools.filter((t) => ids.includes(t.id));
-      return mine.length ? `<div class="rb-sec" data-sec="${sec}" hidden>${mine.map(btn).join('')}</div>` : '';
-    }).join('');
-  }
-  holder.querySelectorAll('.tool').forEach((b) => { b.disabled = ro || previewOn; });
+  // Writing buttons the note's format has (Populi has no headings, lists of tasks, quotes or code).
+  const ids = new Set(F.TOOLBAR[format].map((t) => t.id));
+  $('rb-panels').querySelectorAll('[data-tool]').forEach((b) => { b.hidden = code || !ids.has(b.dataset.tool); b.disabled = ro || previewOn; });
   $('btn-preview').setAttribute('aria-pressed', String(previewOn));
   $('btn-preview').textContent = previewOn ? 'Edit' : pl || 'Preview';
   $('btn-sources').textContent = sourcesOf(note).length ? `Sources (${sourcesOf(note).length})` : 'Sources';
@@ -624,6 +615,7 @@ export function init(hooks) {
     syncRibbon();
   });
   // Buttons in the ribbon keep the text box focused, so a phone keeps its keyboard up.
+  $('toolbar').addEventListener('pointerdown', (e) => { if (e.pointerType !== 'mouse' && e.target.closest('.tool, .rb-chip') && (document.activeElement === $('body') || document.activeElement === $('rich'))) e.preventDefault(); });
   $('toolbar').addEventListener('mousedown', (e) => { if (e.target.closest('.tool, .rb-chip') && (document.activeElement === $('body') || document.activeElement === $('rich'))) e.preventDefault(); });
   $('note-font').addEventListener('change', (e) => {
     const note = app.note();
@@ -631,7 +623,8 @@ export function init(hooks) {
     app.update({ meta: { ...(note.meta || {}), font: e.target.value } });
     log.info('format', 'Note font changed', { font: e.target.value });
   });
-  $('tool-buttons').addEventListener('click', (e) => {
+  window.addEventListener('resize', syncRibbon);
+  $('rb-panels').addEventListener('click', (e) => {
     const b = e.target.closest('[data-tool]');
     if (b) applyToolById(b.dataset.tool);
   });

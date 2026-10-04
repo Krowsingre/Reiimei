@@ -12,7 +12,7 @@ import * as codeIntel from './codeintel.js';
 import { isCode } from './code.js';
 import { noteTitle, noteSnippet, ownTitle, fallbackTitle, sharedFileCheck } from './share.js';
 
-export const APP_VERSION = '0.14.2';
+export const APP_VERSION = '0.14.3';
 export const BUILD_DATE = '2026-10-04';
 
 const $ = (id) => document.getElementById(id);
@@ -474,6 +474,7 @@ function listTitle() {
 }
 
 function renderList() {
+  swipeOpen = null;
   el.listTitle.textContent = listTitle();
   const notes = filteredNotes();
   renderSelectBar(notes);
@@ -496,6 +497,9 @@ function renderList() {
       <div class="title">${n.pinned ? ICONS.pin : ''}<span>${esc(titleOf(n))}</span></div>
       <div class="meta"><span class="date">${esc(formatDate(view().sort === 'created' ? (n.created_at || n.updated_at) : n.updated_at))}</span>${multi ? `<span class="dev">${esc(deviceOf(n).name)}</span>` : ''}${state.showAll ? `<span class="kind">${esc(modes.modeName(modes.kindOf(n)))}</span>` : ''}<span class="snippet">${esc(snippetOf(n))}</span></div>
       ${tagsOf(n).length ? `<div class="tags">${tagsOf(n).map((t) => `<span class="mini-tag">#${esc(t)}</span>`).join('')}</div>` : ''}
+      <div class="swipe-actions" aria-hidden="true">${state.filter.type === 'trash'
+        ? '<button type="button" data-swipe="restore" tabindex="-1">Restore</button><button type="button" class="danger" data-swipe="purge" tabindex="-1">Delete</button>'
+        : `<button type="button" data-swipe="pin" tabindex="-1">${n.pinned ? 'Unpin' : 'Pin'}</button><button type="button" class="danger" data-swipe="delete" tabindex="-1">Delete</button>`}</div>
     </li>`;
   }).join('');
   const v = view();
@@ -1179,10 +1183,10 @@ function openNoteMenu() {
 }
 
 // ---- Splash: the Reiimei page --------------------------------------------------------
-// On a computer it is hidden until the Reiimei name is clicked, and clicking anywhere on it starts
-// a new note in the current mode and folder. On a phone it is the home page the app opens on, and
-// tapping it goes on to the notes. Either way, the Reiimei name shows it again (and hides it).
-// The instruction line has a computer and a phone wording; styles.css shows the right one.
+// The definition, covering the whole app. A phone opens on it ("Click here to get started."),
+// and tapping it goes to the home page with every folder and tag. On a computer it is shown
+// only when the Reiimei name is clicked, as the definition alone, and clicking it goes back to
+// where you were. (The empty note area on a computer is a separate copy that starts a new note.)
 const splashOpen = () => !$('splash').hidden;
 function setSplash(open) {
   $('splash').hidden = !open;
@@ -1194,8 +1198,7 @@ function bindSplash() {
   const splash = $('splash');
   const def = el.emptyEditor.querySelector('.definition').cloneNode(true);
   const hint = def.querySelector('.hint-line');
-  hint.innerHTML = '<span class="hint-wide"></span><span class="hint-phone">Click here to get started.</span>';
-  hint.firstChild.textContent = el.emptyEditor.querySelector('.hint-line').textContent;
+  hint.textContent = 'Click here to get started.';
   splash.append(def);
   $('btn-brand').addEventListener('click', () => {
     const open = !splashOpen();
@@ -1206,10 +1209,119 @@ function bindSplash() {
   const start = (e) => {
     if (e.type === 'keydown' && e.key !== 'Enter' && e.key !== ' ') return;
     e.preventDefault();
-    if (e.currentTarget === splash && isPhone()) { closeSplash(); setMobileView('list'); return; }
+    if (e.currentTarget === splash) { closeSplash(); if (isPhone()) setMobileView('sidebar'); return; }
     newNote();
   };
   for (const box of [splash, el.emptyEditor]) { box.addEventListener('click', start); box.addEventListener('keydown', start); }
+}
+
+// ---- Swipes (phone) ------------------------------------------------------------------
+// Swipe in from the left edge to go back a screen. Swipe a note to the left to show Pin and
+// Delete (Restore and Delete in Recently Deleted); swipe it back, or tap it, to hide them.
+const SWIPE_W = 150;
+let swipeOpen = null;
+let swipedAt = 0;
+function setSwipe(item, x, moving) {
+  item.style.setProperty('--sx', `${x}px`);
+  item.classList.toggle('swiping', moving);
+  item.classList.toggle('swiped', x < 0);
+}
+function closeSwipe() { if (swipeOpen) { setSwipe(swipeOpen, 0, false); swipeOpen = null; } }
+
+function goBack() {
+  const v = el.app.dataset.mobileView;
+  if (splashOpen() || document.querySelector('dialog[open]')) return;
+  if (v === 'editor') $('btn-back-list').click();
+  else if (v === 'list') setMobileView('sidebar');
+  else if (v === 'settings-detail') setMobileView('settings-list');
+  else if (v === 'settings-list') closeSettings();
+  else return;
+  log.debug('swipe', 'Back', { from: v });
+}
+
+async function swipeAction(act, id) {
+  const n = state.notes.find((x) => x.id === id);
+  closeSwipe();
+  if (!n) return;
+  if (act === 'pin') { replaceNote(await db.saveNote(n, { pinned: !n.pinned })); render(); scheduleSync(); toast(n.pinned ? 'Unpinned' : 'Pinned'); return; }
+  if (act === 'restore') { replaceNote(await db.restoreNote(n)); render(); scheduleSync(); toast('Restored'); return; }
+  if (act === 'purge') {
+    const c = await ask({ title: 'Delete this note forever?', text: 'This cannot be undone.', okText: 'Delete forever' });
+    if (c.action !== 'ok') return;
+    replaceNote(await db.purgeNote(n));
+    if (state.currentId === id) state.currentId = null;
+    render(); scheduleSync();
+    return;
+  }
+  if (act === 'delete') {
+    await flushSave();
+    await trashNote(state.notes.find((x) => x.id === id));
+    if (state.currentId === id) state.currentId = null;
+    render(); scheduleSync();
+    toast('Moved to Recently Deleted', 'Undo', async () => {
+      const x = state.notes.find((y) => y.id === id);
+      if (x?.deleted) { replaceNote(await db.restoreNote(x)); render(); scheduleSync(); }
+    });
+  }
+}
+
+// A tap that ends a swipe is not a tap on the note; a tap on a shown action runs it.
+function swipeClick(e, item) {
+  if (Date.now() - swipedAt < 250) return true;
+  const btn = e.target.closest('[data-swipe]');
+  if (btn) { swipeAction(btn.dataset.swipe, item.dataset.id); return true; }
+  if (swipeOpen) { closeSwipe(); return true; }
+  return false;
+}
+
+function bindSwipes(cancelPress) {
+  let edge = null;
+  document.addEventListener('touchstart', (e) => {
+    const t = e.touches[0];
+    edge = isPhone() && e.touches.length === 1 && t.clientX <= 24 ? { x: t.clientX, y: t.clientY } : null;
+  }, { passive: true });
+  document.addEventListener('touchend', (e) => {
+    if (!edge) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - edge.x;
+    const dy = Math.abs(t.clientY - edge.y);
+    edge = null;
+    if (dx > 70 && dy < 60) goBack();
+  }, { passive: true });
+
+  let sw = null;
+  el.noteList.addEventListener('touchstart', (e) => {
+    const item = e.target.closest('.note-item');
+    if (swipeOpen && swipeOpen !== item) closeSwipe();
+    if (!item || state.selecting || e.touches.length !== 1 || e.touches[0].clientX <= 24) { sw = null; return; }
+    sw = { item, x0: e.touches[0].clientX, y0: e.touches[0].clientY, base: item === swipeOpen ? -SWIPE_W : 0, dir: null, dx: 0 };
+  }, { passive: true });
+  el.noteList.addEventListener('touchmove', (e) => {
+    if (!sw) return;
+    const t = e.touches[0];
+    const dx = t.clientX - sw.x0;
+    const dy = t.clientY - sw.y0;
+    if (!sw.dir) {
+      if (Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy) && (dx < 0 || sw.base < 0)) sw.dir = 'h';
+      else if (Math.abs(dy) > 8 || Math.abs(dx) > 8) { sw = null; return; }
+      else return;
+    }
+    e.preventDefault();
+    cancelPress();
+    sw.dx = dx;
+    setSwipe(sw.item, Math.max(-SWIPE_W - 30, Math.min(0, sw.base + dx)), true);
+  }, { passive: false });
+  const end = () => {
+    if (!sw) return;
+    const { item, dir, base, dx } = sw;
+    sw = null;
+    if (dir !== 'h') return;
+    swipedAt = Date.now();
+    if (base + dx < -SWIPE_W / 2) { setSwipe(item, -SWIPE_W, false); swipeOpen = item; }
+    else { setSwipe(item, 0, false); if (swipeOpen === item) swipeOpen = null; }
+  };
+  el.noteList.addEventListener('touchend', end);
+  el.noteList.addEventListener('touchcancel', end);
 }
 
 // ---- Phone keyboard ----------------------------------------------------------------
@@ -1582,11 +1694,13 @@ function bindEvents() {
   el.noteList.addEventListener('click', (e) => {
     const item = e.target.closest('.note-item');
     if (!item) return;
+    if (swipeClick(e, item)) return;
     if (longPressed) { longPressed = false; return; }
     if (state.selecting) toggleSelected(item.dataset.id);
     else if (e.ctrlKey || e.metaKey || e.shiftKey) { state.selecting = true; flushSave(); toggleSelected(item.dataset.id); }
     else selectNote(item.dataset.id);
   });
+  bindSwipes(() => clearTimeout(pressTimer));
   // Press and hold a note (phone) to start selecting.
   let pressTimer = null;
   el.noteList.addEventListener('pointerdown', (e) => {

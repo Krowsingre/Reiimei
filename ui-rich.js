@@ -187,30 +187,201 @@ export function focus(atStart = false) {
 }
 
 // ---- Formatting --------------------------------------------------------------------------
+// Block tools (headings, lists, checklists, moving items in and out, quotes) are done by hand
+// rather than with the browser's own commands, which behave differently on iPhone and can nest
+// a list inside a paragraph. Every tool works on all the paragraphs the selection touches, and
+// text is moved, never copied, so the caret and selection stay where they were.
 const sel = () => getSelection();
 const inBox = (node) => !!node && box.contains(node.nodeType === 1 ? node : node.parentNode);
-const blockOf = (node) => { let n = node?.nodeType === 1 ? node : node?.parentNode; while (n && n !== box && !BLOCK.test(n.tagName)) n = n.parentNode; return n && n !== box ? n : null; };
 const closest = (node, selector) => { const n = node?.nodeType === 1 ? node : node?.parentElement; const hit = n?.closest(selector); return hit && box.contains(hit) ? hit : null; };
+const LEAF = /^(P|DIV|H[1-6]|LI|PRE)$/;
+const isList = (n) => n?.nodeType === 1 && (n.tagName === 'UL' || n.tagName === 'OL');
 
+// The caret is remembered whenever it moves inside the note, so a button or a dialog that takes
+// focus (as a tap does on iPhone) can put it back.
 export function saveCaret() {
   const s = sel();
   if (s.rangeCount && inBox(s.anchorNode)) savedRange = s.getRangeAt(0).cloneRange();
 }
 function restoreCaret() {
-  box.focus();
-  if (savedRange) { const s = sel(); s.removeAllRanges(); s.addRange(savedRange); }
+  box.focus({ preventScroll: true });
+  const s = sel();
+  if (s.rangeCount && inBox(s.anchorNode)) return;
+  const r = savedRange && inBox(savedRange.startContainer) ? savedRange : (() => { const x = document.createRange(); x.selectNodeContents(box); x.collapse(false); return x; })();
+  s.removeAllRanges();
+  s.addRange(r);
+}
+
+// Loose text sitting straight in the page goes into a paragraph, and blocks a browser has put
+// inside a paragraph are taken out of it, so every tool has proper paragraphs to work on.
+function tidyBlocks() {
+  let p = null;
+  for (const n of [...box.childNodes]) {
+    if (n.nodeType === 1 && (BLOCK.test(n.tagName) || n.classList.contains('raw-block'))) { p = null; continue; }
+    if (n.nodeType === 3 && !n.nodeValue.trim() && !p) { n.remove(); continue; }
+    if (!p) { p = document.createElement('p'); n.before(p); }
+    p.appendChild(n);
+  }
+  for (const para of [...box.querySelectorAll('p')]) {
+    const inner = [...para.children].filter((c) => isList(c) || /^(BLOCKQUOTE|H[1-6]|PRE|P|DIV)$/.test(c.tagName));
+    for (const c of inner.reverse()) para.after(c);
+    if (!para.childNodes.length || (!para.textContent.trim() && !para.querySelector('br') && inner.length)) para.remove();
+  }
+  if (!box.firstChild) box.innerHTML = '<p><br></p>';
+}
+
+// The paragraphs, headings and list items the selection touches, in order. A list item counts
+// only for its own text, so a caret in a nested item does not also pick the item around it.
+function selectedBlocks() {
+  const r = sel().getRangeAt(0);
+  if (r.collapsed) {
+    const at = r.startContainer === box ? box.childNodes[Math.min(r.startOffset, box.childNodes.length - 1)] : r.startContainer;
+    const one = at && (at.nodeType === 1 && LEAF.test(at.tagName) ? at : closest(at, 'p,div,h1,h2,h3,h4,h5,h6,li,pre'));
+    return one && one !== box ? [one] : [];
+  }
+  const own = (b) => [...b.childNodes].filter((k) => !isList(k));
+  return [...box.querySelectorAll('p,div,h1,h2,h3,h4,h5,h6,li,pre')].filter((b) => {
+    if (b.closest('.raw-block')) return false;
+    if (b.tagName === 'LI') return own(b).some((k) => r.intersectsNode(k));
+    if (b.tagName === 'DIV' && b.querySelector('p,div,h1,h2,h3,h4,h5,h6,li,ul,ol,blockquote')) return false;
+    return r.intersectsNode(b);
+  });
+}
+
+function keepSelection(fn) {
+  const s = sel();
+  const r = s.rangeCount ? s.getRangeAt(0) : null;
+  const a = r && [r.startContainer, r.startOffset, r.endContainer, r.endOffset];
+  fn();
+  if (!a || !box.contains(a[0]) || !box.contains(a[2])) return;
+  const len = (n) => (n.nodeType === 3 ? n.length : n.childNodes.length);
+  const nr = document.createRange();
+  nr.setStart(a[0], Math.min(a[1], len(a[0])));
+  nr.setEnd(a[2], Math.min(a[3], len(a[2])));
+  s.removeAllRanges();
+  s.addRange(nr);
+}
+const moveKids = (from, to) => { while (from.firstChild) to.appendChild(from.firstChild); if (!to.firstChild) to.appendChild(document.createElement('br')); };
+function rename(el, tag) {
+  const n = document.createElement(tag);
+  for (const a of el.attributes) n.setAttribute(a.name, a.value);
+  moveKids(el, n);
+  el.replaceWith(n);
+  return n;
+}
+const nestedLists = (li) => [...li.children].filter(isList);
+const isNestedList = (list) => list.parentElement !== box && (list.parentElement.tagName === 'LI' || isList(list.parentElement));
+
+// A list item becomes a paragraph again, splitting its list in two if it was in the middle.
+function unlist(li) {
+  const list = li.parentElement;
+  const p = document.createElement('p');
+  for (const k of [...li.childNodes]) if (!isList(k)) p.appendChild(k);
+  if (!p.firstChild) p.appendChild(document.createElement('br'));
+  const after = [...list.children].slice([...list.children].indexOf(li) + 1);
+  const kids = nestedLists(li);
+  list.after(p);
+  let last = p;
+  for (const k of kids) { last.after(k); last = k; }
+  if (after.length) { const rest = document.createElement(list.tagName); after.forEach((x) => rest.appendChild(x)); last.after(rest); }
+  li.remove();
+  if (!list.children.length) list.remove();
+  return p;
+}
+
+function toList(tag, blocks = selectedBlocks()) {
+  const items = blocks.filter((b) => b.tagName === 'LI');
+  const others = blocks.filter((b) => b.tagName !== 'LI' && b.tagName !== 'PRE');
+  if (!others.length && items.length) {
+    // All list items already: the same button again turns them back into paragraphs (or, for a
+    // nested item, moves it out); the other list button switches the kind of list.
+    if (items.every((li) => li.parentElement.tagName === tag)) {
+      for (const li of items.reverse()) { if (isNestedList(li.parentElement)) outdent(li); else unlist(li); }
+    } else {
+      new Set(items.map((li) => li.parentElement)).forEach((list) => { if (list.tagName !== tag) rename(list, tag); });
+    }
+    return [];
+  }
+  const made = [];
+  for (const b of others) {
+    const li = document.createElement('li');
+    moveKids(b, li);
+    const prev = b.previousElementSibling;
+    if (prev && prev.tagName === tag && !prev.classList.contains('raw-block')) { prev.appendChild(li); b.remove(); }
+    else { const list = document.createElement(tag); list.appendChild(li); b.replaceWith(list); }
+    // Join a list that follows straight after.
+    const list = li.parentElement;
+    const next = list.nextElementSibling;
+    if (next && next.tagName === tag) { while (next.firstChild) list.appendChild(next.firstChild); next.remove(); }
+    made.push(li);
+  }
+  return made;
+}
+
+function indent(li) {
+  const list = li.parentElement;
+  const prev = li.previousElementSibling;
+  if (prev && prev.tagName === 'LI') {
+    let sub = nestedLists(prev).pop();
+    if (!sub) { sub = document.createElement(list.tagName); prev.appendChild(sub); }
+    sub.appendChild(li);
+  } else {
+    // The first item of a list moves in on its own.
+    const sub = document.createElement(list.tagName);
+    li.before(sub);
+    sub.appendChild(li);
+  }
+}
+function outdent(li) {
+  const list = li.parentElement;
+  if (!isNestedList(list)) { unlist(li); return; }
+  const holder = list.parentElement.tagName === 'LI' ? list.parentElement : list;
+  const after = [...list.children].slice([...list.children].indexOf(li) + 1);
+  holder.after(li);
+  if (after.length) { const sub = document.createElement(list.tagName); after.forEach((x) => sub.appendChild(x)); li.appendChild(sub); }
+  if (!list.children.length) list.remove();
+}
+
+const topOf = (n) => { while (n.parentElement && n.parentElement !== box) n = n.parentElement; return n; };
+function toggleQuote(blocks) {
+  const q = closest(blocks[0], 'blockquote');
+  if (q) { while (q.firstChild) q.before(q.firstChild); q.remove(); return; }
+  const tops = [...new Set(blocks.map(topOf))];
+  const bq = document.createElement('blockquote');
+  tops[0].before(bq);
+  tops.forEach((t) => bq.appendChild(t));
+  const prev = bq.previousElementSibling;
+  if (prev?.tagName === 'BLOCKQUOTE') { while (bq.firstChild) prev.appendChild(bq.firstChild); bq.remove(); }
+}
+
+function toggleTask(blocks) {
+  const items = blocks.filter((b) => b.tagName === 'LI');
+  const made = toList('UL', blocks.filter((b) => b.tagName !== 'LI'));
+  const all = [...items, ...made];
+  const off = made.length === 0 && items.every((li) => li.classList.contains('task'));
+  for (const li of all) {
+    if (off) { li.classList.remove('task'); delete li.dataset.done; }
+    else if (!li.classList.contains('task')) { li.classList.add('task'); li.dataset.done = 'false'; }
+  }
+}
+
+const HEADINGS = ['P', 'H1', 'H2', 'H3'];
+function cycleHeading(blocks) {
+  const paras = blocks.filter((b) => /^(P|DIV|H[1-6])$/.test(b.tagName));
+  if (!paras.length) return false;
+  const cur = HEADINGS.includes(paras[0].tagName) ? paras[0].tagName : 'P';
+  const next = HEADINGS[(HEADINGS.indexOf(cur) + 1) % HEADINGS.length];
+  for (const b of paras) rename(b, next);
+  return true;
 }
 
 // Wrap the selection in <tag>, or take the wrapping away if it is already there.
 function toggleInline(tag) {
   const s = sel();
-  if (!s.rangeCount) return;
   const r = s.getRangeAt(0);
   const hit = closest(r.commonAncestorContainer, tag);
   if (hit) {
-    const parent = hit.parentNode;
-    while (hit.firstChild) parent.insertBefore(hit.firstChild, hit);
-    hit.remove();
+    keepSelection(() => { const parent = hit.parentNode; while (hit.firstChild) parent.insertBefore(hit.firstChild, hit); hit.remove(); });
     return;
   }
   if (r.collapsed) return;
@@ -222,76 +393,13 @@ function toggleInline(tag) {
   s.addRange(r);
 }
 
-function setBlock(tag) {
-  document.execCommand('formatBlock', false, `<${tag}>`);
-}
-
-// Lists and quotes are rebuilt by hand: the browser's own list command nests the list inside the
-// paragraph and loses the caret. The caret's text node is moved, never copied, so it stays put.
-function keepCaret(fn) {
-  const s = sel();
-  const at = s.rangeCount ? [s.anchorNode, s.anchorOffset] : null;
-  fn();
-  if (at && box.contains(at[0])) { const r = document.createRange(); r.setStart(at[0], Math.min(at[1], at[0].length ?? at[0].childNodes.length)); r.collapse(true); s.removeAllRanges(); s.addRange(r); }
-}
-const moveKids = (from, to) => { while (from.firstChild) to.appendChild(from.firstChild); if (!to.firstChild) to.appendChild(document.createElement('br')); };
-function rename(el, tag) {
-  const n = document.createElement(tag);
-  for (const a of el.attributes) n.setAttribute(a.name, a.value);
-  moveKids(el, n);
-  el.replaceWith(n);
-  return n;
-}
-function toList(tag) {
-  keepCaret(() => {
-    const li = closest(sel().anchorNode, 'li');
-    if (li) {
-      const list = li.parentElement;
-      if (list.tagName !== tag) { rename(list, tag); return; }
-      // Same kind again: this item goes back to being a paragraph, splitting the list if needed.
-      const p = document.createElement('p');
-      for (const k of [...li.childNodes]) if (!(k.nodeType === 1 && /^(UL|OL)$/.test(k.tagName))) p.appendChild(k);
-      if (!p.firstChild) p.appendChild(document.createElement('br'));
-      const after = [...list.children].slice([...list.children].indexOf(li) + 1);
-      list.after(p);
-      if (after.length) { const rest = document.createElement(tag); after.forEach((x) => rest.appendChild(x)); p.after(rest); }
-      li.remove();
-      if (!list.children.length) list.remove();
-      return;
-    }
-    const block = blockOf(sel().anchorNode) || box;
-    const item = document.createElement('li');
-    if (block === box) { const p = document.createElement('p'); moveKids(box, p); box.appendChild(p); return toList(tag); }
-    moveKids(block, item);
-    const prev = block.previousElementSibling;
-    if (prev && prev.tagName === tag) { prev.appendChild(item); block.remove(); } else { const list = document.createElement(tag); list.appendChild(item); block.replaceWith(list); }
-  });
-}
-function toggleQuote() {
-  keepCaret(() => {
-    const q = closest(sel().anchorNode, 'blockquote');
-    if (q) { while (q.firstChild) q.before(q.firstChild); q.remove(); return; }
-    const block = closest(sel().anchorNode, 'ul,ol') || blockOf(sel().anchorNode);
-    if (!block) return;
-    const prev = block.previousElementSibling;
-    if (prev?.tagName === 'BLOCKQUOTE') { prev.appendChild(block); return; }
-    const bq = document.createElement('blockquote');
-    block.replaceWith(bq);
-    bq.appendChild(block);
-  });
-}
-
-function toggleTask() {
-  let li = closest(sel().anchorNode, 'li');
-  if (!li) { toList('UL'); li = closest(sel().anchorNode, 'li'); if (li) { li.classList.add('task'); li.dataset.done = 'false'; } return; }
-  if (li.classList.contains('task')) { li.classList.remove('task'); delete li.dataset.done; } else { li.classList.add('task'); li.dataset.done = 'false'; }
-}
-
-const HEADINGS = ['P', 'H1', 'H2', 'H3'];
 export async function apply(id) {
   if (!active() || box.contentEditable !== 'true') return;
-  if (!inBox(sel().anchorNode)) restoreCaret();
-  const block = blockOf(sel().anchorNode);
+  restoreCaret();
+  tidyBlocks();
+  if (!sel().rangeCount) return;
+  const blocks = selectedBlocks();
+  const items = blocks.filter((b) => b.tagName === 'LI');
   switch (id) {
     case 'b': document.execCommand('bold'); break;
     case 'i': document.execCommand('italic'); break;
@@ -301,17 +409,19 @@ export async function apply(id) {
     case 'sub': document.execCommand('subscript'); break;
     case 'mark': toggleInline('mark'); break;
     case 'code': toggleInline('code'); break;
-    case 'h': { // Normal text, Heading 1, 2, 3, back to normal
-      const cur = block && HEADINGS.includes(block.tagName) ? block.tagName : 'P';
-      setBlock(HEADINGS[(HEADINGS.indexOf(cur) + 1) % HEADINGS.length]);
+    case 'h': keepSelection(() => { if (!cycleHeading(blocks)) app.toast('Headings work on paragraphs, not list items.'); }); break;
+    case 'ul': keepSelection(() => toList('UL', blocks)); break;
+    case 'ol': keepSelection(() => toList('OL', blocks)); break;
+    case 'task': keepSelection(() => toggleTask(blocks)); break;
+    case 'indent':
+      if (!items.length) { app.toast('Move in works on list items. Start a list with • or 1. first.'); return; }
+      keepSelection(() => items.forEach(indent));
       break;
-    }
-    case 'ul': toList('UL'); break;
-    case 'ol': toList('OL'); break;
-    case 'task': toggleTask(); break;
-    case 'indent': if (closest(sel().anchorNode, 'li')) document.execCommand('indent'); break;
-    case 'outdent': if (closest(sel().anchorNode, 'li')) document.execCommand('outdent'); break;
-    case 'quote': toggleQuote(); break;
+    case 'outdent':
+      if (!items.length) { app.toast('Move out works on list items.'); return; }
+      keepSelection(() => [...items].reverse().forEach(outdent));
+      break;
+    case 'quote': if (blocks.length) keepSelection(() => toggleQuote(blocks)); break;
     case 'link': {
       saveCaret();
       const r = await app.ask({ title: 'Add a link', value: 'https://', okText: 'Add link' });
@@ -323,7 +433,36 @@ export async function apply(id) {
     }
     default: return;
   }
-  box.focus();
+  box.focus({ preventScroll: true });
+  saveCaret();
+  pushToBody();
+}
+
+// Typing "1. " (or "1) ") at the start of a paragraph starts a numbered list, and "- ", "* " or
+// "• " a bulleted one, the way a word processor does.
+function autoList(e) {
+  if (e.inputType !== 'insertText' || e.data !== ' ') return;
+  const s = sel();
+  if (!s.rangeCount || !s.isCollapsed) return;
+  const r = s.getRangeAt(0);
+  const block = closest(r.startContainer, 'p,div,h1,h2,h3,h4,h5,h6,li,pre');
+  if (!block || !/^(P|DIV)$/.test(block.tagName) || block === box) return;
+  const before = document.createRange();
+  before.setStart(block, 0);
+  before.setEnd(r.startContainer, r.startOffset);
+  const typed = before.toString();
+  const m = /^(\d+[.)]|[-*•])$/.exec(typed);
+  if (!m) return;
+  e.preventDefault();
+  before.deleteContents();
+  if (!block.textContent && !block.querySelector('br')) block.appendChild(document.createElement('br'));
+  const caret = document.createRange();
+  caret.setStart(block, 0);
+  caret.collapse(true);
+  s.removeAllRanges();
+  s.addRange(caret);
+  const [li] = toList(/\d/.test(m[1]) ? 'OL' : 'UL', [block]);
+  if (li) { const c = document.createRange(); c.setStart(li, 0); c.collapse(true); s.removeAllRanges(); s.addRange(c); }
   pushToBody();
 }
 
@@ -357,8 +496,9 @@ export function init(hooks) {
   try { document.execCommand('defaultParagraphSeparator', false, 'p'); document.execCommand('styleWithCSS', false, false); } catch { /* not needed everywhere */ }
 
   box.addEventListener('input', pushToBody);
-  box.addEventListener('blur', () => { saveCaret(); app.flushSave(); });
-  ['keyup', 'mouseup', 'touchend'].forEach((t) => box.addEventListener(t, saveCaret));
+  box.addEventListener('blur', () => app.flushSave());
+  document.addEventListener('selectionchange', saveCaret);
+  box.addEventListener('beforeinput', autoList);
   // Anything else that changes the text (citations, moving a section, Undo in a message, the
   // scene board) changes the hidden text box; show that on the page too.
   $('body').addEventListener('input', () => { if (!fromRich && active()) show($('body').value); });
@@ -366,7 +506,7 @@ export function init(hooks) {
   box.addEventListener('keydown', (e) => {
     if (e.isComposing) return;
     const li = closest(sel().anchorNode, 'li');
-    if (e.key === 'Tab' && li) { e.preventDefault(); document.execCommand(e.shiftKey ? 'outdent' : 'indent'); pushToBody(); return; }
+    if (e.key === 'Tab' && li) { e.preventDefault(); apply(e.shiftKey ? 'outdent' : 'indent'); return; }
     // A new checklist item starts unticked (the browser copies the ticked one).
     if (e.key === 'Enter' && li?.classList.contains('task')) {
       setTimeout(() => {
