@@ -18,13 +18,18 @@ function plainLine(line, format) {
   const nodes = b.t === 'h' ? b.c : b.t === 'list' ? b.items[0].c : b.t === 'p' ? b.lines[0] : b.t === 'quote' && b.blocks[0]?.lines ? b.blocks[0].lines[0] : null;
   return nodes ? inlineToRuns(nodes).map((r) => r.text).join('') : line;
 }
+// A title typed in the title field (meta.title) wins; without one, the first line is the title.
+export const ownTitle = (note) => String(note?.meta?.title || '').replace(/\s+/g, ' ').trim();
+export function fallbackTitle(note) {
+  if (isCode(note.format)) return codeTitle(note.body, note.format).slice(0, 120);
+  return (plainLine(lines(note.body)[0], note.format) || '').slice(0, 120);
+}
 export function noteTitle(note) {
-  if (isCode(note.format)) return codeTitle(note.body, note.format).slice(0, 120) || 'Untitled';
-  return (plainLine(lines(note.body)[0], note.format) || 'New Note').slice(0, 120);
+  return ownTitle(note).slice(0, 200) || fallbackTitle(note) || (isCode(note.format) ? 'Untitled' : 'New Note');
 }
 export function noteSnippet(note) {
   if (isCode(note.format)) return `${LANGS[note.format].label} · ${lines(note.body).length} lines`;
-  return plainLine(lines(note.body)[1], note.format) || 'No additional text';
+  return plainLine(lines(note.body)[ownTitle(note) ? 0 : 1], note.format) || 'No additional text';
 }
 
 // ---- Citation context -------------------------------------------------------
@@ -63,12 +68,20 @@ export function plainText(note, ctx = citeContext(note)) {
 }
 
 // One note as text. target: 'plain' | 'markdown' | 'populi'
+// A title typed in the title field is not part of the text, so it is put back on top.
+export function titleLine(note, target = 'plain') {
+  const t = ownTitle(note);
+  if (!t || isCode(note.format)) return '';
+  return `${target === 'markdown' ? '# ' : ''}${t}
+
+`;
+}
 export function noteText(note, target = 'plain') {
   if (isCode(note.format)) return note.body;
   const ctx = citeContext(note);
   const from = note.format === 'populi' ? 'populi' : 'markdown';
-  if (target === 'plain') return plainText(note, ctx) + referencesText(note, 'plain');
-  return exportNote(note.body, from, target, ctx) + referencesText(note, target);
+  if (target === 'plain') return titleLine(note) + plainText(note, ctx) + referencesText(note, 'plain');
+  return titleLine(note, target) + exportNote(note.body, from, target, ctx) + referencesText(note, target);
 }
 
 // ---- File names -------------------------------------------------------------
@@ -97,8 +110,10 @@ function metaLine(note, folderName) {
   return bits.join(' · ');
 }
 
-// The note's first line becomes the section heading, so the body starts after it.
+// The note's first line becomes the section heading, so the body starts after it
+// (unless the note has a title of its own, which is the heading instead).
 function bodyAfterTitle(note) {
+  if (ownTitle(note)) return String(note.body || '');
   const ls = String(note.body || '').split('\n');
   const k = ls.findIndex((l) => l.trim());
   return k >= 0 ? ls.slice(k + 1).join('\n') : '';

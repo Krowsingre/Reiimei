@@ -23,7 +23,7 @@
     <!-- Sidebar: folders and tags -->
     <aside class="pane sidebar" aria-label="Folders and tags">
       <header class="pane-head">
-        <h1 class="brand">Reiimei</h1>
+        <h1 class="brand"><button type="button" id="btn-brand" aria-expanded="false" aria-controls="splash" title="Show or hide the Reiimei page">Reiimei</button></h1>
         <button class="icon-btn" id="btn-settings" title="Settings" aria-label="Settings">
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
         </button>
@@ -92,56 +92,29 @@
         <button class="icon-btn desktop-only" id="btn-close-note" title="Close note (Esc)" aria-label="Close note">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>
         </button>
-        <select id="note-folder" aria-label="Folder"></select>
-        <select id="note-mode" aria-label="Move to mode" title="Move to mode"></select>
+        <button type="button" class="folder-btn" id="note-folder" aria-haspopup="dialog" title="Folder"><span id="note-folder-name"></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
         <span class="spacer"></span>
-        <span class="save-state" id="save-state"></span>
-        <button class="icon-btn" id="btn-share" title="Share" aria-label="Share note"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M5 12v7h14v-7"/></svg></button>
-        <button class="icon-btn" id="btn-pin" title="Pin" aria-label="Pin note" aria-pressed="false">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17v5"/><path d="M9 10.8V4h6v6.8l3 3.2H6z"/></svg>
-        </button>
-        <button class="icon-btn" id="btn-delete" title="Delete" aria-label="Delete note">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg>
-        </button>
+        <span class="save-state" id="save-state" role="status"></span>
+        <button class="icon-btn" id="btn-note-menu" title="Share, pin or delete" aria-label="Note menu" aria-haspopup="dialog"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/></svg><i class="pin-dot" id="pin-dot" hidden></i></button>
       </header>
+      <div class="title-row" id="title-row">
+        <textarea id="note-title" rows="1" maxlength="200" placeholder="Title" aria-label="Title" autocomplete="off" spellcheck="true"></textarea>
+      </div>
       <div class="tag-row" id="tag-row">
         <div class="chips" id="chips"></div>
         <input id="tag-input" placeholder="Add tag" autocomplete="off" autocapitalize="off" aria-label="Add tag" list="tag-suggest">
         <datalist id="tag-suggest"></datalist>
       </div>
       <div class="toolbar" id="toolbar" role="toolbar" aria-label="Formatting">
-        <select id="note-format" aria-label="Note format or language" title="Note format or language">
-          <optgroup label="Writing">
-            <option value="markdown">Markdown</option>
-            <option value="populi">Populi</option>
-          </optgroup>
-          <optgroup label="Code">
-            <option value="python">Python</option>
-            <option value="html">HTML5</option>
-            <option value="xml">XML</option>
-            <option value="javascript">JavaScript</option>
-            <option value="css">CSS</option>
-            <option value="json">JSON</option>
-            <option value="sql">SQL</option>
-          </optgroup>
-        </select>
-        <select id="note-font" aria-label="Font for this note" title="Font for this note">
-          <optgroup label="Reiimei fonts">
-            <option value="display">Reiimei Display</option>
-            <option value="echolume">Echolume</option>
-          </optgroup>
-          <optgroup label="Device fonts">
-            <option value="serif">System serif</option>
-            <option value="sans">System sans-serif</option>
-          </optgroup>
-        </select>
         <div class="rb-chips" id="rb-chips" role="group" aria-label="Toolbar sections">
           <button class="rb-chip" data-sec="text" aria-expanded="false" hidden>Text</button>
           <button class="rb-chip" data-sec="para" aria-expanded="false" hidden>Paragraph</button>
           <button class="rb-chip" data-sec="insert" aria-expanded="false" hidden>Insert</button>
           <button class="rb-chip" data-sec="edit" aria-expanded="false" hidden>Edit</button>
           <button class="rb-chip" data-sec="nav" aria-expanded="false" hidden>Navigate</button>
+          <button class="rb-chip" data-sec="view" aria-expanded="false" hidden>View</button>
           <button class="rb-chip" data-sec="tools" aria-expanded="false" hidden>Tools</button>
+          <button class="rb-chip" data-sec="note" aria-expanded="false" hidden>Note</button>
         </div>
         <div class="rb-panels" id="rb-panels">
           <div class="rb-group" id="tool-buttons"></div>
@@ -155,6 +128,8 @@
             <div class="rb-sec" data-sec="nav" hidden>
               <button class="tool" id="btn-find" aria-pressed="false" title="Find and replace (Ctrl+F)">Find</button>
               <button class="tool" id="btn-snippets" title="Snippets saved in this project">Snippets</button>
+            </div>
+            <div class="rb-sec" data-sec="view" hidden>
               <button class="tool" id="btn-code-outline" aria-pressed="false" title="Outline of functions, classes, headings">Outline</button>
             </div>
           </div>
@@ -163,14 +138,48 @@
               <button class="tool" id="btn-sources" title="Sources and citations">Sources</button>
               <button class="tool research-only" id="btn-quote" title="Quote a source" hidden>Quote</button>
             </div>
-            <div class="rb-sec" data-sec="tools" hidden>
+            <div class="rb-sec" data-sec="view" hidden>
               <button class="tool" id="btn-preview" aria-pressed="false" title="Preview">Preview</button>
               <button class="tool research-only" id="btn-outline" aria-pressed="false" title="Outline of headings" hidden>Outline</button>
               <button class="tool story-only" id="btn-board" aria-pressed="true" title="Switch between scene cards and text" hidden>Board</button>
+            </div>
+            <div class="rb-sec" data-sec="tools" hidden>
               <button class="tool story-only" id="btn-registers" title="Characters, locations, items and settings for this project" hidden>Registers</button>
               <button class="tool story-only" id="btn-continuity" title="Check this story against its registers" hidden>Continuity</button>
               <button class="tool" id="btn-paper" title="Format as an MLA or APA paper">Paper</button>
               <button class="tool" id="btn-copy" title="Copy for Populi or as Markdown">Copy</button>
+            </div>
+            <div class="rb-sec rb-rows" data-sec="note" hidden>
+              <label class="rb-row"><span>Format</span>
+                <select id="note-format" aria-label="Note format or language">
+                  <optgroup label="Writing">
+                    <option value="text">Text</option>
+                    <option value="markdown">Markdown</option>
+                    <option value="populi">Populi</option>
+                  </optgroup>
+                  <optgroup label="Code">
+                    <option value="python">Python</option>
+                    <option value="html">HTML5</option>
+                    <option value="xml">XML</option>
+                    <option value="javascript">JavaScript</option>
+                    <option value="css">CSS</option>
+                    <option value="json">JSON</option>
+                    <option value="sql">SQL</option>
+                  </optgroup>
+                </select>
+              </label>
+              <label class="rb-row" id="note-font-row"><span>Font</span>
+                <select id="note-font" aria-label="Font for this note">
+                  <optgroup label="Reiimei fonts">
+                    <option value="display">Reiimei Display</option>
+                    <option value="echolume">Echolume</option>
+                  </optgroup>
+                  <optgroup label="Device fonts">
+                    <option value="serif">System serif</option>
+                    <option value="sans">System sans-serif</option>
+                  </optgroup>
+                </select>
+              </label>
             </div>
           </div>
         </div>
@@ -206,19 +215,22 @@
         <div class="gutter" id="gutter" hidden aria-hidden="true"></div>
         <pre class="code-layer" id="code-layer" hidden aria-hidden="true"><code id="code-hl"></code></pre>
         <pre class="code-layer mark-layer" id="mark-layer" hidden aria-hidden="true"></pre>
-        <textarea id="body" placeholder="Begin writing. The first line becomes the title." spellcheck="true"></textarea>
+        <textarea id="body" placeholder="Begin writing." spellcheck="true"></textarea>
+        <div class="rich" id="rich" role="textbox" aria-multiline="true" aria-label="Note text" spellcheck="true" hidden></div>
         <article class="preview" id="preview" hidden></article>
         <div class="board" id="board" hidden></div>
         <ul class="ac" id="ac" role="listbox" aria-label="Name suggestions" hidden></ul>
         <iframe class="html-frame" id="html-frame" hidden title="Rendered HTML" sandbox="allow-scripts allow-modals allow-forms"></iframe>
       </div>
-      <div class="empty-editor" id="empty-editor">
+      <!-- The Reiimei page: clicking anywhere on it starts a new note. app.js copies this
+           definition into the splash screen (#splash), so both always match. -->
+      <div class="empty-editor" id="empty-editor" role="button" tabindex="0" aria-label="Start a new note">
         <div class="definition">
           <p class="word">reiimei</p>
           <p class="say">REE-h-may &middot; <span class="pos">n.</span></p>
           <p class="sense">The cold, luminous stillness peculiar to a clear winter night; especially the effect of moonlight upon frost, illuminating the night without dispelling it.</p>
           <p class="eg">There was reiimei over the orchard that night.</p>
-          <p class="hint-line">Select a note, or start a new one.</p>
+          <p class="hint-line">Select a note, or click here to start a new one.</p>
         </div>
       </div>
     </main>
@@ -341,6 +353,7 @@
     <section class="tab-panel" data-panel="writing" hidden>
       <label>New notes use
         <select id="pref-format">
+          <option value="text">Text</option>
           <option value="markdown">Markdown</option>
           <option value="populi">Populi markup</option>
           <option value="python">Python</option>
@@ -422,6 +435,15 @@
       </div>
     </main>
   </div>
+
+  <!-- Splash: the Reiimei page, opened and closed by tapping the Reiimei name -->
+  <div class="splash empty-editor" id="splash" role="button" tabindex="0" aria-label="Start a new note" hidden></div>
+
+  <!-- Menus: a list under the button on a wide screen, a sheet from the bottom on a phone -->
+  <dialog id="menu-sheet" class="menu-sheet" aria-labelledby="menu-title">
+    <p class="ms-title" id="menu-title"></p>
+    <div class="ms-items" id="menu-items" role="menu"></div>
+  </dialog>
 
   <!-- Generic prompt dialog -->
   <dialog id="ask-dialog" class="dialog">
@@ -731,7 +753,7 @@
         </select>
       </label>
       <label data-research>Your notes on this source<textarea id="sf-note" rows="3" placeholder="What it argues, why it matters, where to look again"></textarea></label>
-      <label>Citation key<input id="sf-key" autocomplete="off" autocapitalize="off" pattern="[A-Za-z][A-Za-z0-9_:-]*"></label>
+      <label>Citation key<input id="sf-key" autocomplete="off" autocapitalize="off" pattern="[A-Za-z][A-Za-z0-9_:\-]*"></label>
       <div class="sf-preview" aria-live="polite">
         <p class="tiny-label">APA 7</p><p class="ref-preview" id="sf-prev-apa"></p>
         <p class="tiny-label">MLA 9</p><p class="ref-preview" id="sf-prev-mla"></p>

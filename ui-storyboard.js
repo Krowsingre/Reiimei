@@ -294,7 +294,7 @@ async function runContinuity() {
   const note = app.note();
   await app.flush();
   contReg = JSON.parse(JSON.stringify(app.registry(note.folder_id)));
-  const notes = (scope === 'note' ? [app.note()] : app.notesIn(note.folder_id)).map((n) => ({ id: n.id, title: n.id === note.id ? ($('body').value.split('\n')[0].replace(/^#+\s*/, '') || 'Untitled') : (n.body.split('\n')[0].replace(/^#+\s*/, '') || 'Untitled'), body: n.id === note.id ? $('body').value : n.body }));
+  const notes = (scope === 'note' ? [app.note()] : app.notesIn(note.folder_id)).map((n) => ({ id: n.id, title: String(n.meta?.title || '').trim() || (n.id === note.id ? $('body').value : n.body).split('\n')[0].replace(/^#+\s*/, '') || 'Untitled', body: n.id === note.id ? $('body').value : n.body }));
   const r = K.checkContinuity(contReg, notes);
   results = r.findings;
   const regs = contReg.registers.reduce((s, x) => s + x.agents.length, 0);

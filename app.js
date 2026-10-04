@@ -10,17 +10,17 @@ import * as modes from './modes.js';
 import * as story from './storyboard.js';
 import * as codeIntel from './codeintel.js';
 import { isCode } from './code.js';
-import { noteTitle, noteSnippet, sharedFileCheck } from './share.js';
+import { noteTitle, noteSnippet, ownTitle, fallbackTitle, sharedFileCheck } from './share.js';
 
-export const APP_VERSION = '0.13.2';
-export const BUILD_DATE = '2026-10-03';
+export const APP_VERSION = '0.14.1';
+export const BUILD_DATE = '2026-10-04';
 
 const $ = (id) => document.getElementById(id);
 const el = {
   app: $('app'),
   smartList: $('smart-list'), folderList: $('folder-list'), tagList: $('tag-list'),
   listTitle: $('list-title'), noteList: $('note-list'), search: $('search'),
-  body: $('body'), modeSel: $('note-mode'), folderSel: $('note-folder'), pin: $('btn-pin'), del: $('btn-delete'),
+  body: $('body'), title: $('note-title'), titleRow: $('title-row'), folderBtn: $('note-folder'), noteMenu: $('btn-note-menu'),
   chips: $('chips'), tagInput: $('tag-input'), tagSuggest: $('tag-suggest'), tagRow: $('tag-row'),
   trashBar: $('trash-bar'), emptyEditor: $('empty-editor'), saveState: $('save-state'),
   syncDot: $('sync-dot'), syncText: $('sync-text'),
@@ -52,10 +52,15 @@ const snippetOf = (n) => noteSnippet(n);
 // ---- Preferences (per device) ------------------------------------------
 const PREFS_KEY = 'reiimei.prefs';
 const VIEW_DEFAULT = { sort: 'updated', dir: 'desc', hidden: [] };
-const PREF_DEFAULTS = { mode: 'notes', lastProject: '', codeLang: 'python', format: 'markdown', style: 'apa', view: VIEW_DEFAULT };
+const PREF_DEFAULTS = { mode: 'notes', lastProject: '', codeLang: 'python', format: 'text', style: 'apa', view: VIEW_DEFAULT };
 function prefs() {
-  try { return { ...PREF_DEFAULTS, ...JSON.parse(localStorage.getItem(PREFS_KEY) || '{}') }; }
-  catch { return { ...PREF_DEFAULTS }; }
+  try {
+    const p = { ...PREF_DEFAULTS, ...JSON.parse(localStorage.getItem(PREFS_KEY) || '{}') };
+    // v0.14.1: Text is the default for new notes. Devices that were on Markdown (the old default)
+    // switch once; a different choice made later in Settings › Writing is kept.
+    if (!p.textDefault) { if (p.format === 'markdown') p.format = 'text'; p.textDefault = true; localStorage.setItem(PREFS_KEY, JSON.stringify(p)); }
+    return p;
+  } catch { return { ...PREF_DEFAULTS }; }
 }
 
 // Fonts: interface text and new notes use Reiimei Display. Each note can pick its own font from the
@@ -123,7 +128,9 @@ function toast(text, actionLabel = null, action = null) {
 const isRegistry = (n) => !!(n.meta && n.meta.registry);
 const activeNotes = () => state.notes.filter((n) => !n.deleted && !isRegistry(n));
 // A permanently deleted note is a blank deleted stub (kept only so other devices wipe it too).
-const isPurged = (n) => n.deleted && !n.locked && !(n.body || '').trim() && !(n.tags || []).length;
+const isPurged = (n) => n.deleted && !n.locked && !(n.body || '').trim() && !ownTitle(n) && !(n.tags || []).length;
+// A note with no text and no title is blank; blank notes are discarded when you leave them.
+const isBlank = (n) => !(n.body || '').trim() && !ownTitle(n);
 const trashNotes = () => state.notes.filter((n) => n.deleted && !isPurged(n) && !isRegistry(n));
 const anyFolders = () => state.folders.filter((f) => !f.deleted);
 const liveFolders = () => anyFolders().filter((f) => !modes.isProject(f)).sort((a, b) => a.name.localeCompare(b.name));
@@ -200,7 +207,7 @@ function filteredNotes() {
   const q = state.query.trim().toLowerCase();
   if (q) {
     const tagQ = q.replace(/^#/, '');
-    list = list.filter((n) => n.body.toLowerCase().includes(q) || tagsOf(n).some((t) => t.includes(tagQ)));
+    list = list.filter((n) => n.body.toLowerCase().includes(q) || ownTitle(n).toLowerCase().includes(q) || tagsOf(n).some((t) => t.includes(tagQ)));
   }
   return sortNotes(list, v);
 }
@@ -234,7 +241,10 @@ function groupLabel(n) {
   return null;
 }
 
-function setMobileView(view) { el.app.dataset.mobileView = view; }
+function setMobileView(view) {
+  el.app.dataset.mobileView = view;
+  if (view === 'editor') fitTitle();
+}
 const isPhone = () => window.matchMedia('(max-width: 760px)').matches;
 
 // ---- Dialog ------------------------------------------------------------
@@ -496,7 +506,7 @@ function renderEditor() {
   const n = currentNote();
   const show = !!n;
   el.emptyEditor.hidden = show;
-  [el.body, el.tagRow, el.folderSel, el.pin, el.del, $('btn-share'), $('btn-close-note')].forEach((x) => { x.hidden = !show; });
+  [el.body, el.titleRow, el.tagRow, el.folderBtn, el.noteMenu, $('btn-close-note')].forEach((x) => { x.hidden = !show; });
   if (!show) { writing.renderToolbar(null); $('preview').hidden = true; }
   el.trashBar.hidden = !(n && n.deleted);
   $('erased-bar').hidden = !(n && !n.deleted && !n.body.trim() && state.cache && state.cache.offeredTo === n.id);
@@ -510,24 +520,21 @@ function renderEditor() {
   }
   el.body.readOnly = n.deleted;
   el.tagInput.disabled = n.deleted;
-  el.folderSel.disabled = n.deleted;
+  el.title.readOnly = n.deleted;
+  // The title box shows the saved title, or (greyed) the first line that stands in for it.
+  if (document.activeElement !== el.title && !(titlePending && titlePending.id === n.id)) el.title.value = ownTitle(n);
+  el.title.placeholder = fallbackTitle(n) || 'Title';
+  fitTitle();
 
   const isResearch = modes.hasProjects(modes.kindOf(n));
-  const folders = isResearch ? liveProjects(modes.kindOf(n)) : liveFolders();
-  el.folderSel.innerHTML = (isResearch ? '' : `<option value="">Notes (no folder)</option>`) +
-    folders.map((f) => `<option value="${f.id}">${esc(modes.projectName(f))}</option>`).join('');
-  el.folderSel.value = folders.some((f) => f.id === n.folder_id) ? n.folder_id : (isResearch ? folders[0]?.id || '' : '');
-  el.folderSel.setAttribute('aria-label', isResearch ? 'Project' : 'Folder');
-  el.folderSel.title = isResearch ? 'Project' : 'Folder';
-
-  el.modeSel.innerHTML = modes.MODES.map((m) => `<option value="${m.id}">${esc(m.name)}</option>`).join('');
-  el.modeSel.value = modes.kindOf(n);
-  el.modeSel.disabled = n.deleted;
+  const where = isResearch ? 'Project' : 'Folder';
+  $('note-folder-name').textContent = folderLabel(n);
+  el.folderBtn.disabled = n.deleted;
+  el.folderBtn.title = n.deleted ? where : `${where}: change where this note is kept`;
+  el.folderBtn.setAttribute('aria-label', `${where}: ${folderLabel(n)}`);
   $('editor').dataset.kind = modes.kindOf(n);
   $('editor').dataset.font = fontOf(n);
-  el.pin.setAttribute('aria-pressed', String(!!n.pinned));
-  el.del.title = n.deleted ? 'Already deleted' : 'Delete';
-  el.del.disabled = n.deleted;
+  $('pin-dot').hidden = !n.pinned;
 
   const pt = projectTagOf(n);
   el.chips.innerHTML = tagsOf(n).map((t) => t === pt
@@ -556,7 +563,7 @@ async function refreshCache() {
 
 async function discardIfBlank(id) {
   const n = state.notes.find((x) => x.id === id);
-  if (!n || n.deleted || n.locked || n.body.trim()) return false;
+  if (!n || n.deleted || n.locked || !isBlank(n)) return false;
   if (!n.synced_updated_at) {
     await db.locked(() => db.remove('notes', id));
     state.notes = state.notes.filter((x) => x.id !== id);
@@ -568,9 +575,19 @@ async function discardIfBlank(id) {
   return true;
 }
 
-async function flushSave() {
+// Saves run one after another: a second caller (closing a note while the save started by the
+// text box losing focus is still running) waits for the first, and never sees the note as it was.
+let saveChain = Promise.resolve();
+function flushSave() {
+  const run = saveChain.then(saveNow);
+  saveChain = run.catch(() => {});
+  return run;
+}
+
+async function saveNow() {
   clearTimeout(saveTimer);
   saveTimer = null;
+  await flushTitle();
   if (!pending) return;
   const { id, body } = pending;
   pending = null;
@@ -578,19 +595,63 @@ async function flushSave() {
   if (!n || body === n.body) return;
   try {
     replaceNote(await db.saveNote(n, { body }));
+    if (id === state.currentId) el.title.placeholder = fallbackTitle(currentNote()) || 'Title';
     if (!body.trim() && n.body.trim()) {
       // Everything was erased: keep the text in the cache (one slot, shared by all devices).
       await db.setCache(n.body, id);
       await refreshCache();
       log.info('cache', 'Erased text cached', { from: id, chars: n.body.length });
     }
-    el.saveState.textContent = 'Saved';
+    setSaveState(titlePending ? 'unsaved' : '');
     renderList();
     renderSidebar();
     scheduleSync();
   } catch (e) {
     log.error('editor', 'Save failed', e);
-    el.saveState.textContent = 'Save failed!';
+    setSaveState('failed');
+  }
+}
+
+// The save indicator shows only while something is unsaved, or when saving failed.
+function setSaveState(kind) {
+  const s = el.saveState;
+  if (s.dataset.state === 'update' && !kind) return; // keep "Update ready" until a save needs the space
+  s.dataset.state = kind;
+  s.textContent = kind === 'unsaved' ? 'Unsaved' : kind === 'failed' ? 'Save failed' : kind === 'update' ? 'Update ready: reopen app' : '';
+  s.title = kind === 'failed' ? 'Your last change was not saved on this device. Keep this note open and try again; Settings › Log has details.' : '';
+}
+
+// ---- Title -----------------------------------------------------------------------
+// What is typed in the title box is the note's title (meta.title, synced and sealed like the
+// rest of meta). An empty box means the first line of the text is the title, as before.
+let titleTimer = null;
+let titlePending = null; // { id, title }
+// The title box grows to show a long title in full. It can only be measured while it is on
+// screen (a phone shows one pane at a time), so it is measured again when the editor appears.
+function fitTitle() {
+  el.title.style.height = '';
+  if (!el.title.offsetParent) return;
+  el.title.style.height = `${el.title.scrollHeight}px`;
+}
+async function flushTitle() {
+  clearTimeout(titleTimer);
+  titleTimer = null;
+  if (!titlePending) return;
+  const { id, title } = titlePending;
+  titlePending = null;
+  const n = state.notes.find((x) => x.id === id);
+  const clean = title.replace(/\s+/g, ' ').trim().slice(0, 200);
+  if (!n || n.deleted || clean === ownTitle(n)) { if (!pending) setSaveState(''); return; }
+  try {
+    const meta = { ...(n.meta || {}) };
+    if (clean) meta.title = clean; else delete meta.title;
+    replaceNote(await db.saveNote(n, { meta }));
+    if (!pending) setSaveState('');
+    renderList();
+    scheduleSync();
+  } catch (e) {
+    log.error('editor', 'Title save failed', e);
+    setSaveState('failed');
   }
 }
 
@@ -623,7 +684,8 @@ async function selectNote(id) {
   const prev = state.currentId;
   if (prev && prev !== id) await discardIfBlank(prev);
   state.currentId = id;
-  el.saveState.textContent = '';
+  setSaveState('');
+  closeSplash();
   renderList();
   renderEditor();
   if (id) setMobileView('editor');
@@ -644,6 +706,7 @@ async function selectFilter(filter) {
 }
 
 async function newNote() {
+  closeSplash();
   await flushSave();
   if (state.currentId) await discardIfBlank(state.currentId);
   const f = state.filter;
@@ -675,7 +738,7 @@ async function newNote() {
   state.currentId = note.id;
   render();
   setMobileView('editor');
-  el.body.focus();
+  writing.focusText();
 }
 
 async function deleteCurrent() {
@@ -695,7 +758,7 @@ async function deleteCurrent() {
 // ---- Trash, selection, closing -------------------------------------------
 // Move one note to Recently Deleted (a blank note that never synced is simply dropped).
 async function trashNote(n) {
-  if (!n.body.trim()) {
+  if (isBlank(n)) {
     await discardIfBlank(n.id);
   } else {
     replaceNote(await db.deleteNote(n));
@@ -800,7 +863,7 @@ async function closeNote() {
   await flushSave();
   if (state.currentId) await discardIfBlank(state.currentId);
   state.currentId = null;
-  el.saveState.textContent = '';
+  setSaveState('');
   writing.resetView();
   render();
   if (isPhone()) setMobileView('list');
@@ -1044,6 +1107,121 @@ async function folderMenu(folder) {
     render();
     scheduleSync();
   }
+}
+
+// ---- Note header: folder label and the ⋯ menu ---------------------------------------
+function folderLabel(n) {
+  const f = folderById(n.folder_id);
+  if (modes.hasProjects(modes.kindOf(n))) return f ? modes.projectName(f) : modes.UNSORTED;
+  return f && !modes.isProject(f) ? f.name : 'Notes';
+}
+
+// One menu for both: a list under its button on a wide screen, a sheet from the bottom on a
+// phone. items: [{ label, hint, checked, danger, disabled, run }] or { heading }.
+let menuItems = [];
+function openMenu(anchor, title, items) {
+  const dlg = $('menu-sheet');
+  menuItems = items;
+  $('menu-title').textContent = title;
+  $('menu-items').innerHTML = items.map((it, i) => (it.heading
+    ? `<p class="ms-head">${esc(it.heading)}</p>`
+    : `<button type="button" class="ms-item${it.danger ? ' danger' : ''}" role="${it.checked !== undefined ? 'menuitemradio' : 'menuitem'}"${it.checked !== undefined ? ` aria-checked="${!!it.checked}"` : ''} data-i="${i}"${it.disabled ? ' disabled' : ''}><span class="ms-label">${esc(it.label)}</span>${it.hint ? `<span class="ms-hint">${esc(it.hint)}</span>` : ''}</button>`)).join('');
+  dlg.style.top = '';
+  dlg.style.left = '';
+  dlg.showModal();
+  if (!isPhone()) {
+    const r = anchor.getBoundingClientRect();
+    dlg.style.top = `${Math.round(Math.max(8, Math.min(r.bottom + 4, window.innerHeight - dlg.offsetHeight - 8)))}px`;
+    dlg.style.left = `${Math.round(Math.max(8, Math.min(r.left, window.innerWidth - dlg.offsetWidth - 8)))}px`;
+  }
+  (dlg.querySelector('.ms-item[aria-checked="true"]') || dlg.querySelector('.ms-item:not([disabled])'))?.focus();
+}
+function bindMenuSheet() {
+  const dlg = $('menu-sheet');
+  dlg.addEventListener('click', (e) => {
+    const b = e.target.closest('.ms-item');
+    if (b) { const it = menuItems[+b.dataset.i]; dlg.close(); it?.run?.(); return; }
+    // A click on the backdrop (outside the menu) closes it.
+    const r = dlg.getBoundingClientRect();
+    if (e.target === dlg && (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom)) dlg.close();
+  });
+}
+
+async function moveToFolder(id) {
+  const pf = folderById(id);
+  if (modes.isProject(pf)) setPrefs({ [lastProjectKey(modes.projectKind(pf))]: id });
+  await updateCurrent({ folder_id: id || null });
+}
+
+function openFolderMenu() {
+  const n = currentNote();
+  if (!n || n.deleted) return;
+  const kind = modes.kindOf(n);
+  const proj = modes.hasProjects(kind);
+  const folders = proj ? liveProjects(kind) : liveFolders();
+  const items = [];
+  if (!proj) items.push({ label: 'Notes', hint: 'No folder', checked: !folders.some((f) => f.id === n.folder_id), run: () => moveToFolder(null) });
+  for (const f of folders) items.push({ label: modes.projectName(f), checked: f.id === n.folder_id, run: () => moveToFolder(f.id) });
+  // Moving a note to another mode lives here now that the mode menu has left the note header.
+  items.push({ heading: 'Move to another mode' });
+  for (const m of modes.MODES.filter((x) => x.id !== kind)) items.push({ label: m.name, run: () => moveToMode(m.id) });
+  openMenu(el.folderBtn, proj ? 'Project' : 'Folder', items);
+}
+
+function openNoteMenu() {
+  const n = currentNote();
+  if (!n) return;
+  openMenu(el.noteMenu, 'Note', [
+    { label: 'Share…', run: async () => { await flushSave(); const x = currentNote(); if (x) shareUi.open([x], { single: true }); } },
+    { label: n.pinned ? 'Unpin' : 'Pin to top', disabled: n.deleted, run: () => { const x = currentNote(); if (x) updateCurrent({ pinned: !x.pinned }); } },
+    { label: n.deleted ? 'In Recently Deleted' : 'Delete', danger: !n.deleted, disabled: n.deleted, run: deleteCurrent },
+  ]);
+}
+
+// ---- Splash: the Reiimei page --------------------------------------------------------
+// Hidden until the Reiimei name is tapped; tapping the name again hides it. Tapping anywhere
+// on it starts a new note in the current mode and folder.
+const splashOpen = () => !$('splash').hidden;
+function setSplash(open) {
+  $('splash').hidden = !open;
+  $('btn-brand').setAttribute('aria-expanded', String(open));
+  el.app.dataset.splash = open ? 'on' : 'off';
+}
+function closeSplash() { if (splashOpen()) setSplash(false); }
+function bindSplash() {
+  const splash = $('splash');
+  splash.append(el.emptyEditor.querySelector('.definition').cloneNode(true));
+  $('btn-brand').addEventListener('click', () => {
+    const open = !splashOpen();
+    if (open) closeSettings();
+    setSplash(open);
+    log.debug('splash', open ? 'Shown' : 'Hidden');
+  });
+  const start = (e) => {
+    if (e.type === 'keydown' && e.key !== 'Enter' && e.key !== ' ') return;
+    e.preventDefault();
+    newNote();
+  };
+  for (const box of [splash, el.emptyEditor]) { box.addEventListener('click', start); box.addEventListener('keydown', start); }
+}
+
+// ---- Phone keyboard ----------------------------------------------------------------
+// The on-screen keyboard covers the bottom of the page. On a phone the app is sized to the part
+// that is still visible, so the ribbon at the foot of the editor sits just above the keyboard.
+function trackViewport() {
+  const vv = window.visualViewport;
+  if (!vv) return;
+  const root = document.documentElement;
+  const update = () => {
+    if (!isPhone()) { root.style.removeProperty('--vvh'); root.style.removeProperty('--vvt'); delete root.dataset.kb; return; }
+    root.style.setProperty('--vvh', `${Math.round(vv.height)}px`);
+    root.style.setProperty('--vvt', `${Math.round(vv.offsetTop)}px`);
+    root.dataset.kb = window.innerHeight - vv.height > 120 ? 'open' : 'closed';
+  };
+  vv.addEventListener('resize', update);
+  vv.addEventListener('scroll', update);
+  window.addEventListener('resize', update);
+  update();
 }
 
 // ---- Sync wiring -------------------------------------------------------
@@ -1348,10 +1526,31 @@ async function importBackup(file) {
 
 // ---- Events ------------------------------------------------------------
 function bindEvents() {
-  $('btn-share').addEventListener('click', async () => {
+  el.noteMenu.addEventListener('click', openNoteMenu);
+  el.folderBtn.addEventListener('click', openFolderMenu);
+  bindMenuSheet();
+  bindSplash();
+  el.title.addEventListener('input', () => {
+    if (!state.currentId) return;
+    if (/\n/.test(el.title.value)) el.title.value = el.title.value.replace(/\n+/g, ' ');
+    fitTitle();
+    titlePending = { id: state.currentId, title: el.title.value };
+    setSaveState('unsaved');
+    clearTimeout(titleTimer);
+    titleTimer = setTimeout(flushSave, 400);
+  });
+  el.title.addEventListener('keydown', (e) => {
+    // Enter (or the down arrow at the end) moves on to the text.
+    const atEnd = el.title.selectionStart === el.title.value.length;
+    if ((e.key === 'Enter' && !e.isComposing) || (e.key === 'ArrowDown' && atEnd)) {
+      e.preventDefault();
+      writing.focusText(true);
+    }
+  });
+  el.title.addEventListener('blur', async () => {
     await flushSave();
     const n = currentNote();
-    if (n) shareUi.open([n], { single: true });
+    if (n && document.activeElement !== el.title) { el.title.value = ownTitle(n); fitTitle(); }
   });
   $('btn-share-list').addEventListener('click', async () => {
     await flushSave();
@@ -1367,7 +1566,7 @@ function bindEvents() {
     const text = `Reiimei ${APP_VERSION} (${BUILD_DATE}), ${device().name || 'unnamed device'}`;
     try { await navigator.clipboard.writeText(text); toast('Version info copied'); } catch { toast(text); }
   });
-  $('btn-settings').addEventListener('click', () => (state.settingsOpen ? closeSettings() : openSettings('sync', false)));
+  $('btn-settings').addEventListener('click', () => { closeSplash(); if (state.settingsOpen) closeSettings(); else openSettings('sync', false); });
   $('btn-settings-back').addEventListener('click', closeSettings);
   $('btn-settings-tabs').addEventListener('click', () => setMobileView('settings-list'));
   $('sync-foot').addEventListener('click', () => openSettings('sync'));
@@ -1430,9 +1629,10 @@ function bindEvents() {
   $('view-reset').addEventListener('click', () => { setPrefs({ view: VIEW_DEFAULT }); renderViewDialog(); renderList(); });
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape' || document.querySelector('dialog[open]')) return;
+    if (splashOpen()) { closeSplash(); return; }
     if (state.settingsOpen) { if (!['TEXTAREA', 'INPUT', 'SELECT'].includes(document.activeElement?.tagName)) closeSettings(); return; }
     if (state.selecting) { setSelecting(false); return; }
-    if (state.currentId && !['TEXTAREA', 'INPUT', 'SELECT'].includes(document.activeElement?.tagName)) closeNote();
+    if (state.currentId && !['TEXTAREA', 'INPUT', 'SELECT'].includes(document.activeElement?.tagName) && !document.activeElement?.isContentEditable) closeNote();
   });
 
   let searchTimer = null;
@@ -1453,13 +1653,12 @@ function bindEvents() {
   el.body.addEventListener('input', () => {
     if (!state.currentId) return;
     pending = { id: state.currentId, body: el.body.value };
-    el.saveState.textContent = 'Editing…';
+    setSaveState('unsaved');
     clearTimeout(saveTimer);
     saveTimer = setTimeout(flushSave, 400);
   });
   el.body.addEventListener('blur', flushSave);
 
-  el.modeSel.addEventListener('change', () => moveToMode(el.modeSel.value));
   $('mode-switch').addEventListener('click', (e) => { const b = e.target.closest('[data-mode]'); if (b) setMode(b.dataset.mode); });
   $('mode-all').addEventListener('click', toggleShowAll);
   document.addEventListener('keydown', (e) => {
@@ -1467,9 +1666,6 @@ function bindEvents() {
     const m = modes.MODES.find((x) => x.key === e.key);
     if (m) { e.preventDefault(); setMode(m.id); }
   });
-  el.folderSel.addEventListener('change', () => { { const pf = folderById(el.folderSel.value); if (modes.isProject(pf)) setPrefs({ [lastProjectKey(modes.projectKind(pf))]: el.folderSel.value }); } updateCurrent({ folder_id: el.folderSel.value || null }); });
-  el.pin.addEventListener('click', () => { const n = currentNote(); if (n) updateCurrent({ pinned: !n.pinned }); });
-  el.del.addEventListener('click', deleteCurrent);
   $('btn-paste-erased').addEventListener('click', pasteErased);
   $('btn-restore').addEventListener('click', async () => {
     await updateCurrent({ deleted: false });
@@ -1535,6 +1731,7 @@ function bindEvents() {
     else scheduleSync(500);
   });
   window.addEventListener('pagehide', flushSave);
+  window.addEventListener('resize', fitTitle);
   window.addEventListener('online', () => { log.info('net', 'Back online'); scheduleSync(500); });
   window.addEventListener('offline', () => { log.info('net', 'Went offline'); sync.syncNow('offline-check'); });
   setInterval(() => { if (document.visibilityState === 'visible') scheduleSync(0); }, 60_000);
@@ -1554,7 +1751,7 @@ async function registerServiceWorker() {
     navigator.serviceWorker.addEventListener('controllerchange', () => {
       if (hadController) {
         log.info('sw', 'App updated; new version applies on next launch');
-        el.saveState.textContent = 'Update ready: reopen app';
+        setSaveState('update');
       }
       hadController = true;
     });
@@ -1568,7 +1765,7 @@ async function loadData() {
   if (modes.MODE_IDS.includes(prefs().mode)) state.mode = prefs().mode;
   [state.notes, state.folders] = await Promise.all([db.getAll('notes'), db.getAll('folders')]);
   // Tidy up: brand-new empty notes left behind are discarded silently.
-  for (const n of state.notes.filter((x) => !x.deleted && !x.locked && !x.body.trim())) await discardIfBlank(n.id);
+  for (const n of state.notes.filter((x) => !x.deleted && !x.locked && isBlank(x))) await discardIfBlank(n.id);
   state.notes = await db.getAll('notes');
   await refreshCache();
   await fixResearchNotes();
@@ -1631,6 +1828,7 @@ async function boot() {
   log.info('boot', `Reiimei ${APP_VERSION} starting`);
   try {
     bindEvents();
+    trackViewport();
     writing.init(hooks);
     writing.setStyleDefault(() => prefs().style);
     security.init(hooks);

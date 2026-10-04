@@ -2,6 +2,7 @@
 // Research notes live in projects (see modes.js). A project's library is every source
 // used by the notes in that project; importing copies a source from another project.
 import { log } from './logger.js';
+import * as rich from './ui-rich.js';
 import * as F from './format.js';
 import * as C from './cite.js';
 import * as modes from './modes.js';
@@ -256,6 +257,7 @@ function renderOutline() {
 }
 
 function jump(i) {
+  if (rich.active()) { rich.scrollToHeading(i); return; }
   const { heads } = headings($('body').value);
   const h = heads[i];
   if (!h) return;

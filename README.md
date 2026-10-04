@@ -1,8 +1,24 @@
-# Reiimei v0.13.2
+# Reiimei v0.14.1
 
 *reiimei* (REE-h-may), n. The cold, luminous stillness peculiar to a clear winter night; especially the effect of moonlight upon frost, illuminating the night without dispelling it.
 
 An offline-first notes app for Windows and iPhone, built as a Progressive Web App (PWA). No Mac, no App Store, no developer fee.
+
+## What changed in v0.14.1
+
+- **Text notes: write the way you would in Word.** **Text** is a new note format, listed first in **Format** (Text, Markdown, Populi). Bold looks bold, headings look like headings, lists and checklists look like lists, with no symbols to type and no switching between editing and preview. The **Text**, **Paragraph** and **Insert** buttons work on the selected words, and **Ctrl+B**, **Ctrl+I** and **Ctrl+U** work as usual. **Heading** steps through Heading 1, 2 and 3 and back to normal text. Tap the box in front of a checklist item to tick it. Pasting keeps bold, italics, headings and lists and drops everything else.
+- **Text is the default for new notes**, on every device once it has this version. You can still pick Markdown or Populi in **Settings › Writing**. Notes you already have keep their format.
+- A Text note is stored as Markdown, so switching a note between Text and Markdown changes nothing in it, and sharing, papers, Copy, citations, search and sync work as before. Citations such as `[@smith2020, 42]` stay as you type them and are filled in when you share, copy or make a paper. Markdown and Populi notes keep **Preview**; Text notes do not need it.
+- One new file, `ui-rich.js`: 42 files now. No Supabase changes.
+
+## What changed in v0.14.0
+
+- **Titles.** Each note has a title line above its tags. What you type there is the note's title in the list, in shared files and as a paper's title. Leave it empty and the first line of the text is the title, as before, so older notes look the same; that line shows greyed in the empty title box. **Enter** in the title moves to the text. Titles sync and are encrypted with the rest of the note. Search finds titles too.
+- **The Reiimei page is hidden.** Tap **Reiimei** at the top of the folder list to show the definition page, and tap it again to hide it. Tap anywhere on the page to start a new note in the mode and folder you are in. On a computer, the empty space where a note would be shows the same page and works the same way.
+- **A simpler note header.** One row: back (or close), the note's folder as a single label, and a **⋯** menu with **Share**, **Pin** and **Delete**. Tap the folder label to move the note to another folder or project; the same list has **Move to another mode**, which replaces the mode menu that used to sit beside the folder. A small gold dot on **⋯** marks a pinned note. Folder and mode lists open as a sheet from the bottom on a phone.
+- **"Saved" is gone.** The header only says something when a change is not saved yet (after a second or so) or when saving failed.
+- **The toolbar.** **Format** and **Font** have moved into a **Note** section, as full-width rows. **Preview** and **Outline** (and **Board** in Storyboard) are together in a new **View** section. Every section still starts closed. On a phone the sections are one row of chips at the bottom of the note, just above the keyboard, which scrolls sideways; a section opens as a sheet above the chips, one at a time, and tapping its chip again closes it. Toolbar buttons no longer take the keyboard away on a phone.
+- No new files and no Supabase changes. Still 41 files.
 
 ## What changed in v0.13.2
 
@@ -66,7 +82,7 @@ An offline-first notes app for Windows and iPhone, built as a Progressive Web Ap
 - **Modes.** Four modes: **Notes**, **Research**, **Coding** and **Storyboard**. The switcher sits at the top of the sidebar, and Ctrl+1 to Ctrl+4 jump between them (in a browser tab, Ctrl+1 to 4 may switch browser tabs instead; the installed app does not have that problem). Your last mode is remembered on each device.
 - **A mode filters your notes.** All Notes, This device and folders show only the notes of the current mode, with counts to match. **Show all modes**, at the top of the note list, lists every mode together and labels each note with its mode.
 - **Search, tags and Recently Deleted cover every mode.** Folders and tags are shared by all modes.
-- **Every note has a mode.** New notes start in the mode you are in. Notes written before modes are sorted for you: code notes go to Coding, notes with sources go to Research, everything else goes to Notes. To change one, use the **mode menu** at the top of the note (next to the folder menu). Your other devices follow after sync.
+- **Every note has a mode.** New notes start in the mode you are in. Notes written before modes are sorted for you: code notes go to Coding, notes with sources go to Research, everything else goes to Notes. To change one, tap the folder label at the top of the note and choose **Move to another mode** (before v0.14.0 this was the mode menu next to the folder menu). Your other devices follow after sync.
 - **A note keeps the tools it needs.** Open a code note from Notes mode and it still shows its code tools.
 - This release is the framework. Each mode's own features come next, one mode at a time. Until then the modes differ in what they list, not yet in what they offer.
 
@@ -155,6 +171,7 @@ Note: a device still on v0.7 would show the hidden cache record in Recently Dele
 | `index.html`, `styles.css` | The interface |
 | `app.js` | App logic, diagnostics, settings |
 | `ui-writing.js` | Toolbar, preview, conversion, copying, sources, papers |
+| `ui-rich.js` | Text notes: formatted editing, kept as Markdown underneath |
 | `ui-security.js` | Lock screen and encryption settings |
 | `code.js`, `ui-code.js` | Code coloring, editing helpers, tidy, HTML, XML and JSON previews, JavaScript runner |
 | `codeintel.js`, `ui-coding.js` | Coding mode: name check, autocomplete, find and replace, outline, snippets |
@@ -188,9 +205,9 @@ Then open http://localhost:8000 in Edge or Chrome. Notes work immediately, saved
 
 The iPhone needs an HTTPS address. GitHub Pages hosts the app for free. Only the app's code goes to GitHub; your notes never do.
 
-1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.13.2` folder.
+1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.14.1` folder.
 2. **Create the repository.** In Safari, sign in at github.com, tap **+** › **New repository**. Name it `reiimei`, set it to **Public** (free Pages needs a public repository), and tap **Create repository**.
-3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.13.2` folder, tap **Select**, select all 41 files, and tap **Open**. Scroll down and tap **Commit changes**.
+3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.14.1` folder, tap **Select**, select all 42 files, and tap **Open**. Scroll down and tap **Commit changes**.
    - If you don't see the upload link, tap the **aA** button in Safari's address bar › **Request Desktop Website** and try again.
 4. **Turn on Pages.** In the repository, open **Settings** › **Pages**. Under **Build and deployment**, set Source to **Deploy from a branch**, Branch to **main** and **/ (root)**, then tap **Save**.
 5. **Wait a minute or two**, then reload the Pages screen. It shows your address, which looks like `https://yourname.github.io/reiimei/`.
@@ -238,7 +255,9 @@ Anyone can open your Reiimei address, but they never see your notes. Notes live 
 
 ## Writing
 
-**Formats.** Choose Markdown or Populi for each note in the toolbar. **Settings › Writing** sets the default for new notes and shows the syntax for both. Converting a note keeps everything both formats share. Markdown features Populi lacks (headings, lists, quotes, code, tables, strikethrough) are kept as plain text, and you are asked first. **Undo** appears right after converting.
+**Titles.** Type a title in the line above the tags, or leave it empty to use the text's first line.
+
+**Formats.** Choose Text, Markdown or Populi for each note in the toolbar's **Note** section. Text shows formatting as you write; Markdown and Populi use symbols, with a **Preview**. **Settings › Writing** sets the default for new notes and shows the syntax for both. Converting a note keeps everything both formats share. Markdown features Populi lacks (headings, lists, quotes, code, tables, strikethrough) are kept as plain text, and you are asked first. **Undo** appears right after converting.
 
 **Citations.** Open **Sources** to add what you are citing, then tap **Cite** to insert a citation where your cursor was. Citations are short codes in your text:
 
@@ -256,7 +275,7 @@ Titles are typed once. Reiimei applies title case for MLA and sentence case for 
 
 ## Code
 
-Choose **Python**, **HTML5**, **XML**, **JavaScript**, **CSS**, **JSON**, or **SQL** from the format menu in the toolbar (or make one the default in **Settings › Writing**). Switching between writing and code never changes the text; **Undo** appears right after.
+Choose **Python**, **HTML5**, **XML**, **JavaScript**, **CSS**, **JSON**, or **SQL** from **Format** in the toolbar's **Note** section (or make one the default in **Settings › Writing**). Switching between writing and code never changes the text; **Undo** appears right after.
 
 - **Tab** and **Shift+Tab** indent and outdent. **Enter** keeps the indentation, adds a level after a Python line ending in `:` or an opening HTML/XML tag, and drops a level after `return`, `pass`, `break`, `continue`, or `raise`.
 - **Ctrl+/** (or **Comment**) comments or uncomments the selected lines.
@@ -272,7 +291,7 @@ Choose **Python**, **HTML5**, **XML**, **JavaScript**, **CSS**, **JSON**, or **S
 
 ## Sharing
 
-- **One note:** the share button in the note's toolbar. **Send as text** offers the share sheet, Email, Text message, and Copy, in plain text, Markdown, or Populi markup. **Send as a file** offers Word, web page, Markdown, or text, and code notes can be sent as their own .py, .html, or .xml file.
+- **One note:** **⋯** › **Share** at the top of the note. **Send as text** offers the share sheet, Email, Text message, and Copy, in plain text, Markdown, or Populi markup. **Send as a file** offers Word, web page, Markdown, or text, and code notes can be sent as their own .py, .html, or .xml file.
 - **Several notes:** the share button above the note list shares the list you are looking at (All Notes, a folder, a tag, or search results). Uncheck any notes you want to leave out. A folder's **⋯** menu also has **Share folder**.
 - **One document** puts every note in its own section with its title, folder, tags, and date. Word files start each note on a new page. Web pages include a table of contents.
 - **Separate files (.zip)** keeps your folders and saves each note as its own file: Markdown notes as .md, Populi notes as .txt with Populi markup, and code notes as .py, .html, or .xml. A Contents.txt lists everything.
@@ -293,7 +312,7 @@ The service worker caches the app files. When you change any file, bump `VERSION
 - **Settings › Log** › Download gives a text log of everything the app did, including sync results and errors.
 - **"Test connection"** in Settings › Sync confirms the URL, key, sign-in, and tables are all correct.
 
-## Known limits in v0.13.1
+## Known limits in v0.14.1
 
 - Images can be linked but not attached
 - Sources belong to one note; there is no shared library yet

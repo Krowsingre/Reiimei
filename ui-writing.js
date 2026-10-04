@@ -12,6 +12,7 @@ import * as research from './ui-research.js';
 import * as storyUi from './ui-storyboard.js';
 import * as codingUi from './ui-coding.js';
 import * as modes from './modes.js';
+import * as rich from './ui-rich.js';
 
 const $ = (id) => document.getElementById(id);
 let app = null; // hooks supplied by app.js
@@ -21,7 +22,9 @@ let caret = { start: 0, end: 0 };
 const styleOf = (note) => (note?.meta?.style === 'mla' ? 'mla' : note?.meta?.style === 'apa' ? 'apa' : app.prefs().style);
 const sourcesOf = (note) => note?.meta?.sources || [];
 const citerFor = (note) => C.makeCiter(sourcesOf(note), styleOf(note));
+// Text notes are kept as Markdown underneath, so they share its tools, conversion and exports.
 const fmtOf = (note) => (note?.format === 'populi' ? 'populi' : 'markdown');
+const FORMAT_NAMES = { text: 'Text', markdown: 'Markdown', populi: 'Populi markup' };
 const isCodeNote = (note) => !!note && isCode(note.format);
 
 async function saveMeta(patch) {
@@ -34,16 +37,19 @@ async function saveMeta(patch) {
 // The formatting buttons are sectioned by kind; each section opens from a chip in the toolbar.
 const SECTIONS = { text: ['b', 'i', 'u', 's', 'mark', 'sup', 'sub'], para: ['h', 'ul', 'ol', 'task', 'outdent', 'indent', 'quote'], insert: ['code', 'link'] };
 const ribbonOpen = new Set(); // sections open now; every section starts closed
+// On a phone the ribbon is one scrolling row of chips, and one section at a time opens as a sheet.
+const isPhone = () => window.matchMedia('(max-width: 760px)').matches;
 function syncRibbon() {
   const panels = $('rb-panels');
   document.querySelectorAll('#rb-chips .rb-chip').forEach((chip) => {
     const secs = [...panels.querySelectorAll(`.rb-sec[data-sec="${chip.dataset.sec}"]`)];
-    const live = secs.filter((x) => !x.parentElement.hidden && [...x.querySelectorAll('.tool')].some((b) => !b.hidden));
+    const live = secs.filter((x) => !x.parentElement.hidden && [...x.querySelectorAll('.tool, .rb-row')].some((b) => !b.hidden));
     chip.hidden = !live.length;
-    const open = !!live.length && (ribbonOpen.has(chip.dataset.sec) || (chip.dataset.sec === 'tools' && previewOn));
+    const open = !!live.length && (ribbonOpen.has(chip.dataset.sec) || (chip.dataset.sec === 'view' && previewOn && !isPhone()));
     chip.setAttribute('aria-expanded', String(open));
     secs.forEach((x) => { x.hidden = !(open && live.includes(x)); });
   });
+  $('toolbar').dataset.open = String(!!panels.querySelector('.rb-sec:not([hidden])'));
 }
 const LABELS = { b: 'B', i: 'I', u: 'U', s: 'S', mark: '<span>H</span>', sup: 'x²', sub: 'x₂', h: 'H', ul: '•', ol: '1.', task: '☐', outdent: '⇤', indent: '⇥', quote: '❝', code: '{ }', link: 'Link' };
 
@@ -53,7 +59,7 @@ export function renderToolbar(note) {
   if (!note) { storyUi.renderToolbar(null); codingUi.renderToolbar(null); return; }
   const code = isCodeNote(note);
   const format = fmtOf(note);
-  $('note-format').value = code ? note.format : format;
+  $('note-format').value = code || note.format === 'text' ? note.format : format;
   const ro = !!note.deleted;
   $('note-format').disabled = ro;
   // Code notes get code tools; writing notes get formatting buttons.
@@ -63,9 +69,10 @@ export function renderToolbar(note) {
   $('btn-sources').hidden = code;
   research.renderToolbar(note, code);
   $('btn-paper').hidden = code;
-  const pl = code ? codeUi.previewLabel(note.format) : 'Preview';
+  // Text notes are always shown formatted, so they have no Preview.
+  const pl = code ? codeUi.previewLabel(note.format) : note.format === 'text' ? null : 'Preview';
   $('btn-preview').hidden = !pl;
-  if (code && !pl) previewOn = false;
+  if (!pl) previewOn = false;
   codeUi.render(note);
   const tools = F.TOOLBAR[format];
   const holder = $('tool-buttons');
@@ -85,9 +92,10 @@ export function renderToolbar(note) {
   storyUi.renderToolbar(note, code, previewOn);
   codingUi.renderToolbar(note);
   const fs = $('note-font');
-  fs.hidden = code;
+  $('note-font-row').hidden = code;
   fs.disabled = ro;
   fs.value = ['display', 'echolume', 'serif', 'sans'].includes(note.meta?.font) ? note.meta.font : 'display';
+  rich.render(note);
   syncRibbon();
 }
 
@@ -146,6 +154,7 @@ export function applyEdit(ta, value, start, end) {
 function applyToolById(id) {
   const note = app.note();
   if (!note || note.deleted) return;
+  if (rich.active()) { rich.apply(id); return; }
   const tool = F.TOOLBAR[fmtOf(note)].find((t) => t.id === id);
   if (!tool) return;
   const ta = $('body');
@@ -176,6 +185,7 @@ function applyToolById(id) {
 async function changeFormat(to) {
   const note = app.note();
   if (!note || (note.format || 'markdown') === to) return;
+  if (to === 'text' || note.format === 'text') rich.saveCaret();
   await app.flushSave();
   const current = app.note();
   if (isCode(to) || isCode(current.format)) {
@@ -188,11 +198,19 @@ async function changeFormat(to) {
     app.toast(isCode(to) ? `This note is now ${LANGS[to].label} code` : `This note is now ${to === 'populi' ? 'Populi' : 'Markdown'}`, 'Undo', () => app.update({ format: before }));
     return;
   }
-  const from = fmtOf(current);
+  const from = current.format || 'markdown';
+  // Text and Markdown are the same text underneath, so switching between them changes nothing.
+  if (fmtOf(current) === fmtOf({ format: to })) {
+    previewOn = false;
+    await app.update({ format: to });
+    log.info('format', 'Note type changed', { from, to });
+    app.toast(`This note is now ${FORMAT_NAMES[to]}`, 'Undo', () => app.update({ format: from }));
+    return;
+  }
   const result = to === 'populi' ? F.markdownToPopuli(current.body) : F.populiToMarkdown(current.body);
   if (result.lost.length) {
     const ok = await app.ask({
-      title: `Convert to ${to === 'populi' ? 'Populi markup' : 'Markdown'}?`,
+      title: `Convert to ${FORMAT_NAMES[to]}?`,
       text: `Populi has no equivalent for: ${result.lost.join(', ')}. Everything else carries over exactly. You can undo right after converting.`,
       okText: 'Convert',
     });
@@ -202,7 +220,7 @@ async function changeFormat(to) {
   await app.update({ body: result.text, format: to });
   app.setEditorText(result.text);
   log.info('format', 'Note converted', { from, to, simplified: result.lost });
-  app.toast(`Converted to ${to === 'populi' ? 'Populi' : 'Markdown'}`, 'Undo', async () => {
+  app.toast(`Converted to ${FORMAT_NAMES[to]}`, 'Undo', async () => {
     await app.update(before);
     app.setEditorText(before.body);
     log.info('format', 'Conversion undone');
@@ -238,8 +256,8 @@ async function copyAs(target) {
   const ctx = { cite: citer.cite, ncite: citer.ncite };
   let text;
   if (isCodeNote(note)) text = note.body;
-  else if (target === 'plain') text = plainText(note, ctx) + referencesText(note, 'plain');
-  else text = F.exportNote(note.body, fmtOf(note), target, ctx) + referencesText(note, target);
+  else if (target === 'plain') text = S.titleLine(note) + plainText(note, ctx) + referencesText(note, 'plain');
+  else text = S.titleLine(note, target) + F.exportNote(note.body, fmtOf(note), target, ctx) + referencesText(note, target);
   const ok = await writeClipboard(text);
   $('copy-msg').textContent = ok ? `Copied ${target === 'populi' ? 'for Populi' : target === 'markdown' ? 'as Markdown' : 'as plain text'}.` : 'Copying was blocked. Try again.';
   $('copy-msg').className = `msg ${ok ? 'ok' : 'error'}`;
@@ -437,6 +455,7 @@ function openCite(source) {
 
 function insertAtCaret(text) {
   if (previewOn) { previewOn = false; renderToolbar(app.note()); }
+  if (rich.active()) { rich.insertText(text); return; }
   const ta = $('body');
   const v = ta.value;
   const start = Math.min(caret.start, v.length);
@@ -591,6 +610,7 @@ export function init(hooks) {
   app = hooks;
   codeUi.init(hooks);
   storyUi.init(hooks);
+  rich.init(hooks);
   codingUi.init(hooks);
   research.init(hooks, { renderSources, saveMeta, insertText: (t) => insertAtCaret(t), sourcesOf, styleOf, citerFor });
 
@@ -598,9 +618,13 @@ export function init(hooks) {
     const chip = e.target.closest('.rb-chip');
     if (!chip) return;
     const sec = chip.dataset.sec;
-    if (ribbonOpen.has(sec)) ribbonOpen.delete(sec); else ribbonOpen.add(sec);
+    const wasOpen = chip.getAttribute('aria-expanded') === 'true';
+    if (isPhone()) ribbonOpen.clear();
+    if (wasOpen) ribbonOpen.delete(sec); else ribbonOpen.add(sec);
     syncRibbon();
   });
+  // Buttons in the ribbon keep the text box focused, so a phone keeps its keyboard up.
+  $('toolbar').addEventListener('mousedown', (e) => { if (e.target.closest('.tool, .rb-chip') && (document.activeElement === $('body') || document.activeElement === $('rich'))) e.preventDefault(); });
   $('note-font').addEventListener('change', (e) => {
     const note = app.note();
     if (!note) return;
@@ -731,6 +755,14 @@ export function init(hooks) {
   $('btn-paper-close').addEventListener('click', () => { $('paper-view').hidden = true; });
   $('btn-paper-print').addEventListener('click', () => window.print());
   $('btn-paper-docx2').addEventListener('click', () => downloadDocx(null));
+}
+
+// Put the caret in the note's text (the formatted page for Text notes).
+export function focusText(atStart = false) {
+  if (rich.focus(atStart)) return;
+  const ta = $('body');
+  ta.focus();
+  if (atStart) { ta.setSelectionRange(0, 0); ta.scrollTop = 0; }
 }
 
 export function resetView() {

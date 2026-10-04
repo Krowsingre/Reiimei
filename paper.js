@@ -12,7 +12,7 @@ const plainRuns = (text, extra = {}) => [{ text, ...extra }];
 export function defaultPaper(note) {
   const first = (note.body || '').split('\n').find((l) => l.trim()) || '';
   return {
-    title: first.replace(/^#{1,6}\s+/, '').replace(/[*_#^~+=`]/g, '').trim(),
+    title: String(note.meta?.title || '').trim() || first.replace(/^#{1,6}\s+/, '').replace(/[*_#^~+=`]/g, '').trim(),
     date: new Date().toISOString().slice(0, 10),
     mla: { name: '', instructor: '', course: '' },
     apa: { author: '', affiliation: '', course: '', instructor: '' },
