@@ -66,12 +66,15 @@ export function plainText(note, ctx = citeContext(note)) {
     else if (b.t === 'hr') out.push('* * *');
   });
   walk(blocks);
-  // One blank line between paragraphs, plus one more for each blank line typed on purpose.
+  // A Text note is written line by line (each Enter is a new line), so its lines follow one
+  // another and only the blank lines you typed are blank. Markdown and Populi paragraphs keep a
+  // blank line between them.
+  const sep = note.format === 'text' ? '\n' : '\n\n';
   let text = '';
   let first = true;
   for (const piece of out) {
     if (piece === BLANK) { text += '\n'; continue; }
-    text += (first ? '' : '\n\n') + piece;
+    text += (first ? '' : sep) + piece;
     first = false;
   }
   return text;

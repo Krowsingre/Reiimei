@@ -1,8 +1,15 @@
-# Reiimei v0.16.1
+# Reiimei v0.16.2
 
 *reiimei* (REE-h-may), n. The cold, luminous stillness peculiar to a clear winter night; especially the effect of moonlight upon frost, illuminating the night without dispelling it.
 
 An offline-first notes app for Windows and iPhone, built as a Progressive Web App (PWA). No Mac, no App Store, no developer fee.
+
+## What changed in v0.16.2
+
+- **A Text note is written line by line.** Each Enter starts a new line right under the last one, without the gap that used to follow every line, so a blank line in the note is one you typed. Copying matches it: pasted elsewhere, each line arrives as a line, and only your blank lines are blank (v0.15.2 turned the old gap into a blank line, which put an extra line break between every line). Pasting into a note works the same way in reverse.
+- **Line spacing starts at 1.** Spacing now counts line spacing as a word processor does: 1 is single spacing (the new default), 1.5 is one and a half, 2 is double. If you had set a line spacing before, check it once in Spacing.
+- **The Reiimei page spacing, on every browser.** The definition sits as one centred block in the upper middle of the page, and "Click here to get started." sits well below it, near the bottom of a phone screen. (The earlier layout relied on something older iPhone browsers do not do, so there the line sat right under the example sentence.)
+- Still 86 files. No Supabase changes.
 
 ## What changed in v0.16.1
 
@@ -284,9 +291,9 @@ Then open http://localhost:8000 in Edge or Chrome. Notes work immediately, saved
 
 The iPhone needs an HTTPS address. GitHub Pages hosts the app for free. Only the app's code goes to GitHub; your notes never do.
 
-1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.16.1` folder.
+1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.16.2` folder.
 2. **Create the repository.** In Safari, sign in at github.com, tap **+** › **New repository**. Name it `reiimei`, set it to **Public** (free Pages needs a public repository), and tap **Create repository**.
-3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.16.1` folder, tap **Select**, select all 86 files, and tap **Open**. Scroll down and tap **Commit changes**.
+3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.16.2` folder, tap **Select**, select all 86 files, and tap **Open**. Scroll down and tap **Commit changes**.
    - If you don't see the upload link, tap the **aA** button in Safari's address bar › **Request Desktop Website** and try again.
 4. **Turn on Pages.** In the repository, open **Settings** › **Pages**. Under **Build and deployment**, set Source to **Deploy from a branch**, Branch to **main** and **/ (root)**, then tap **Save**.
 5. **Wait a minute or two**, then reload the Pages screen. It shows your address, which looks like `https://yourname.github.io/reiimei/`.
@@ -391,7 +398,7 @@ The service worker caches the app files. When you change any file, bump `VERSION
 - **Settings › Log** › Download gives a text log of everything the app did, including sync results and errors.
 - **"Test connection"** in Settings › Sync confirms the URL, key, sign-in, and tables are all correct.
 
-## Known limits in v0.16.1
+## Known limits in v0.16.2
 
 - Images can be linked but not attached
 - Sources belong to one note; there is no shared library yet

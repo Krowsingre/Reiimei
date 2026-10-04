@@ -668,8 +668,9 @@ export function init(hooks) {
     const one = closest(s.getRangeAt(0).commonAncestorContainer, 'li, h1, h2, h3, h4, h5, h6');
     if (one && !holder.querySelector('li, h1, h2, h3, h4, h5, h6')) { const w = document.createElement(one.tagName === 'LI' ? 'p' : one.tagName); while (holder.firstChild) w.appendChild(holder.firstChild); holder.appendChild(w); }
     const md = htmlToMarkdown(holder);
-    e.clipboardData.setData('text/plain', plainText({ body: md, format: 'markdown', meta: {} }, {}).replace(/\n/g, '\r\n').replace(/\r\r\n/g, '\r\n'));
-    e.clipboardData.setData('text/html', noteToHtml(md, 'markdown').replace(/<p class="blank">&nbsp;<\/p>/g, '<p><br></p>'));
+    e.clipboardData.setData('text/plain', plainText({ body: md, format: 'text', meta: {} }, {}).replace(/\n/g, '\r\n').replace(/\r\r\n/g, '\r\n'));
+    // Lines, not spaced paragraphs: other apps should not add a gap after each line.
+    e.clipboardData.setData('text/html', noteToHtml(md, 'markdown').replace(/<p class="blank">&nbsp;<\/p>/g, '<p style="margin:0"><br></p>').replace(/<p>/g, '<p style="margin:0">'));
     e.preventDefault();
     if (e.type === 'cut' && box.contentEditable === 'true') {
       // Take the text out by hand (the browser's delete can try to write inline styles), and join
@@ -705,12 +706,11 @@ export function init(hooks) {
       const single = blocks.length === 1 && blocks[0].t === 'p';
       document.execCommand('insertHTML', false, single ? blocks[0].lines.map(inlineHtml).join('<br>') : blocksHtml(blocks));
     } else if (/\n/.test(text)) {
-      // Plain text over several lines: each line a paragraph. Reiimei shows a gap between
-      // paragraphs, so one blank line between them is just that gap; more blank lines are kept.
+      // Plain text over several lines: each line a line, and each empty line a blank line.
       const parts = text.replace(/\r\n?/g, '\n').replace(/\n+$/, '').split(/(\n+)/);
       let html = '';
       for (const part of parts) {
-        if (/^\n+$/.test(part)) { for (let k = 2; k < part.length; k++) html += '<p><br></p>'; continue; }
+        if (/^\n+$/.test(part)) { for (let k = 1; k < part.length; k++) html += '<p><br></p>'; continue; }
         html += `<p>${esc(part) || '<br>'}</p>`;
       }
       document.execCommand('insertHTML', false, html);

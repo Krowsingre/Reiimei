@@ -125,7 +125,9 @@ export function renderToolbar(note) {
 // ---- Spacing ---------------------------------------------------------------------
 // Line height, letter spacing and word spacing for the whole note (meta.lh, meta.ls, meta.ws), or
 // the defaults from Settings › Fonts & Styles when the note has not set its own.
-export const SPACING_DEFAULT = { lh: 1.7, ls: 0.01, ws: 0 };
+// Line spacing is counted as in a word processor: 1 is single spacing, 2 is double.
+export const SPACING_DEFAULT = { lh: 1, ls: 0.01, ws: 0 };
+const SINGLE = 1.25; // the line height of single spacing, in ems
 const num = (v, d) => (Number.isFinite(Number(v)) && v !== null && v !== '' ? Number(v) : d);
 export function spacingOf(note) {
   const p = app.prefs();
@@ -133,11 +135,11 @@ export function spacingOf(note) {
   const m = note?.meta || {};
   return { lh: num(m.lh, d.lh), ls: num(m.ls, d.ls), ws: num(m.ws, d.ws), own: ['lh', 'ls', 'ws'].some((k) => m[k] !== undefined && m[k] !== null) };
 }
-const fmt = { lh: (v) => v.toFixed(2).replace(/0$/, ''), ls: (v) => `${v >= 0 ? '' : '−'}${Math.abs(v).toFixed(2)}`, ws: (v) => `${v >= 0 ? '' : '−'}${Math.abs(v).toFixed(2)}` };
+const fmt = { lh: (v) => String(Math.round(v * 100) / 100), ls: (v) => `${v >= 0 ? '' : '−'}${Math.abs(v).toFixed(2)}`, ws: (v) => `${v >= 0 ? '' : '−'}${Math.abs(v).toFixed(2)}` };
 export function applySpacing(note, live = null) {
   const s = live || spacingOf(note);
   const ed = $('editor');
-  ed.style.setProperty('--lh', String(s.lh));
+  ed.style.setProperty('--lh', String(Math.round(s.lh * SINGLE * 1000) / 1000));
   ed.style.setProperty('--ls', `${s.ls}em`);
   ed.style.setProperty('--ws', `${s.ws}em`);
   $('btn-spacing').textContent = `Line ${fmt.lh(s.lh)}`;

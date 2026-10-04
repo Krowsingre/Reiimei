@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-version="0.16.1">
+<html lang="en" data-version="0.16.2">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -274,11 +274,14 @@
            definition into the splash screen (#splash), so both always match. -->
       <div class="empty-editor" id="empty-editor" role="button" tabindex="0" aria-label="Start a new note">
         <div class="definition">
+          <span class="def-gap top" aria-hidden="true"></span>
           <p class="word">reiimei</p>
           <p class="say">REE-h-may &middot; <span class="pos">n.</span></p>
           <p class="sense">The cold, luminous stillness peculiar to a clear winter night; especially the effect of moonlight upon frost, illuminating the night without dispelling it.</p>
           <p class="eg">There was reiimei over the orchard that night.</p>
+          <span class="def-gap mid" aria-hidden="true"></span>
           <p class="hint-line">Select a note, or click here to start a new one.</p>
+          <span class="def-gap end" aria-hidden="true"></span>
         </div>
       </div>
     </main>
@@ -411,7 +414,7 @@
       <div class="set-group">
         <h4 class="set-head">Spacing</h4>
         <p class="set-help">For every note that has not set its own (use Spacing in a note's toolbar for one note).</p>
-        <div class="set-row"><label for="pref-lh">Line height</label><span class="range-wrap"><input type="range" id="pref-lh" min="1" max="2.6" step="0.05"><output id="pref-lh-v"></output></span></div>
+        <div class="set-row"><label for="pref-lh">Line spacing</label><span class="range-wrap"><input type="range" id="pref-lh" min="1" max="3" step="0.05"><output id="pref-lh-v"></output></span></div>
         <div class="set-row"><label for="pref-ls">Letters</label><span class="range-wrap"><input type="range" id="pref-ls" min="-0.05" max="0.3" step="0.01"><output id="pref-ls-v"></output></span></div>
         <div class="set-row"><label for="pref-ws">Words</label><span class="range-wrap"><input type="range" id="pref-ws" min="-0.1" max="1" step="0.05"><output id="pref-ws-v"></output></span></div>
         <div class="set-row"><span></span><span><button type="button" class="text-btn" id="pref-spacing-reset">Back to the usual spacing</button></span></div>
@@ -556,7 +559,7 @@
   <!-- Spacing for one note -->
   <dialog id="spacing-dialog" class="menu-sheet spacing-sheet" aria-labelledby="spacing-title">
     <p class="ms-title" id="spacing-title">Spacing for this note</p>
-    <label class="sp-row"><span>Line height</span><input type="range" id="sp-lh" min="1" max="2.6" step="0.05"><output id="sp-lh-v"></output></label>
+    <label class="sp-row"><span>Line spacing</span><input type="range" id="sp-lh" min="1" max="3" step="0.05"><output id="sp-lh-v"></output></label>
     <label class="sp-row"><span>Letters</span><input type="range" id="sp-ls" min="-0.05" max="0.3" step="0.01"><output id="sp-ls-v"></output></label>
     <label class="sp-row"><span>Words</span><input type="range" id="sp-ws" min="-0.1" max="1" step="0.05"><output id="sp-ws-v"></output></label>
     <div class="row sp-actions"><button type="button" class="text-btn" id="sp-reset">Use the defaults</button><span class="spacer"></span><button type="button" class="btn small" id="sp-done">Done</button></div>

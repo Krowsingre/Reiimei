@@ -1214,3 +1214,33 @@ input.switch:disabled { opacity: .5; cursor: default; }
 }
 .toolbar .spacing-btn { height: auto; min-height: 32px; padding: 6px 12px; border: 1px solid var(--rule); border-radius: 8px; background: var(--paper); color: var(--ink); font-size: 14px; }
 .toolbar .spacing-btn:hover { background: var(--paper-3); }
+
+/* ---- v0.16.2: a Text note is written line by line ---- */
+/* Each Enter is a new line with no gap after it; blank lines are the ones you type. Line spacing
+   (Spacing) sets how far apart the lines are, 1 being single spacing. */
+.rich p, .rich ul, .rich ol, .rich blockquote { margin: 0; }
+.rich li { margin: 0; }
+.rich pre, .rich .raw-block, .rich hr { margin: .3em 0; }
+.rich h1, .rich h2, .rich h3, .rich h4, .rich h5, .rich h6 { margin: .3em 0 .1em; }
+.rich > :first-child { margin-top: 0; }
+
+/* The Reiimei page, laid out with spacers in a full-height column (rather than grid rows, which
+   older Safari did not stretch): the definition sits in the upper middle as one centred block,
+   and the "click" line sits well below it, near the bottom on a phone. */
+.empty-editor .definition { display: flex; flex-direction: column; height: auto; min-height: 0; align-self: stretch; }
+.empty-editor .definition > * { flex: none; grid-row: auto; }
+.empty-editor .definition > .def-gap { display: block; }
+.empty-editor .definition > .def-gap.top { flex: 1 1 0; }
+.empty-editor .definition > .def-gap.mid { flex: 1.4 1 0; min-height: 28px; }
+.empty-editor .definition > .def-gap.end { flex: .45 1 0; }
+.empty-editor .definition .hint-line { margin: 0; }
+@media (max-width: 760px) {
+  .empty-editor .definition > .def-gap.top { flex: 1 1 0; }
+  .empty-editor .definition > .def-gap.mid { flex: 2.6 1 0; min-height: 32px; }
+  .empty-editor .definition > .def-gap.end { flex: .3 1 0; }
+}
+/* A computer's splash shows the definition alone, simply centred. */
+@media (min-width: 761px) {
+  .splash .definition > .def-gap.mid { flex: 0 0 0; min-height: 0; }
+  .splash .definition > .def-gap.end { flex: 1 1 0; }
+}

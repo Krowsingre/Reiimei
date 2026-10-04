@@ -13,7 +13,7 @@ import { isCode } from './code.js';
 import * as fonts from './fonts.js';
 import { noteTitle, noteSnippet, ownTitle, fallbackTitle, sharedFileCheck } from './share.js';
 
-export const APP_VERSION = '0.16.1';
+export const APP_VERSION = '0.16.2';
 // boot.js compares this with the page's version to catch a launch that mixes two releases.
 window.__reiimeiVersion = APP_VERSION;
 export const BUILD_DATE = '2026-10-04';
@@ -1662,7 +1662,7 @@ function renderDiagnostics() {
 function renderSpacingSettings() {
   const d = writing.SPACING_DEFAULT;
   const v = { lh: prefs().lh ?? d.lh, ls: prefs().ls ?? d.ls, ws: prefs().ws ?? d.ws };
-  for (const k of ['lh', 'ls', 'ws']) { $(`pref-${k}`).value = String(v[k]); $(`pref-${k}-v`).textContent = k === 'lh' ? Number(v[k]).toFixed(2).replace(/0$/, '') : `${Number(v[k]).toFixed(2)} em`; }
+  for (const k of ['lh', 'ls', 'ws']) { $(`pref-${k}`).value = String(v[k]); $(`pref-${k}-v`).textContent = k === 'lh' ? String(Math.round(Number(v[k]) * 100) / 100) : `${Number(v[k]).toFixed(2)} em`; }
 }
 const hiddenFonts = () => (Array.isArray(prefs().hiddenFonts) ? prefs().hiddenFonts.filter((x) => fonts.FONT_IDS.includes(x)) : []);
 function renderFontSettings() {
