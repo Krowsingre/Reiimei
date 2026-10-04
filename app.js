@@ -13,7 +13,7 @@ import { isCode } from './code.js';
 import * as fonts from './fonts.js';
 import { noteTitle, noteSnippet, ownTitle, fallbackTitle, sharedFileCheck } from './share.js';
 
-export const APP_VERSION = '0.14.6';
+export const APP_VERSION = '0.15.0';
 export const BUILD_DATE = '2026-10-04';
 
 const $ = (id) => document.getElementById(id);
@@ -132,7 +132,24 @@ const isPurged = (n) => n.deleted && !n.locked && !(n.body || '').trim() && !own
 const isBlank = (n) => !(n.body || '').trim() && !ownTitle(n);
 const trashNotes = () => state.notes.filter((n) => n.deleted && !isPurged(n) && !isRegistry(n));
 const anyFolders = () => state.folders.filter((f) => !f.deleted);
-const liveFolders = () => anyFolders().filter((f) => !modes.isProject(f)).sort((a, b) => a.name.localeCompare(b.name));
+const liveFolders = () => anyFolders().filter((f) => !modes.isProject(f)).sort((a, b) => modes.projectName(a).localeCompare(modes.projectName(b)));
+// Subfolders (Notes mode, one level). A folder's parent counts only while it is a live top-level folder.
+function parentOf(f) {
+  const p = folderById(modes.parentIdOf(f));
+  return p && !modes.isProject(p) && !modes.parentIdOf(p) ? p : null;
+}
+const childrenOf = (f) => liveFolders().filter((c) => parentOf(c)?.id === f.id);
+// Top-level folders, each followed by its subfolders.
+function folderTree() {
+  const out = [];
+  for (const f of liveFolders().filter((x) => !parentOf(x))) {
+    const kids = childrenOf(f);
+    out.push({ f, depth: 0, kids: kids.length });
+    kids.forEach((k) => out.push({ f: k, depth: 1, kids: 0 }));
+  }
+  return out;
+}
+const closedFolders = () => (Array.isArray(prefs().closedFolders) ? prefs().closedFolders : []);
 const liveProjects = (mode = state.mode) => anyFolders().filter((f) => modes.isProject(f, mode)).sort((a, b) => modes.projectName(a).localeCompare(modes.projectName(b)));
 const folderById = (id) => anyFolders().find((f) => f.id === id);
 // A Research note's project gives it a tag automatically. It is worked out, not stored, so
@@ -240,6 +257,16 @@ function groupLabel(n) {
   return null;
 }
 
+function applyRail() {
+  const on = !!prefs().rail;
+  el.app.dataset.rail = on ? 'on' : 'off';
+  const b = $('btn-rail');
+  b.setAttribute('aria-pressed', String(on));
+  b.title = on ? 'Show the sidebar' : 'Fold the sidebar to icons';
+  b.setAttribute('aria-label', b.title);
+  writing.fitToolbar();
+}
+
 function setMobileView(view) {
   el.app.dataset.mobileView = view;
   if (view === 'editor') fitTitle();
@@ -335,8 +362,9 @@ function sideItem(filter, icon, name, count, withMore = false) {
   li.innerHTML = `${ICONS[icon]}<span class="name">${esc(name)}</span>` +
     (withMore ? `<button class="icon-btn more" aria-label="Folder options">${ICONS.more}</button>` : '') +
     `<span class="count">${count}</span>`;
+  li.title = name;
   li.addEventListener('click', (e) => {
-    if (e.target.closest('.more')) return;
+    if (e.target.closest('.more, .sub-toggle')) return;
     selectFilter(filter);
   });
   return li;
@@ -352,20 +380,37 @@ function renderSidebar() {
   const folders = research ? liveProjects() : liveFolders();
   renderModeSwitch();
   $('folders-label').textContent = research ? 'Projects' : 'Folders';
-  $('btn-new-folder').textContent = 'New';
   $('btn-new-folder').title = research ? 'New project' : 'New folder';
+  $('btn-new-folder').setAttribute('aria-label', research ? 'New project' : 'New folder');
   const folderIds = new Set(folders.map((f) => f.id));
   el.smartList.replaceChildren(
     sideItem({ type: 'all' }, 'all', allLabel(), act.length),
     sideItem({ type: 'device' }, 'device', 'This device', act.filter((n) => originOf(n)?.id === device().id).length),
   );
 
-  el.folderList.replaceChildren(...folders.map((f) => {
+  const closed = closedFolders();
+  const rows = research ? folders.map((f) => ({ f, depth: 0, kids: 0 })) : folderTree();
+  el.folderList.replaceChildren(...rows.filter(({ f, depth }) => !(depth && closed.includes(parentOf(f).id))).map(({ f, depth, kids }) => {
     const li = sideItem({ type: 'folder', id: f.id }, 'folder', modes.projectName(f), act.filter((n) => n.folder_id === f.id).length, true);
-    li.querySelector('.more').addEventListener('click', () => folderMenu(f));
+    if (depth) li.classList.add('sub');
+    if (kids) {
+      const open = !closed.includes(f.id);
+      const t = document.createElement('button');
+      t.className = 'sub-toggle';
+      t.setAttribute('aria-expanded', String(open));
+      t.setAttribute('aria-label', `${open ? 'Hide' : 'Show'} the subfolders of ${modes.projectName(f)}`);
+      t.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
+      t.addEventListener('click', () => { setPrefs({ closedFolders: open ? [...closed, f.id] : closed.filter((x) => x !== f.id) }); renderSidebar(); });
+      li.prepend(t);
+      li.classList.add('has-sub');
+    }
+    li.querySelector('.more').addEventListener('click', (e) => folderMenu(f, e.currentTarget));
     return li;
   }));
   if (!folders.length) el.folderList.innerHTML = `<li class="side-empty">${research ? 'No projects yet' : 'No folders yet'}</li>`;
+  const foldersOpen = prefs().foldersOpen !== false;
+  for (const id of ['btn-folders-toggle', 'btn-folders-chevron']) $(id).setAttribute('aria-expanded', String(foldersOpen));
+  el.folderList.hidden = !foldersOpen;
 
   const tags = tagCounts();
   el.tagList.replaceChildren(...tags.map(([t, c]) => {
@@ -400,7 +445,7 @@ function renderModeSwitch() {
   box.innerHTML = modes.MODES.map((m) => {
     const on = m.id === state.mode;
     const c = act.filter((n) => modes.kindOf(n) === m.id).length;
-    return `<button class="mode-btn${on ? ' on' : ''}" role="tab" aria-selected="${on}" data-mode="${m.id}" title="${m.name} (Ctrl+${m.key}) · ${c} ${c === 1 ? 'note' : 'notes'}">${esc(m.name)}</button>`;
+    return `<button class="mode-btn${on ? ' on' : ''}" role="tab" aria-selected="${on}" data-mode="${m.id}" data-short="${esc(m.name[0])}" title="${m.name} (Ctrl+${m.key}) · ${c} ${c === 1 ? 'note' : 'notes'}">${esc(m.name)}</button>`;
   }).join('');
 }
 
@@ -979,12 +1024,14 @@ async function removeTag(tag) {
   }
 }
 
-async function newFolder() {
+async function newFolder(parentId = null) {
   const research = modes.hasProjects(state.mode);
-  const r = await ask({ title: research ? 'New project' : 'New folder', value: '', placeholder: research ? 'Project name' : 'Folder name', okText: 'Create' });
+  const parent = research || typeof parentId !== 'string' ? null : folderById(parentId);
+  const r = await ask({ title: research ? 'New project' : parent ? `New subfolder in ${modes.projectName(parent)}` : 'New folder', value: '', placeholder: research ? 'Project name' : 'Folder name', okText: 'Create' });
   if (r.action !== 'ok' || !r.value.trim()) return;
   if (research && liveProjects(state.mode).some((p) => modes.projectName(p).toLowerCase() === r.value.trim().toLowerCase())) { toast('A project with that name already exists.'); return; }
-  const f = await db.createFolder(research ? modes.projectStored(r.value, state.mode) : r.value.slice(0, 80));
+  const f = await db.createFolder(research ? modes.projectStored(r.value, state.mode) : modes.folderStored(r.value, parent?.id || null));
+  if (parent) setPrefs({ closedFolders: closedFolders().filter((x) => x !== parent.id) });
   replaceFolder(f);
   if (research) setPrefs({ [lastProjectKey(state.mode)]: f.id });
   await selectFilter({ type: 'folder', id: f.id });
@@ -1080,43 +1127,94 @@ async function fixResearchNotes() {
   }
 }
 
-async function folderMenu(folder) {
+async function folderMenu(folder, anchor) {
   const proj = modes.isProject(folder);
-  const label = proj ? modes.projectName(folder) : folder.name;
-  const r = await ask({ title: proj ? 'Project' : 'Folder', value: label, okText: 'Rename', extra: proj ? 'Delete project' : 'Delete folder', extra2: proj ? 'Share project' : 'Share folder' });
-  if (r.action === 'extra2') {
-    shareUi.open(activeNotes().filter((n) => n.folder_id === folder.id), { title: label, single: false });
-    return;
+  const label = modes.projectName(folder);
+  const kids = proj ? [] : childrenOf(folder);
+  const parent = proj ? null : parentOf(folder);
+  const notesIn = (ids) => activeNotes().filter((n) => ids.includes(n.folder_id));
+  const items = [
+    { label: 'Rename…', run: () => renameFolder(folder) },
+  ];
+  // Folders in Notes go one level deep: a folder at the top can hold subfolders.
+  if (!proj && !parent) items.push({ label: 'New subfolder…', run: () => newFolder(folder.id) });
+  if (!proj) {
+    items.push(kids.length
+      ? { label: 'Move to…', hint: 'Has subfolders', disabled: true }
+      : { label: 'Move to…', run: () => moveFolderMenu(folder, anchor) });
   }
-  if (r.action === 'ok' && r.value && r.value !== label) {
-    if (proj && liveProjects(modes.projectKind(folder)).some((p) => p.id !== folder.id && modes.projectName(p).toLowerCase() === r.value.trim().toLowerCase())) { toast('A project with that name already exists.'); return; }
-    replaceFolder(await db.saveFolder(folder, { name: proj ? modes.projectStored(r.value, modes.projectKind(folder)) : r.value.slice(0, 80) }));
-    render();
-    scheduleSync();
-  } else if (r.action === 'extra') {
-    const inside = activeNotes().filter((n) => n.folder_id === folder.id);
-    if (proj && label === modes.UNSORTED && inside.length) { toast('Move the notes in Unsorted to other projects first.'); return; }
-    const c = await ask({ title: `Delete "${label}"?`, text: proj ? `Its notes will move to the Unsorted project. They will not be deleted.${modes.projectKind(folder) === 'storyboard' ? ' Its registers (characters, locations and so on) will be deleted.' : modes.projectKind(folder) === 'coding' ? ' Its snippets will be deleted.' : ''}` : 'Notes in this folder will move to Notes. They will not be deleted.', okText: proj ? 'Delete project' : 'Delete folder' });
-    if (c.action !== 'ok') return;
-    if (proj && inside.length) {
-      const dest = await ensureUnsorted(modes.projectKind(folder));
-      for (const n of inside) replaceNote(await db.saveNote(n, { folder_id: dest.id }));
-    }
-    if (proj) await dropRegistry(folder.id);
-    await db.deleteFolder(folder);
-    state.notes = await db.getAll('notes');
-    state.folders = await db.getAll('folders');
-    if (state.filter.id === folder.id) state.filter = { type: 'all' };
-    render();
-    scheduleSync();
+  items.push({ label: proj ? 'Share project' : 'Share folder', run: () => shareUi.open(notesIn([folder.id, ...kids.map((k) => k.id)]), { title: label, single: false }) });
+  items.push({ label: proj ? 'Delete project' : 'Delete folder', danger: true, run: () => deleteFolderAsk(folder) });
+  openMenu(anchor, proj ? 'Project' : parent ? `Subfolder of ${modes.projectName(parent)}` : 'Folder', items);
+}
+
+async function renameFolder(folder) {
+  const proj = modes.isProject(folder);
+  const label = modes.projectName(folder);
+  const r = await ask({ title: proj ? 'Rename project' : 'Rename folder', value: label, okText: 'Rename' });
+  if (r.action !== 'ok' || !r.value || r.value === label) return;
+  if (proj && liveProjects(modes.projectKind(folder)).some((p) => p.id !== folder.id && modes.projectName(p).toLowerCase() === r.value.trim().toLowerCase())) { toast('A project with that name already exists.'); return; }
+  replaceFolder(await db.saveFolder(folder, { name: proj ? modes.projectStored(r.value, modes.projectKind(folder)) : modes.folderStored(r.value, parentOf(folder)?.id || null) }));
+  render();
+  scheduleSync();
+}
+
+// Put a folder inside another top-level folder, or back at the top.
+function moveFolderMenu(folder, anchor) {
+  const here = parentOf(folder)?.id || null;
+  const items = [{ label: 'Top level', hint: 'Not inside a folder', checked: !here, run: () => moveFolder(folder, null) }];
+  for (const f of liveFolders().filter((x) => !parentOf(x) && x.id !== folder.id)) items.push({ label: modes.projectName(f), checked: here === f.id, run: () => moveFolder(folder, f.id) });
+  openMenu(anchor, `Move "${modes.projectName(folder)}" to`, items);
+}
+async function moveFolder(folder, parentId) {
+  if ((parentOf(folder)?.id || null) === parentId) return;
+  replaceFolder(await db.saveFolder(folder, { name: modes.folderStored(modes.projectName(folder), parentId) }));
+  if (parentId) setPrefs({ closedFolders: closedFolders().filter((x) => x !== parentId) });
+  log.info('folders', 'Folder moved', { into: parentId ? 'folder' : 'top level' });
+  render();
+  scheduleSync();
+}
+
+// Deleting never loses a note. A project's notes go to its Unsorted project. A folder's notes go
+// to Notes, and its subfolders move up to the top level with their notes. A subfolder's notes go
+// to the folder it was in.
+async function deleteFolderAsk(folder) {
+  const proj = modes.isProject(folder);
+  const label = modes.projectName(folder);
+  const inside = activeNotes().filter((n) => n.folder_id === folder.id);
+  if (proj && label === modes.UNSORTED && inside.length) { toast('Move the notes in Unsorted to other projects first.'); return; }
+  const kids = proj ? [] : childrenOf(folder);
+  const parent = proj ? null : parentOf(folder);
+  const text = proj
+    ? `Its notes will move to the Unsorted project. They will not be deleted.${modes.projectKind(folder) === 'storyboard' ? ' Its registers (characters, locations and so on) will be deleted.' : modes.projectKind(folder) === 'coding' ? ' Its snippets will be deleted.' : ''}`
+    : parent
+      ? `Its notes will move to "${modes.projectName(parent)}". They will not be deleted.`
+      : `Notes in this folder will move to Notes. They will not be deleted.${kids.length ? ` Its ${kids.length === 1 ? 'subfolder moves' : `${kids.length} subfolders move`} to the top level, with ${kids.length === 1 ? 'its' : 'their'} notes.` : ''}`;
+  const c = await ask({ title: `Delete "${label}"?`, text, okText: proj ? 'Delete project' : 'Delete folder' });
+  if (c.action !== 'ok') return;
+  if (proj && inside.length) {
+    const dest = await ensureUnsorted(modes.projectKind(folder));
+    for (const n of inside) replaceNote(await db.saveNote(n, { folder_id: dest.id }));
   }
+  if (parent) for (const n of inside) replaceNote(await db.saveNote(n, { folder_id: parent.id }));
+  for (const k of kids) replaceFolder(await db.saveFolder(k, { name: modes.folderStored(modes.projectName(k), null) }));
+  if (proj) await dropRegistry(folder.id);
+  await db.deleteFolder(folder);
+  state.notes = await db.getAll('notes');
+  state.folders = await db.getAll('folders');
+  log.info('folders', 'Folder deleted', { subfolders: kids.length, notes: inside.length });
+  if (state.filter.id === folder.id) state.filter = parent ? { type: 'folder', id: parent.id } : { type: 'all' };
+  render();
+  scheduleSync();
 }
 
 // ---- Note header: folder label and the ⋯ menu ---------------------------------------
 function folderLabel(n) {
   const f = folderById(n.folder_id);
   if (modes.hasProjects(modes.kindOf(n))) return f ? modes.projectName(f) : modes.UNSORTED;
-  return f && !modes.isProject(f) ? f.name : 'Notes';
+  if (!f || modes.isProject(f)) return 'Notes';
+  const p = parentOf(f);
+  return p ? `${modes.projectName(p)} › ${modes.projectName(f)}` : modes.projectName(f);
 }
 
 // One menu for both: a list under its button on a wide screen, a sheet from the bottom on a
@@ -1128,7 +1226,7 @@ function openMenu(anchor, title, items) {
   $('menu-title').textContent = title;
   $('menu-items').innerHTML = items.map((it, i) => (it.heading
     ? `<p class="ms-head">${esc(it.heading)}</p>`
-    : `<button type="button" class="ms-item${it.danger ? ' danger' : ''}" role="${it.checked !== undefined ? 'menuitemradio' : 'menuitem'}"${it.checked !== undefined ? ` aria-checked="${!!it.checked}"` : ''} data-i="${i}"${it.disabled ? ' disabled' : ''}><span class="ms-label">${esc(it.label)}</span>${it.hint ? `<span class="ms-hint">${esc(it.hint)}</span>` : ''}</button>`)).join('');
+    : `<button type="button" class="ms-item${it.danger ? ' danger' : ''}${it.indent ? ' sub' : ''}" role="${it.checked !== undefined ? 'menuitemradio' : 'menuitem'}"${it.checked !== undefined ? ` aria-checked="${!!it.checked}"` : ''} data-i="${i}"${it.disabled ? ' disabled' : ''}><span class="ms-label">${esc(it.label)}</span>${it.hint ? `<span class="ms-hint">${esc(it.hint)}</span>` : ''}</button>`)).join('');
   dlg.style.top = '';
   dlg.style.left = '';
   dlg.showModal();
@@ -1164,7 +1262,7 @@ function openFolderMenu() {
   const folders = proj ? liveProjects(kind) : liveFolders();
   const items = [];
   if (!proj) items.push({ label: 'Notes', hint: 'No folder', checked: !folders.some((f) => f.id === n.folder_id), run: () => moveToFolder(null) });
-  for (const f of folders) items.push({ label: modes.projectName(f), checked: f.id === n.folder_id, run: () => moveToFolder(f.id) });
+  for (const { f, depth } of proj ? folders.map((f) => ({ f, depth: 0 })) : folderTree()) items.push({ label: modes.projectName(f), indent: depth > 0, checked: f.id === n.folder_id, run: () => moveToFolder(f.id) });
   // Moving a note to another mode lives here now that the mode menu has left the note header.
   items.push({ heading: 'Move to another mode' });
   for (const m of modes.MODES.filter((x) => x.id !== kind)) items.push({ label: m.name, run: () => moveToMode(m.id) });
@@ -1485,6 +1583,34 @@ function renderDiagnostics() {
     `<tr><td class="${r.status}">${mark[r.status]}</td><td>${esc(r.name)}</td><td>${esc(r.detail)}</td></tr>`).join('');
 }
 
+// ---- Settings › Fonts & Styles -----------------------------------------------
+const hiddenFonts = () => (Array.isArray(prefs().hiddenFonts) ? prefs().hiddenFonts.filter((x) => fonts.FONT_IDS.includes(x)) : []);
+function renderFontSettings() {
+  const hidden = hiddenFonts();
+  fonts.fillFontSelect($('pref-ui-font'), { hidden, current: fonts.uiFontId(prefs().uiFont) });
+  fonts.fillFontSelect($('pref-note-font'), { hidden, current: fonts.fontId(prefs().noteFont) });
+  $('font-packs').innerHTML = fonts.PACKS.map((p) => {
+    const list = fonts.FONTS.filter((f) => f.pack === p.id);
+    const on = list.filter((f) => !hidden.includes(f.id)).length;
+    return `<fieldset class="font-pack"><legend>${esc(p.name)} <span class="n">${on} of ${list.length}</span></legend>
+      <div class="row"><button type="button" class="text-btn" data-pack="${p.id}" data-pack-all="all">All</button><button type="button" class="text-btn" data-pack="${p.id}" data-pack-all="none">None</button></div>
+      ${list.map((f) => `<label class="check font-pick"><input type="checkbox" data-font="${f.id}"${hidden.includes(f.id) ? '' : ' checked'}> <span class="f-run" data-font="${f.id}">${esc(f.name)}</span></label>`).join('')}</fieldset>`;
+  }).join('');
+}
+// Show or leave out fonts. At least one font always stays on offer.
+function setFontShown(ids, show) {
+  let hidden = new Set(hiddenFonts());
+  ids.forEach((id) => (show ? hidden.delete(id) : hidden.add(id)));
+  if (hidden.size >= fonts.FONT_IDS.length) {
+    hidden.delete(ids.includes(fonts.DEFAULT_FONT) ? fonts.DEFAULT_FONT : ids[0]);
+    setMsg('fonts-msg', 'At least one font stays on offer.', 'error');
+  } else setMsg('fonts-msg', '');
+  setPrefs({ hiddenFonts: [...hidden] });
+  log.info('prefs', 'Fonts on offer changed', { hidden: hidden.size });
+  renderFontSettings();
+  writing.renderToolbar(currentNote());
+}
+
 // ---- Settings ----------------------------------------------------------
 function setMsg(id, text, kind = '') {
   const m = $(id);
@@ -1527,7 +1653,7 @@ function openSettings(tab = 'sync', explicitTab = tab !== 'sync') {
   security.renderSettings();
   $('pref-format').value = prefs().format;
   $('pref-style').value = prefs().style;
-  $('pref-ui-font').value = fonts.uiFontId(prefs().uiFont);
+  renderFontSettings();
   renderDiagnostics();
   $('log-view').textContent = log.exportText() || '(empty)';
   showTab(tab);
@@ -1693,14 +1819,23 @@ function bindEvents() {
   });
   $('pref-format').addEventListener('change', (e) => { setPrefs({ format: e.target.value }); log.info('prefs', 'Default format changed', { format: e.target.value }); });
   $('pref-style').addEventListener('change', (e) => { setPrefs({ style: e.target.value }); log.info('prefs', 'Default citation style changed', { style: e.target.value }); });
-  fonts.fillFontSelect($('pref-ui-font'));
+  $('pref-note-font').addEventListener('change', (e) => { setPrefs({ noteFont: e.target.value }); log.info('prefs', 'Font for new notes changed', { font: e.target.value }); });
+  $('font-packs').addEventListener('change', (e) => { const id = e.target.dataset?.font; if (id) setFontShown([id], e.target.checked); });
+  $('font-packs').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-pack-all]');
+    if (b) setFontShown(fonts.FONTS.filter((f) => f.pack === b.dataset.pack).map((f) => f.id), b.dataset.packAll === 'all');
+  });
   $('pref-ui-font').addEventListener('change', (e) => {
     setPrefs({ uiFont: e.target.value });
     fonts.applyUiFont(e.target.value);
+    writing.fitToolbar();
     log.info('prefs', 'Interface font changed', { font: e.target.value });
   });
   $('btn-new-note').addEventListener('click', newNote);
-  $('btn-new-folder').addEventListener('click', newFolder);
+  $('btn-new-folder').addEventListener('click', () => newFolder());
+  for (const id of ['btn-folders-toggle', 'btn-folders-chevron']) $(id).addEventListener('click', () => { setPrefs({ foldersOpen: prefs().foldersOpen === false }); renderSidebar(); });
+  // The sidebar folds to a narrow rail of icons on a computer (remembered on this device).
+  $('btn-rail').addEventListener('click', () => { setPrefs({ rail: !prefs().rail }); applyRail(); });
   $('btn-back-sidebar').addEventListener('click', () => setMobileView('sidebar'));
   $('btn-back-list').addEventListener('click', async () => { await flushSave(); if (state.currentId) await discardIfBlank(state.currentId); state.currentId = null; render(); setMobileView('list'); });
   $('btn-copy-version').addEventListener('click', async () => {
@@ -1961,7 +2096,12 @@ const hooks = {
   projects: (mode = 'research') => liveProjects(mode).map((f) => ({ id: f.id, name: modes.projectName(f) })),
   projectNotes: (folderId, mode = 'research') => activeNotes().filter((n) => n.folder_id === folderId && !n.locked && modes.kindOf(n) === mode),
   updateNote: async (n, changes) => { replaceNote(await db.saveNote(n, changes)); render(); scheduleSync(); },
-  folders: () => state.folders.map((f) => (modes.isProject(f) ? { ...f, name: modes.projectName(f) } : f)),
+  // For sharing: display names, with a subfolder as "Parent / Child" (and a folder inside a folder in archives).
+  folders: () => state.folders.map((f) => {
+    const p = modes.isProject(f) ? null : parentOf(f);
+    const name = modes.projectName(f);
+    return { ...f, name: p ? `${modes.projectName(p)} / ${name}` : name, path: p ? [modes.projectName(p), name] : [name] };
+  }),
   encrypted: () => security.isEnabled(),
 };
 
@@ -1971,6 +2111,7 @@ async function boot() {
   log.info('boot', `Reiimei ${APP_VERSION} starting`);
   try {
     fonts.applyUiFont(prefs().uiFont);
+    applyRail();
     bindEvents();
     trackViewport();
     writing.init(hooks);

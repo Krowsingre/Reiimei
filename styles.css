@@ -967,3 +967,100 @@ body { font-synthesis: none; }
 
 /* ---- v0.14.6: Ilunir replaces Lunarian; Echolume is the interface font unless you choose another ---- */
 :root[data-ui-font="display"] { --ui: var(--display); --head-font: var(--display); }
+
+/* ---- v0.15.0 ---- */
+/* The Reiimei name follows the interface font (the definition page keeps Reiimei Display). */
+.brand { font-family: var(--ui); }
+
+/* Folders: a "+" and a chevron at the right of the heading, like the Tags heading's chevron. */
+.side-head { gap: 2px; padding-right: 4px; }
+.side-head .side-toggle { flex: 1; width: auto; padding: 0; font: inherit; letter-spacing: inherit; color: inherit; }
+.side-icon { display: inline-grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 6px; background: none; color: inherit; cursor: pointer; }
+.side-icon:hover { background: var(--paper-3); color: var(--ink); }
+.side-icon svg { width: 16px; height: 16px; transition: transform .15s; }
+.side-chevron[aria-expanded="false"] svg { transform: rotate(-90deg); }
+/* Subfolders sit under their folder; a folder with subfolders has a chevron in front of it. */
+#folder-list .side-item { position: relative; padding-left: 20px; }
+#folder-list .side-item.sub { padding-left: 40px; }
+.sub-toggle { position: absolute; left: 2px; top: 50%; transform: translateY(-50%); display: inline-grid; place-items: center; width: 17px; height: 22px; padding: 0; border: 0; border-radius: 4px; background: none; color: inherit; cursor: pointer; }
+.sub-toggle:hover { background: var(--paper-3); }
+.sub-toggle svg { width: 13px; height: 13px; transition: transform .15s; }
+.sub-toggle[aria-expanded="false"] svg { transform: rotate(-90deg); }
+.ms-item.sub { padding-left: 28px; }
+
+/* The sidebar folded to a rail of icons (computer only). */
+@media (min-width: 761px) {
+  .app[data-rail="on"] { grid-template-columns: 58px 320px 1fr; }
+  .app[data-rail="on"] .sidebar .pane-head { flex-direction: column; gap: 4px; padding: 10px 0; }
+  .app[data-rail="on"] .brand { display: none; }
+  .app[data-rail="on"] #btn-rail svg { transform: scaleX(-1); }
+  .app[data-rail="on"] .mode-switch { grid-template-columns: 1fr; padding: 0 9px 8px; }
+  .app[data-rail="on"] .mode-btn { font-size: 0; padding: 6px 0; }
+  .app[data-rail="on"] .mode-btn::before { content: attr(data-short); font-size: 13px; }
+  .app[data-rail="on"] .side-scroll { padding: 4px 6px 16px; }
+  .app[data-rail="on"] .side-label, .app[data-rail="on"] #tag-section, .app[data-rail="on"] .side-item.sub, .app[data-rail="on"] .side-empty, .app[data-rail="on"] #sync-text { display: none; }
+  .app[data-rail="on"] .side-item, .app[data-rail="on"] #folder-list .side-item { justify-content: center; padding: 9px 0; }
+  .app[data-rail="on"] .side-item .name, .app[data-rail="on"] .side-item .count, .app[data-rail="on"] .side-item .more, .app[data-rail="on"] .sub-toggle { display: none; }
+  .app[data-rail="on"] .side-section { margin-top: 10px; }
+  .app[data-rail="on"] .sync-foot { justify-content: center; }
+}
+
+/* The toolbar groups stay on one line: --tb (set by ui-writing.js) scales them down to fit. */
+@media (min-width: 761px) {
+  .toolbar { --tb: 1; }
+  .rb-panels { gap: calc(8px * var(--tb)); }
+  .rb-sec[data-label] { flex: none; flex-wrap: nowrap; gap: calc(4px * var(--tb)); padding: calc(19px * var(--tb)) calc(6px * var(--tb)) calc(6px * var(--tb)); border-radius: calc(12px * var(--tb)); }
+  .rb-sec[data-label]::before { top: calc(4px * var(--tb)); font-size: calc(11px * var(--tb)); }
+  .rb-sec[data-label] .tool { min-width: calc(34px * var(--tb)); height: calc(32px * var(--tb)); padding: 0 calc(8px * var(--tb)); font-size: calc(13.5px * var(--tb)); border-radius: calc(9px * var(--tb)); }
+  .rb-sec[data-label] .tool svg { width: calc(20px * var(--tb)); height: calc(20px * var(--tb)); }
+}
+
+/* Note text starts where the title and the tags start. Lines still stop at a readable length. */
+@media (min-width: 761px) {
+  .editor-area:not(.code) > #body, .rich, .preview { padding-left: 20px; padding-right: max(20px, calc(100% - 760px)); }
+}
+@media (max-width: 760px) {
+  .tag-row { padding-left: 16px; padding-right: 16px; }
+}
+
+/* The Reiimei page: the definition sits higher and the "click" line lower, centred together. */
+.empty-editor { display: flex; justify-content: center; align-items: stretch; overflow-y: auto; }
+.empty-editor .definition {
+  display: grid; width: 100%; min-height: 100%;
+  grid-template-rows: minmax(0, 1fr) auto auto auto auto minmax(28px, 2.2fr) auto minmax(0, 1fr);
+}
+.empty-editor .definition .word { grid-row: 2; }
+.empty-editor .definition .say { grid-row: 3; }
+.empty-editor .definition .sense { grid-row: 4; }
+.empty-editor .definition .eg { grid-row: 5; }
+.empty-editor .definition .hint-line { grid-row: 7; margin: 0; }
+/* On a computer the splash is the definition alone, so it is simply centred. */
+@media (min-width: 761px) {
+  .splash .definition { grid-template-rows: minmax(0, 1fr) auto auto auto auto 0 0 minmax(0, 1fr); }
+}
+
+/* Fonts set on selected words ([[f:id]]…[[/f]] in a Text note), and the font names in Settings. */
+.f-run[data-font="flow"] { font-family: "Ilunir Flow", "Reiimei Display", Georgia, serif; }
+.f-run[data-font="flow-newmoon"] { font-family: "Ilunir Flow New Moon", "Reiimei Display", Georgia, serif; }
+.f-run[data-font="flow-eclipse"] { font-family: "Ilunir Flow Eclipse", "Reiimei Display", Georgia, serif; }
+.f-run[data-font="flow-codex"] { font-family: "Ilunir Flow Codex", "Reiimei Display", Georgia, serif; }
+.f-run[data-font="flow-sigil"] { font-family: "Ilunir Flow Sigil", "Reiimei Display", Georgia, serif; }
+.f-run[data-font="moonlit"] { font-family: "Ilunir Moonlit Hand", "Reiimei Display", Georgia, serif; }
+.f-run[data-font="cipher"] { font-family: "Ilunir Cipher Hand", "Reiimei Display", Georgia, serif; }
+.f-run[data-font="chancery"] { font-family: "Ilunir Chancery", "Reiimei Display", Georgia, serif; }
+.f-run[data-font="earthshine"] { font-family: "Ilunir Earthshine", "Reiimei Display", Georgia, serif; }
+.f-run[data-font="phaseline"] { font-family: "Ilunir Phase Line", "Reiimei Display", Georgia, serif; }
+.f-run[data-font="codex-caps"] { font-family: "Ilunir Codex Capitals", "Reiimei Display", Georgia, serif; }
+.f-run[data-font="display"] { font-family: var(--display); }
+.f-run[data-font="echolume"] { font-family: "Echolume", "Reiimei Display", system-ui, sans-serif; }
+.f-run[data-font="serif"] { font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif; }
+.f-run[data-font="sans"] { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+.f-run[data-font="serif"], .f-run[data-font="sans"] { font-synthesis: weight style; }
+/* Settings › Fonts & Styles › Fonts to offer */
+.font-packs { display: grid; gap: 12px; }
+.font-pack { border: 1px solid var(--rule); border-radius: 10px; padding: 8px 12px 10px; margin: 0; }
+.font-pack legend { padding: 0 6px; font-size: 13px; color: var(--ink-2); }
+.font-pack legend .n { color: var(--ink-3); font-size: 12px; margin-left: 4px; }
+.font-pack .row { margin: 0 0 4px; gap: 10px; }
+.settings-body label.font-pick { display: flex; align-items: center; gap: 8px; margin: 0; padding: 3px 0; font-size: 16px; color: var(--ink); }
+.font-pick input { width: auto; margin: 0; }

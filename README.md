@@ -1,8 +1,24 @@
-# Reiimei v0.14.6
+# Reiimei v0.15.0
 
 *reiimei* (REE-h-may), n. The cold, luminous stillness peculiar to a clear winter night; especially the effect of moonlight upon frost, illuminating the night without dispelling it.
 
 An offline-first notes app for Windows and iPhone, built as a Progressive Web App (PWA). No Mac, no App Store, no developer fee.
+
+## What changed in v0.15.0
+
+- **Subfolders (Notes mode).** A folder can hold subfolders, one level deep. Open a folder's **⋯** menu and choose **New subfolder…**. Subfolders are listed under their folder, which gets its own chevron to show or hide them. **Move to…** in a folder's menu puts it inside another folder or back at the top (a folder that has subfolders stays at the top). In a note's folder list, subfolders appear under their folder.
+  Deleting never loses notes: a subfolder's notes go to the folder it was in; a folder's own notes go to Notes and its subfolders move to the top level with their notes. You are asked first.
+  Subfolders need no Supabase changes: like projects, a subfolder is marked in its name. A device still on an older version shows that mark (such as "[In 1f2e…] Receipts") as part of the folder's name until it is updated.
+- **Folders heading.** **Folders** can be shown or hidden with a chevron, like **Tags**, and the **+** next to it makes a new folder (it replaces **New**).
+- **A narrower sidebar on a computer.** The button next to the Reiimei name folds the sidebar to a rail of icons (modes as their first letter, your lists and folders as icons, with their names when you point at them). Press it again to open it. Each device remembers.
+- **The toolbar stays on one line on a computer.** If the groups would not fit (a wide interface font or a narrow window), the whole toolbar is drawn smaller, down to half size, instead of wrapping.
+- **Note text lines up** with the title and the tags on a computer, instead of starting further in. Lines still stop at a comfortable length.
+- **The Reiimei page** keeps its text centred as one block, with the definition higher up and "Click here to get started." lower down. On a computer the splash shows the definition alone, centred.
+- **The Reiimei name** at the top of the folder list now uses the interface font. The definition page stays in Reiimei Display.
+- **Settings › Writing is now two sections.** **Fonts & Styles** has the interface font, a new **Font for new notes**, and **Fonts to offer**: tick or untick each font (with All and None for each pack: Reiimei, Ilunir, and the device's own) to choose which appear in each note's Font menu and in the lists. At least one font always stays, and a font a note already uses is kept (marked "hidden" in its menu). These choices belong to the device. **Formatting** has the rest: the format and citation style for new notes, and the Markdown and Populi cheat sheets.
+- **Formatting and fonts follow the selection (Text notes).** With words selected, bold, italic, underline, strikethrough, highlight, superscript, subscript and code change only those words; with nothing selected, they change the whole note. Headings, lists, checklists, quotes and moving list items in and out change the paragraphs the selection touches, or the paragraph you are in. The **Font** menu with words selected sets the font of those words only; with nothing selected it sets the note's font, as before.
+  A font on selected words is kept as a small mark in the note's text (`[[f:flow]]words[[/f]]`). It shows in the note and in Preview, and switching between Text and Markdown keeps it (in Markdown you see the mark). Sharing, Copy, papers and Word files keep the words but not their font. Converting to Populi asks first, because Populi cannot keep it. In Markdown notes the Font menu also marks selected words; Populi notes have one font for the whole note.
+- Still 84 files. No Supabase changes.
 
 ## What changed in v0.14.6
 
@@ -238,9 +254,9 @@ Then open http://localhost:8000 in Edge or Chrome. Notes work immediately, saved
 
 The iPhone needs an HTTPS address. GitHub Pages hosts the app for free. Only the app's code goes to GitHub; your notes never do.
 
-1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.14.6` folder.
+1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.15.0` folder.
 2. **Create the repository.** In Safari, sign in at github.com, tap **+** › **New repository**. Name it `reiimei`, set it to **Public** (free Pages needs a public repository), and tap **Create repository**.
-3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.14.6` folder, tap **Select**, select all 84 files, and tap **Open**. Scroll down and tap **Commit changes**.
+3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.15.0` folder, tap **Select**, select all 84 files, and tap **Open**. Scroll down and tap **Commit changes**.
    - If you don't see the upload link, tap the **aA** button in Safari's address bar › **Request Desktop Website** and try again.
 4. **Turn on Pages.** In the repository, open **Settings** › **Pages**. Under **Build and deployment**, set Source to **Deploy from a branch**, Branch to **main** and **/ (root)**, then tap **Save**.
 5. **Wait a minute or two**, then reload the Pages screen. It shows your address, which looks like `https://yourname.github.io/reiimei/`.
@@ -345,7 +361,7 @@ The service worker caches the app files. When you change any file, bump `VERSION
 - **Settings › Log** › Download gives a text log of everything the app did, including sync results and errors.
 - **"Test connection"** in Settings › Sync confirms the URL, key, sign-in, and tables are all correct.
 
-## Known limits in v0.14.6
+## Known limits in v0.15.0
 
 - Images can be linked but not attached
 - Sources belong to one note; there is no shared library yet
@@ -354,6 +370,6 @@ The service worker caches the app files. When you change any file, bump `VERSION
 - The name check does not read other files outside Reiimei, so a name from a library you import can look undefined if it is close to one of yours; use **Keep my spelling**
 - The name check and autocomplete do not cover XML or JSON
 - Email and text-message links carry text only; to attach a file, use Share file… or Download
-- Folders are one level deep
+- Folders go one level deep: a folder in Notes can hold subfolders, but a subfolder cannot
 - Recently Deleted is never emptied automatically; empty it yourself when you like
 - The first launch needs a connection for the fonts; until then the app uses similar system fonts

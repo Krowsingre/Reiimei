@@ -24,6 +24,9 @@
     <aside class="pane sidebar" aria-label="Folders and tags">
       <header class="pane-head">
         <h1 class="brand"><button type="button" id="btn-brand" aria-expanded="false" aria-controls="splash" title="Show or hide the Reiimei page">Reiimei</button></h1>
+        <button class="icon-btn desktop-only" id="btn-rail" title="Fold the sidebar to icons" aria-label="Fold the sidebar to icons" aria-pressed="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/><path d="M15 10l-2 2 2 2"/></svg>
+        </button>
         <button class="icon-btn" id="btn-settings" title="Settings" aria-label="Settings">
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
         </button>
@@ -32,9 +35,10 @@
       <nav class="side-scroll">
         <ul class="side-list" id="smart-list"></ul>
         <div class="side-section">
-          <div class="side-label">
-            <span id="folders-label">Folders</span>
-            <button class="text-btn" id="btn-new-folder">New</button>
+          <div class="side-label side-head">
+            <button class="side-toggle" id="btn-folders-toggle" aria-expanded="true" aria-controls="folder-list"><span id="folders-label">Folders</span></button>
+            <button class="side-icon" id="btn-new-folder" title="New folder" aria-label="New folder"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v12M6 12h12"/></svg></button>
+            <button class="side-icon side-chevron" id="btn-folders-chevron" aria-expanded="true" aria-controls="folder-list" aria-label="Show or hide folders"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
           </div>
           <ul class="side-list" id="folder-list"></ul>
         </div>
@@ -271,7 +275,8 @@
       <nav class="tabs" role="tablist" aria-label="Settings sections">
         <button class="tab active" data-tab="sync" role="tab">Sync</button>
         <button class="tab" data-tab="security" role="tab">Security</button>
-        <button class="tab" data-tab="writing" role="tab">Writing</button>
+        <button class="tab" data-tab="fonts" role="tab">Fonts &amp; Styles</button>
+        <button class="tab" data-tab="writing" role="tab">Formatting</button>
         <button class="tab" data-tab="diag" role="tab">Diagnostics</button>
         <button class="tab" data-tab="log" role="tab">Log</button>
         <button class="tab" data-tab="data" role="tab">Backup</button>
@@ -375,6 +380,20 @@
       <p class="hint">Reiimei &copy; Krowsingre Publishing LLC. Reiimei Display, Echolume and the Ilunir family are Krowsingre Publishing fonts. They ship inside the app, so every font works offline.</p>
     </section>
 
+    <section class="tab-panel" data-panel="fonts" hidden>
+      <label>Interface font
+        <select id="pref-ui-font"><option value="echolume">Echolume</option></select>
+      </label>
+      <p class="font-choice-sample">Menus, lists, settings and buttons use this font. Notes keep their own Font.</p>
+      <label>Font for new notes
+        <select id="pref-note-font"><option value="display">Reiimei Display</option></select>
+      </label>
+      <h4 class="sec-head">Fonts to offer</h4>
+      <p class="hint">Untick a font to leave it out of each note's Font menu and the lists above. A note or setting that already uses it keeps it. These choices belong to this device.</p>
+      <div class="font-packs" id="font-packs"></div>
+      <p class="msg" id="fonts-msg" role="status"></p>
+    </section>
+
     <section class="tab-panel" data-panel="writing" hidden>
       <label>New notes use
         <select id="pref-format">
@@ -392,10 +411,6 @@
           <option value="mla">MLA 9th edition</option>
         </select>
       </label>
-      <label>Interface font
-        <select id="pref-ui-font"><option value="echolume">Echolume</option></select>
-      </label>
-      <p class="font-choice-sample">Menus, lists, settings and buttons use this font. Notes keep their own Font.</p>
       <div class="cheats">
         <div>
           <h4 class="sec-head">Markdown</h4>

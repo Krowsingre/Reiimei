@@ -51,6 +51,28 @@ function syncRibbon() {
     secs.forEach((x) => { x.hidden = !(open && live.includes(x)); });
   });
   $('toolbar').dataset.open = String(!!panels.querySelector('.rb-sec:not([hidden])'));
+  fitToolbar();
+}
+
+// On a computer the labelled groups stay on one line: when they would not fit (a wide interface
+// font, a narrow window), the whole toolbar is drawn smaller, down to half size, instead of
+// wrapping. At full size when it already fits.
+export function fitToolbar() {
+  const bar = $('toolbar');
+  const panels = $('rb-panels');
+  if (isPhone() || bar.hidden) { bar.style.removeProperty('--tb'); return; }
+  const secs = [...panels.querySelectorAll('.rb-sec[data-label]')].filter((x) => !x.hidden && x.offsetParent);
+  if (!secs.length) return;
+  // Borders do not shrink with the rest, so measure again until it really fits (a few rounds).
+  let scale = 1;
+  for (let k = 0; k < 8; k++) {
+    bar.style.setProperty('--tb', String(scale));
+    const avail = panels.clientWidth - 2;
+    const gap = parseFloat(getComputedStyle(panels).columnGap) || 0;
+    const need = secs.reduce((w, x) => w + x.getBoundingClientRect().width, 0) + gap * (secs.length - 1);
+    if (need <= avail || scale <= 0.5) break;
+    scale = Math.max(0.5, Math.min(scale - 0.005, Math.floor(scale * (avail / need) * 1000) / 1000));
+  }
 }
 
 export function renderToolbar(note) {
@@ -86,7 +108,7 @@ export function renderToolbar(note) {
   const fs = $('note-font');
   $('note-font-row').hidden = code;
   fs.disabled = ro;
-  fs.value = fonts.fontId(note.meta?.font);
+  fonts.fillFontSelect(fs, { hidden: app.prefs().hiddenFonts || [], current: fonts.fontId(note.meta?.font) });
   rich.render(note);
   syncRibbon();
 }
@@ -196,7 +218,8 @@ async function changeFormat(to) {
     previewOn = false;
     await app.update({ format: to });
     log.info('format', 'Note type changed', { from, to });
-    app.toast(`This note is now ${FORMAT_NAMES[to]}`, 'Undo', () => app.update({ format: from }));
+    const runs = current.body.includes('[[f:') && to === 'markdown';
+    app.toast(runs ? 'This note is now Markdown. Fonts on selected words show as [[f:…]] marks, and come back if you switch to Text.' : `This note is now ${FORMAT_NAMES[to]}`, 'Undo', () => app.update({ format: from }));
     return;
   }
   const result = to === 'populi' ? F.markdownToPopuli(current.body) : F.populiToMarkdown(current.body);
@@ -603,7 +626,7 @@ export function init(hooks) {
   codeUi.init(hooks);
   storyUi.init(hooks);
   rich.init(hooks);
-  fonts.fillFontSelect($('note-font'));
+  fonts.fillFontSelect($('note-font'), { hidden: app.prefs().hiddenFonts || [] });
   codingUi.init(hooks);
   research.init(hooks, { renderSources, saveMeta, insertText: (t) => insertAtCaret(t), sourcesOf, styleOf, citerFor });
 
@@ -619,13 +642,34 @@ export function init(hooks) {
   // Buttons in the ribbon keep the text box focused, so a phone keeps its keyboard up.
   $('toolbar').addEventListener('pointerdown', (e) => { if (e.pointerType !== 'mouse' && e.target.closest('.tool, .rb-chip') && (document.activeElement === $('body') || document.activeElement === $('rich'))) e.preventDefault(); });
   $('toolbar').addEventListener('mousedown', (e) => { if (e.target.closest('.tool, .rb-chip') && (document.activeElement === $('body') || document.activeElement === $('rich'))) e.preventDefault(); });
-  $('note-font').addEventListener('change', (e) => {
+  // With words selected, the Font menu sets the font of those words only (Text and Markdown notes);
+  // with nothing selected it sets the font of the whole note.
+  $('note-font').addEventListener('change', async (e) => {
     const note = app.note();
     if (!note) return;
-    app.update({ meta: { ...(note.meta || {}), font: e.target.value } });
-    log.info('format', 'Note font changed', { font: e.target.value });
+    const id = e.target.value;
+    const own = fonts.fontId(note.meta?.font);
+    if (rich.active() && rich.hasSelection()) {
+      e.target.value = own;
+      if (rich.applyFont(id, own)) { app.toast(`${fonts.fontName(id)} for the selected text`); log.info('format', 'Font set on selected text', { font: id }); }
+      return;
+    }
+    const ta = $('body');
+    if (!rich.active() && note.format === 'markdown' && !isCodeNote(note) && ta.selectionEnd > ta.selectionStart) {
+      e.target.value = own;
+      const { selectionStart: a, selectionEnd: b } = ta;
+      const words = ta.value.slice(a, b);
+      applyEdit(ta, `${ta.value.slice(0, a)}[[f:${id}]]${words}[[/f]]${ta.value.slice(b)}`, a + id.length + 6, a + id.length + 6 + words.length);
+      app.toast(`${fonts.fontName(id)} for the selected text`);
+      return;
+    }
+    await app.update({ meta: { ...(note.meta || {}), font: id } });
+    log.info('format', 'Note font changed', { font: id });
   });
   window.addEventListener('resize', syncRibbon);
+  // Fonts load after the first drawing; measure again once they have.
+  document.fonts?.addEventListener?.('loadingdone', fitToolbar);
+  document.fonts?.ready?.then(fitToolbar);
   $('rb-panels').addEventListener('click', (e) => {
     const b = e.target.closest('[data-tool]');
     if (b) applyToolById(b.dataset.tool);
@@ -764,6 +808,6 @@ export function resetView() {
   previewOn = false;
 }
 export const isPreview = () => previewOn;
-export const newNoteMeta = (prefs) => ({ style: prefs.style });
+export const newNoteMeta = (prefs) => ({ style: prefs.style, ...(fonts.fontId(prefs.noteFont) !== fonts.DEFAULT_FONT ? { font: fonts.fontId(prefs.noteFont) } : {}) });
 // Notes without a saved style use the preferred style everywhere, including sharing.
 export const setStyleDefault = (fn) => S.setDefaultStyle(fn);

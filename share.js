@@ -260,7 +260,9 @@ export function buildArchive(notes, folders, title) {
   const files = notes.map((n) => {
     const folder = folders.find((f) => f.id === n.folder_id && !f.deleted);
     const f = nativeFile(n);
-    const path = uniquePath(`${folder ? `${safeName(folder.name, 'Folder')}/` : ''}${safeName(noteTitle(n))}.${f.ext}`, used);
+    // A subfolder becomes a folder inside its parent's folder.
+    const dir = folder ? (folder.path || [folder.name]).map((p) => safeName(p, 'Folder')).join('/') + '/' : '';
+    const path = uniquePath(`${dir}${safeName(noteTitle(n))}.${f.ext}`, used);
     return { name: path, data: f.data };
   });
   const t = title || 'Reiimei notes';

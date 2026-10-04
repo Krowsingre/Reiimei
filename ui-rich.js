@@ -30,6 +30,7 @@ function inlineHtml(nodes) {
       case 'url': return esc(n.v);
       case 'img': return esc(`![${n.alt}](${n.src})`);
       case 'emoji': return esc(`:${n.name}:`);
+      case 'font': return `<span class="f-run" data-font="${esc(n.font)}">${inlineHtml(n.c)}</span>`;
       default: return TAG[n.t] ? `<${TAG[n.t]}>${inlineHtml(n.c)}</${TAG[n.t]}>` : '';
     }
   }).join('');
@@ -75,7 +76,7 @@ const KEEP = /(\[@[\w:-]+[^\]\n]*\]|https?:\/\/[^\s<>"]*[^\s<>"'.,:;!?)\]]|:[a-z
 function escText(s) {
   return s.split(KEEP).map((part, k) => (k % 2 ? part : part.replace(/([\\`*_[\]~^])/g, '\\$1').replace(/==/g, '\\==').replace(/\+\+/g, '\\++'))).join('');
 }
-function inlineMd(node) {
+function inlineMd(node, font = null) {
   let out = '';
   for (const n of node.childNodes) {
     if (n.nodeType === 3) { out += escText(n.nodeValue.replace(/\u00a0/g, ' ').replace(/\n/g, ' ')); continue; }
@@ -83,7 +84,15 @@ function inlineMd(node) {
     const t = n.tagName;
     if (t === 'BR') { out += '\n'; continue; }
     if (t === 'CODE') { out += n.textContent ? `\`${n.textContent.replace(/`/g, "'")}\`` : ''; continue; }
-    const inner = inlineMd(n);
+    if (t === 'SPAN' && n.dataset.font && /^[a-z][a-z0-9-]*$/.test(n.dataset.font)) {
+      const f = n.dataset.font;
+      const inner = inlineMd(n, f);
+      if (!inner.trim() || f === font) { out += inner; continue; }
+      const [, lead, core, trail] = /^(\s*)([\s\S]*?)(\s*)$/.exec(inner);
+      out += `${lead}${font ? '[[/f]]' : ''}[[f:${f}]]${core}[[/f]]${font ? `[[f:${font}]]` : ''}${trail}`;
+      continue;
+    }
+    const inner = inlineMd(n, font);
     if (t === 'A') { const href = n.getAttribute('href') || ''; out += /^(https?:|mailto:)/i.test(href) && inner.trim() ? `[${inner}](${href})` : inner; continue; }
     let m = MARK[t];
     if (!m && t === 'SPAN') { const st = n.getAttribute('data-style') || ''; m = /font-weight:\s*(bold|[6-9]00)/i.test(st) ? '**' : /font-style:\s*italic/i.test(st) ? '*' : ''; }
@@ -96,8 +105,9 @@ function inlineMd(node) {
 }
 // A line of a paragraph that starts like a heading, list or quote is escaped to stay text.
 const escLineStart = (line) => line.replace(/^(\s*)(#|>|[-*+](?=\s)|\d+[.)](?=\s))/, '$1\\$2');
+const dropEmptyRuns = (s) => s.replace(/\[\[f:[a-z][a-z0-9-]*\]\]\[\[\/f\]\]/g, '');
 function paraMd(el) {
-  const text = inlineMd(el).replace(/\n+$/, '');
+  const text = dropEmptyRuns(inlineMd(el)).replace(/\n+$/, '');
   return text.split('\n').map((l) => escLineStart(l.replace(/\s+$/, ''))).join('\n');
 }
 function listMd(list, level, out) {
@@ -110,7 +120,7 @@ function listMd(list, level, out) {
     const own = c.ownerDocument.createElement('div');
     const nested = [];
     for (const k of c.childNodes) { if (k.nodeType === 1 && (k.tagName === 'UL' || k.tagName === 'OL')) nested.push(k); else own.appendChild(k.cloneNode(true)); }
-    out.push(`${'  '.repeat(level)}${marker} ${task}${inlineMd(own).replace(/\n+/g, ' ').trim()}`);
+    out.push(`${'  '.repeat(level)}${marker} ${task}${dropEmptyRuns(inlineMd(own)).replace(/\n+/g, ' ').trim()}`);
     for (const k of nested) listMd(k, level + 1, out);
   }
 }
@@ -128,7 +138,7 @@ function blocksMd(parent) {
     }
     flushLoose();
     const t = n.tagName;
-    if (/^H[1-6]$/.test(t)) { const s = inlineMd(n).replace(/\n+/g, ' ').trim(); if (s) out.push(`${'#'.repeat(+t[1])} ${s}`); }
+    if (/^H[1-6]$/.test(t)) { const s = dropEmptyRuns(inlineMd(n)).replace(/\n+/g, ' ').trim(); if (s) out.push(`${'#'.repeat(+t[1])} ${s}`); }
     else if (t === 'UL' || t === 'OL') { const lines = []; listMd(n, 0, lines); if (lines.length) out.push(lines.join('\n')); }
     else if (t === 'BLOCKQUOTE') { const inner = blocksMd(n); if (inner.trim()) out.push(inner.split('\n').map((l) => (l ? `> ${l}` : '>')).join('\n')); }
     else if (t === 'PRE') out.push(`\`\`\`${n.dataset.lang || ''}\n${n.textContent.replace(/\n$/, '')}\n\`\`\``);
@@ -201,7 +211,16 @@ const isList = (n) => n?.nodeType === 1 && (n.tagName === 'UL' || n.tagName === 
 // focus (as a tap does on iPhone) can put it back.
 export function saveCaret() {
   const s = sel();
-  if (s.rangeCount && inBox(s.anchorNode)) savedRange = s.getRangeAt(0).cloneRange();
+  if (s.rangeCount && inBox(s.anchorNode)) { savedRange = s.getRangeAt(0).cloneRange(); return; }
+  const a = document.activeElement;
+  // (Fields in dialogs, such as Add source, do not count: the citation goes back where the caret was.)
+  if (a && a !== box && !a.closest('dialog') && (a.isContentEditable || /^(INPUT|TEXTAREA)$/.test(a.tagName))) savedRange = null;
+}
+// True when words are selected in the note (or were, just before a menu took the focus).
+export function hasSelection() {
+  const s = sel();
+  if (s.rangeCount && inBox(s.anchorNode) && !s.isCollapsed) return true;
+  return !!savedRange && !savedRange.collapsed && inBox(savedRange.startContainer);
 }
 function restoreCaret() {
   box.focus({ preventScroll: true });
@@ -375,40 +394,132 @@ function cycleHeading(blocks) {
   return true;
 }
 
-// Wrap the selection in <tag>, or take the wrapping away if it is already there.
-function toggleInline(tag) {
-  const s = sel();
-  const r = s.getRangeAt(0);
-  const hit = closest(r.commonAncestorContainer, tag);
-  if (hit) {
-    keepSelection(() => { const parent = hit.parentNode; while (hit.firstChild) parent.insertBefore(hit.firstChild, hit); hit.remove(); });
-    return;
+// The text nodes a range covers, split at its ends so each lies wholly inside it.
+function textsIn(r) {
+  const out = [];
+  const walk = document.createTreeWalker(box, NodeFilter.SHOW_TEXT, { acceptNode: (n) => (n.nodeValue.length && r.intersectsNode(n) && !n.parentElement.closest('.raw-block') ? 1 : 2) });
+  const all = [];
+  while (walk.nextNode()) all.push(walk.currentNode);
+  const { startContainer: sc, startOffset: so, endContainer: ec, endOffset: eo } = r;
+  for (const n of all) {
+    const start = n === sc ? so : 0;
+    const end = n === ec ? eo : n.length;
+    if (start >= end) continue;
+    let t = n;
+    if (end < t.length) t.splitText(end);
+    if (start > 0) t = t.splitText(start);
+    out.push(t);
   }
-  if (r.collapsed) return;
-  const el = document.createElement(tag);
-  el.appendChild(r.extractContents());
-  r.insertNode(el);
-  r.selectNodeContents(el);
-  s.removeAllRanges();
-  s.addRange(r);
+  return out;
+}
+function selectTexts(texts) {
+  if (!texts.length) return;
+  const r = document.createRange();
+  r.setStart(texts[0], 0);
+  r.setEnd(texts[texts.length - 1], texts[texts.length - 1].length);
+  sel().removeAllRanges();
+  sel().addRange(r);
+}
+function wrapText(t, make) {
+  const el = make();
+  t.before(el);
+  el.appendChild(t);
+  return el;
+}
+// Join neighbouring runs of the same kind so a note does not fill up with tiny pieces.
+function mergeRuns(selector, same) {
+  for (const el of [...box.querySelectorAll(selector)]) {
+    const prev = el.previousSibling;
+    if (prev && prev.nodeType === 1 && prev.matches(selector) && same(prev, el)) { while (el.firstChild) prev.appendChild(el.firstChild); el.remove(); }
+  }
+}
+// Highlight and code: wrap the selected text (across paragraphs too), or take it away when all of
+// the selected text already has it.
+// The elements that already carry each style (a browser or a paste may use either tag).
+const STYLE_TAGS = { strong: 'strong,b', em: 'em,i', u: 'u', s: 's,strike,del', sup: 'sup', sub: 'sub', mark: 'mark', code: 'code' };
+function toggleWrap(tag, r) {
+  const texts = textsIn(r);
+  if (!texts.length) return;
+  const inside = (t) => closest(t, STYLE_TAGS[tag] || tag);
+  if (texts.every(inside)) {
+    for (const el of new Set(texts.map(inside))) { const parent = el.parentNode; while (el.firstChild) parent.insertBefore(el.firstChild, el); el.remove(); }
+  } else {
+    for (const t of texts) if (!inside(t)) wrapText(t, () => document.createElement(tag));
+    mergeRuns(tag, () => true);
+    if (tag === 'sup' || tag === 'sub') {
+      // Superscript and subscript do not stack: the other one comes off this text.
+      for (const t of texts) { const o = closest(t, tag === 'sup' ? 'sub' : 'sup'); if (o) { const parent = o.parentNode; while (o.firstChild) parent.insertBefore(o.firstChild, o); o.remove(); } }
+    }
+  }
+  selectTexts(texts);
 }
 
-export async function apply(id) {
+const fontRun = (id) => { const el = document.createElement('span'); el.className = 'f-run'; el.dataset.font = id; return el; };
+// A font on the selected text only. Choosing the note's own font takes the run away again.
+export function applyFont(id, noteFont) {
+  if (!active() || box.contentEditable !== 'true') return false;
+  restoreCaret();
+  if (!sel().rangeCount || sel().isCollapsed) return false;
+  tidyBlocks();
+  const texts = textsIn(sel().getRangeAt(0));
+  if (!texts.length) return false;
+  for (const t of texts) {
+    const run = t.parentElement;
+    if (run.matches('span.f-run')) {
+      // The text sits straight in a font run: split the run around it.
+      const after = run.cloneNode(false);
+      let n = t.nextSibling;
+      while (n) { const next = n.nextSibling; after.appendChild(n); n = next; }
+      run.after(t);
+      if (after.childNodes.length) t.after(after);
+      if (!run.childNodes.length) run.remove();
+      if (id !== noteFont || t.parentElement.closest('span.f-run')) wrapText(t, () => fontRun(id));
+    } else if (id !== noteFont || t.parentElement.closest('span.f-run')) {
+      // Inside bold or similar: a run of its own, which wins over a run around it.
+      wrapText(t, () => fontRun(id));
+    }
+  }
+  mergeRuns('span.f-run', (a, b) => a.dataset.font === b.dataset.font);
+  selectTexts(texts);
+  saveCaret();
+  pushToBody();
+  return true;
+}
+
+export async function apply(id, { typing = false } = {}) {
   if (!active() || box.contentEditable !== 'true') return;
   restoreCaret();
   tidyBlocks();
   if (!sel().rangeCount) return;
   const blocks = selectedBlocks();
   const items = blocks.filter((b) => b.tagName === 'LI');
+  // Bold, italic and the other text styles change the selected words, or the whole note when
+  // nothing is selected. (Headings, lists, quotes and indents change the paragraph you are in.)
+  const INLINE = { b: 'bold', i: 'italic', u: 'underline', s: 'strikeThrough', sup: 'superscript', sub: 'subscript' };
+  const WRAP = { b: 'strong', i: 'em', u: 'u', s: 's', sup: 'sup', sub: 'sub', mark: 'mark', code: 'code' };
+  if (WRAP[id]) {
+    // Ctrl+B, Ctrl+I and Ctrl+U with nothing selected keep a word processor's habit instead:
+    // they switch the style on or off for what you type next.
+    if (typing && sel().isCollapsed && INLINE[id]) { document.execCommand(INLINE[id]); return; }
+    const whole = sel().isCollapsed;
+    const keep = whole ? [sel().anchorNode, sel().anchorOffset] : null;
+    if (whole) { const r = document.createRange(); r.selectNodeContents(box); sel().removeAllRanges(); sel().addRange(r); }
+    // Done by hand rather than with the browser's command, which can try to write inline styles
+    // (blocked by the app's security policy) when taking a style off.
+    toggleWrap(WRAP[id], sel().getRangeAt(0));
+    if (whole) {
+      const r = document.createRange();
+      if (keep[0] && box.contains(keep[0])) { r.setStart(keep[0], Math.min(keep[1], keep[0].nodeType === 3 ? keep[0].length : keep[0].childNodes.length)); } else { r.selectNodeContents(box); r.collapse(false); }
+      r.collapse(true);
+      sel().removeAllRanges();
+      sel().addRange(r);
+    }
+    box.focus({ preventScroll: true });
+    saveCaret();
+    pushToBody();
+    return;
+  }
   switch (id) {
-    case 'b': document.execCommand('bold'); break;
-    case 'i': document.execCommand('italic'); break;
-    case 'u': document.execCommand('underline'); break;
-    case 's': document.execCommand('strikeThrough'); break;
-    case 'sup': document.execCommand('superscript'); break;
-    case 'sub': document.execCommand('subscript'); break;
-    case 'mark': toggleInline('mark'); break;
-    case 'code': toggleInline('code'); break;
     case 'h': keepSelection(() => { if (!cycleHeading(blocks)) app.toast('Headings work on paragraphs, not list items.'); }); break;
     case 'ul': keepSelection(() => toList('UL', blocks)); break;
     case 'ol': keepSelection(() => toList('OL', blocks)); break;
@@ -516,7 +627,7 @@ export function init(hooks) {
     }
     const mod = e.ctrlKey || e.metaKey;
     if (mod && e.shiftKey && (e.code === 'Digit8' || e.code === 'Digit7')) { e.preventDefault(); apply(e.code === 'Digit8' ? 'ul' : 'ol'); return; }
-    if (mod && !e.shiftKey && !e.altKey && ['b', 'i', 'u'].includes(e.key.toLowerCase())) { e.preventDefault(); apply(e.key.toLowerCase()); }
+    if (mod && !e.shiftKey && !e.altKey && ['b', 'i', 'u'].includes(e.key.toLowerCase())) { e.preventDefault(); apply(e.key.toLowerCase(), { typing: true }); }
   });
   // Tap the box in front of a checklist item to tick it.
   box.addEventListener('click', (e) => {

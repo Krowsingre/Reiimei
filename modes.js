@@ -36,7 +36,16 @@ export function projectKind(f) {
 }
 // isProject(f): a project of any mode. isProject(f, mode): a project of that mode.
 export const isProject = (f, mode) => { const k = projectKind(f); return !!k && (!mode || k === mode); };
-export const projectName = (f) => { const k = projectKind(f); return k ? f.name.slice(PROJECT_MARKS[k].length) : f?.name || ''; };
+export const projectName = (f) => { const k = projectKind(f); return k ? f.name.slice(PROJECT_MARKS[k].length) : String(f?.name || '').replace(SUB_RE, ''); };
 export const projectStored = (name, mode = 'research') => PROJECT_MARKS[mode] + String(name).trim().slice(0, 80);
+// ---- Subfolders (Notes mode) --------------------------------------------------------
+// Folders go one level deep. Like a project, a subfolder is marked in its name, because folders
+// sync with only a name: "[In <parent folder id>] Name". No server change is needed, and a
+// device on an older version shows the mark as part of the name. A subfolder whose parent is
+// gone (deleted elsewhere) is shown as an ordinary folder.
+const SUB_RE = /^\[In ([0-9a-f-]{36})\] /i;
+export const parentIdOf = (f) => (f && typeof f.name === 'string' && !projectKind(f) ? SUB_RE.exec(f.name)?.[1]?.toLowerCase() || null : null);
+export const folderStored = (name, parentId = null) => (parentId ? `[In ${parentId}] ` : '') + String(name).trim().slice(0, 80);
+
 // The tag a project gives its notes (the same shape as every tag).
 export const slugTag = (name) => String(name).trim().replace(/^#+/, '').toLowerCase().replace(/\s+/g, '-').replace(/[^\p{L}\p{N}_-]/gu, '').slice(0, 40);

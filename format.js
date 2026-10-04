@@ -67,8 +67,15 @@ function parseInline(src, mode) {
     if (ch === '\\' && i + 1 < src.length && /[\\`*_{}[\]()#+\-.!~^=>|:@]/.test(src[i + 1])) {
       buf += src[i + 1]; i += 2; continue;
     }
+    // A font on part of the text (set from the Font menu with text selected): [[f:flow]]text[[/f]].
+    // Typed brackets are escaped when a Text note is saved, so this never appears by accident.
+    let m = ch === '[' && /^\[\[f:([a-z][a-z0-9-]*)\]\]/.exec(rest);
+    if (m) {
+      const close = src.indexOf('[[/f]]', i + m[0].length);
+      if (close >= 0) { flush(); out.push({ t: 'font', font: m[1], c: parseInline(src.slice(i + m[0].length, close), mode) }); i = close + 6; continue; }
+    }
     // Citation tokens work in both formats: [@key], [@key, 42; @other]
-    let m = /^\[(@[\w:-]+[^\]\n]*)\]/.exec(rest);
+    m = /^\[(@[\w:-]+[^\]\n]*)\]/.exec(rest);
     if (m) { flush(); out.push({ t: 'cite', raw: m[1] }); i += m[0].length; continue; }
     if (ch === '@' && !isAlnum(prev) && (m = /^@([A-Za-z](?:[\w-]*[A-Za-z0-9])?)/.exec(rest))) {
       flush(); out.push({ t: 'ncite', key: m[1], raw: m[0] }); i += m[0].length; continue;
@@ -237,6 +244,7 @@ export function inlineToHtml(nodes, ctx = {}) {
         const runs = ctx.ncite ? ctx.ncite(n.key) : null;
         return runs ? `<span class="cite">${runsToHtml(runs)}</span>` : escapeHtml(n.raw);
       }
+      case 'font': return `<span class="f-run" data-font="${escapeHtml(n.font)}">${inlineToHtml(n.c, ctx)}</span>`;
       default: return `<${TAGS[n.t]}>${inlineToHtml(n.c, ctx)}</${TAGS[n.t]}>`;
     }
   }).join('');
@@ -317,6 +325,8 @@ export function inlineToMarkdown(nodes, ctx = {}) {
         const runs = ctx.resolve && ctx.ncite ? ctx.ncite(n.key) : null;
         return runs ? runs.map((r) => (r.italic ? `*${r.text}*` : r.text)).join('') : n.raw;
       }
+      // Kept inside Reiimei; Markdown made for other apps leaves the font out.
+      case 'font': return ctx.resolve ? inlineToMarkdown(n.c, ctx) : `[[f:${n.font}]]${inlineToMarkdown(n.c, ctx)}[[/f]]`;
       default: return MD_MARK[n.t] + inlineToMarkdown(n.c, ctx) + MD_MARK[n.t];
     }
   }).join('');
@@ -336,6 +346,7 @@ export function inlineToPopuli(nodes, ctx = {}, lost = new Set()) {
       }
       case 'img': return n.src;
       case 's': lost.add('strikethrough'); return inlineToPopuli(n.c, ctx, lost);
+      case 'font': lost.add('fonts set on selected text'); return inlineToPopuli(n.c, ctx, lost);
       case 'cite': {
         const runs = ctx.resolve && ctx.cite ? ctx.cite(n.raw) : null;
         return runs ? runs.map((r) => (r.italic ? `_${r.text}_` : r.text)).join('') : `[${n.raw}]`;
@@ -418,8 +429,8 @@ function inlineLinesToPopuli(body, ctx) {
 }
 
 function blocksToMarkdownResolved(body, ctx) {
-  // Keep the author's Markdown as written; only replace citation tokens.
-  return String(body).split('\n').map((l) => {
+  // Keep the author's Markdown as written; only replace citation tokens and drop font markers.
+  return String(body).split('\n').map((l) => l.replace(/\[\[f:[a-z][a-z0-9-]*\]\]|\[\[\/f\]\]/g, '')).map((l) => {
     if (!/\[@|@\w/.test(l)) return l;
     return l.replace(/\[(@[\w:-]+[^\]\n]*)\]/g, (m, raw) => {
       const runs = ctx.cite ? ctx.cite(raw) : null;
@@ -461,6 +472,7 @@ export function inlineToRuns(nodes, ctx = {}, style = {}) {
         else out.push({ ...style, text: n.raw });
         break;
       }
+      case 'font': out.push(...inlineToRuns(n.c, ctx, { ...style, font: n.font })); break;
       default: out.push(...inlineToRuns(n.c, ctx, { ...style, [n.t]: true }));
     }
   }
