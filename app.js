@@ -12,7 +12,8 @@ import * as codeIntel from './codeintel.js';
 import { isCode } from './code.js';
 import { noteTitle, noteSnippet, sharedFileCheck } from './share.js';
 
-export const APP_VERSION = '0.12.0';
+export const APP_VERSION = '0.13.0';
+export const BUILD_DATE = '2026-10-03';
 
 const $ = (id) => document.getElementById(id);
 const el = {
@@ -51,36 +52,17 @@ const snippetOf = (n) => noteSnippet(n);
 // ---- Preferences (per device) ------------------------------------------
 const PREFS_KEY = 'reiimei.prefs';
 const VIEW_DEFAULT = { sort: 'updated', dir: 'desc', hidden: [] };
-const PREF_DEFAULTS = { mode: 'notes', lastProject: '', codeLang: 'python', format: 'markdown', style: 'apa', headFont: 'reiimei', noteFont: 'newsreader', view: VIEW_DEFAULT };
+const PREF_DEFAULTS = { mode: 'notes', lastProject: '', codeLang: 'python', format: 'markdown', style: 'apa', view: VIEW_DEFAULT };
 function prefs() {
   try { return { ...PREF_DEFAULTS, ...JSON.parse(localStorage.getItem(PREFS_KEY) || '{}') }; }
   catch { return { ...PREF_DEFAULTS }; }
 }
 
-// Fonts: set CSS variables through the style API (allowed by the security policy).
-const FONT_STACKS = {
-  display: '"Reiimei Display", "Marcellus", "Palatino Linotype", Georgia, serif',
-  echolume: '"Echolume", "Marcellus", system-ui, sans-serif',
-  newsreader: '"Newsreader", "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif',
-  sans: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
-};
-const FONT_NAMES = { reiimei: 'Marcellus', display: 'Reiimei Display', echolume: 'Echolume', newsreader: 'Newsreader', sans: 'System sans-serif' };
-function applyFonts(p = prefs()) {
-  const root = document.documentElement.style;
-  const head = ['display', 'echolume'].includes(p.headFont) ? p.headFont : 'reiimei';
-  const note = FONT_STACKS[p.noteFont] ? p.noteFont : 'newsreader';
-  if (head !== 'reiimei') {
-    root.setProperty('--display', FONT_STACKS[head]);
-    root.setProperty('--head-font', FONT_STACKS[head]);
-  } else {
-    root.removeProperty('--display');
-    root.removeProperty('--head-font');
-  }
-  if (note !== 'newsreader') root.setProperty('--note-font', FONT_STACKS[note]);
-  else root.removeProperty('--note-font');
-  document.documentElement.dataset.headFont = head;
-  document.documentElement.dataset.noteFont = note;
-}
+// Fonts: interface text and new notes use Reiimei Display. Each note can pick its own font from the
+// Font menu in the toolbar (meta.font); the editor shows it through #editor[data-font].
+const NOTE_FONTS = ['display', 'echolume', 'newsreader', 'marcellus', 'sans'];
+const FONT_LABELS = { display: 'Reiimei Display', echolume: 'Echolume', newsreader: 'Newsreader', marcellus: 'Marcellus', sans: 'System sans-serif' };
+const fontOf = (n) => (NOTE_FONTS.includes(n?.meta?.font) ? n.meta.font : 'display');
 function setPrefs(patch) {
   try { localStorage.setItem(PREFS_KEY, JSON.stringify({ ...prefs(), ...patch })); } catch { /* storage blocked */ }
 }
@@ -351,6 +333,10 @@ function sideItem(filter, icon, name, count, withMore = false) {
   return li;
 }
 
+// What the top list item is called: the mode's own notes, or every note when all modes are shown.
+const MODE_NOTES = { notes: 'Notes', research: 'Research notes', coding: 'Coding notes', storyboard: 'Storyboard notes' };
+const allLabel = () => (state.showAll ? 'All notes' : MODE_NOTES[state.mode] || 'Notes');
+
 function renderSidebar() {
   const act = activeNotes().filter((n) => state.showAll || modes.kindOf(n) === state.mode);
   const research = modes.hasProjects(state.mode);
@@ -361,7 +347,7 @@ function renderSidebar() {
   $('btn-new-folder').title = research ? 'New project' : 'New folder';
   const folderIds = new Set(folders.map((f) => f.id));
   el.smartList.replaceChildren(
-    sideItem({ type: 'all' }, 'all', 'All Notes', act.length),
+    sideItem({ type: 'all' }, 'all', allLabel(), act.length),
     sideItem({ type: 'device' }, 'device', 'This device', act.filter((n) => originOf(n)?.id === device().id).length),
   );
 
@@ -474,7 +460,7 @@ function listTitle() {
   if (f.type === 'trash') return 'Recently Deleted';
   if (f.type === 'device') return 'This device';
   if (f.type === 'none') return 'Notes';
-  return state.showAll ? 'All Notes · every mode' : `All Notes · ${modes.modeName(state.mode)}`;
+  return allLabel();
 }
 
 function renderList() {
@@ -538,6 +524,7 @@ function renderEditor() {
   el.modeSel.value = modes.kindOf(n);
   el.modeSel.disabled = n.deleted;
   $('editor').dataset.kind = modes.kindOf(n);
+  $('editor').dataset.font = fontOf(n);
   el.pin.setAttribute('aria-pressed', String(!!n.pinned));
   el.del.title = n.deleted ? 'Already deleted' : 'Delete';
   el.del.disabled = n.deleted;
@@ -1162,11 +1149,8 @@ async function runDiagnostics() {
     add('Encryption', 'warn', 'Off: notes are stored as plain text (Settings › Security)');
   }
   try {
-    const p = prefs();
-    const names = { display: 'Reiimei Display', echolume: 'Echolume' };
-    const want = [...new Set([names[p.headFont], names[p.noteFont]].filter(Boolean))];
-    const loaded = await Promise.all(want.map((f) => document.fonts.load(`16px "${f}"`).then((r) => r.length > 0)));
-    add('Fonts', loaded.every(Boolean) ? 'pass' : 'warn', `Headings: ${FONT_NAMES[p.headFont] || 'Marcellus'}; notes: ${FONT_NAMES[p.noteFont] || 'Newsreader'}${loaded.every(Boolean) ? '' : ' (a bundled font did not load)'}`);
+    const loaded = await Promise.all(['Reiimei Display', 'Echolume'].map((f) => document.fonts.load(`16px "${f}"`).then((r) => r.length > 0)));
+    add('Fonts', loaded.every(Boolean) ? 'pass' : 'warn', `Interface and new notes: Reiimei Display${loaded.every(Boolean) ? '' : ' (a bundled font did not load)'}`);
   } catch (e) { add('Fonts', 'warn', e.message); }
   const sh = sharedFileCheck();
   add('Sharing', sh.text ? 'pass' : 'warn', `${sh.text ? 'Share sheet available' : 'No share sheet: use Email, Copy, or Download'}${sh.files ? '; files can be shared' : '; files are downloaded'}`);
@@ -1231,8 +1215,6 @@ function openSettings(tab = 'sync', explicitTab = tab !== 'sync') {
   security.renderSettings();
   $('pref-format').value = prefs().format;
   $('pref-style').value = prefs().style;
-  $('pref-head-font').value = prefs().headFont;
-  $('pref-note-font').value = prefs().noteFont;
   renderDiagnostics();
   $('log-view').textContent = log.exportText() || '(empty)';
   showTab(tab);
@@ -1264,6 +1246,12 @@ function showTab(tab) {
   document.querySelectorAll('.tab').forEach((b) => { b.classList.toggle('active', b.dataset.tab === tab); if (b.dataset.tab === tab) $('settings-title').textContent = b.textContent; });
   $('settings-main').querySelector('.settings-body').scrollTop = 0;
   document.querySelectorAll('.tab-panel').forEach((p) => { p.hidden = p.dataset.panel !== tab; });
+  if (tab === 'about') {
+    $('about-version').textContent = APP_VERSION;
+    $('about-date').textContent = BUILD_DATE;
+    $('about-mode').textContent = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone ? 'Installed app' : 'Browser tab';
+    $('about-device').textContent = device().name || 'Not named yet';
+  }
   if (tab === 'log') {
     const v = $('log-view');
     v.textContent = log.exportText() || '(empty)';
@@ -1360,8 +1348,6 @@ async function importBackup(file) {
 
 // ---- Events ------------------------------------------------------------
 function bindEvents() {
-  $('pref-head-font').addEventListener('change', (e) => { setPrefs({ headFont: e.target.value }); applyFonts(); log.info('prefs', 'Heading font changed', { font: e.target.value }); });
-  $('pref-note-font').addEventListener('change', (e) => { setPrefs({ noteFont: e.target.value }); applyFonts(); log.info('prefs', 'Note font changed', { font: e.target.value }); });
   $('btn-share').addEventListener('click', async () => {
     await flushSave();
     const n = currentNote();
@@ -1377,6 +1363,10 @@ function bindEvents() {
   $('btn-new-folder').addEventListener('click', newFolder);
   $('btn-back-sidebar').addEventListener('click', () => setMobileView('sidebar'));
   $('btn-back-list').addEventListener('click', async () => { await flushSave(); if (state.currentId) await discardIfBlank(state.currentId); state.currentId = null; render(); setMobileView('list'); });
+  $('btn-copy-version').addEventListener('click', async () => {
+    const text = `Reiimei ${APP_VERSION} (${BUILD_DATE}), ${device().name || 'unnamed device'}`;
+    try { await navigator.clipboard.writeText(text); toast('Version info copied'); } catch { toast(text); }
+  });
   $('btn-settings').addEventListener('click', () => (state.settingsOpen ? closeSettings() : openSettings('sync', false)));
   $('btn-settings-back').addEventListener('click', closeSettings);
   $('btn-settings-tabs').addEventListener('click', () => setMobileView('settings-list'));
@@ -1418,7 +1408,6 @@ function bindEvents() {
   $('btn-empty-trash').addEventListener('click', emptyTrash);
   $('btn-purge').addEventListener('click', purgeCurrent);
   $('btn-close-note').addEventListener('click', closeNote);
-  $('btn-fonts').addEventListener('click', () => openSettings('fonts'));
   $('btn-find-copies').addEventListener('click', findConflictedCopies);
   $('btn-view').addEventListener('click', () => { renderViewDialog(); $('view-msg').textContent = ''; $('view-dialog').showModal(); });
   for (const id of ['view-close', 'view-done']) $(id).addEventListener('click', () => $('view-dialog').close());
@@ -1640,7 +1629,6 @@ const hooks = {
 async function boot() {
   const t0 = performance.now();
   log.info('boot', `Reiimei ${APP_VERSION} starting`);
-  applyFonts();
   try {
     bindEvents();
     writing.init(hooks);

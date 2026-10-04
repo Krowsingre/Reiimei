@@ -31,6 +31,20 @@ async function saveMeta(patch) {
 }
 
 // ---- Toolbar -------------------------------------------------------------
+// The formatting buttons are sectioned by kind; each section opens from a chip in the toolbar.
+const SECTIONS = { text: ['b', 'i', 'u', 's', 'mark', 'sup', 'sub'], para: ['h', 'ul', 'ol', 'task', 'outdent', 'indent', 'quote'], insert: ['code', 'link'] };
+const ribbonOpen = new Set(); // sections open now; every section starts closed
+function syncRibbon() {
+  const panels = $('rb-panels');
+  document.querySelectorAll('#rb-chips .rb-chip').forEach((chip) => {
+    const secs = [...panels.querySelectorAll(`.rb-sec[data-sec="${chip.dataset.sec}"]`)];
+    const live = secs.filter((x) => !x.parentElement.hidden && [...x.querySelectorAll('.tool')].some((b) => !b.hidden));
+    chip.hidden = !live.length;
+    const open = !!live.length && (ribbonOpen.has(chip.dataset.sec) || (chip.dataset.sec === 'tools' && previewOn));
+    chip.setAttribute('aria-expanded', String(open));
+    secs.forEach((x) => { x.hidden = !(open && live.includes(x)); });
+  });
+}
 const LABELS = { b: 'B', i: 'I', u: 'U', s: 'S', mark: '<span>H</span>', sup: 'x²', sub: 'x₂', h: 'H', ul: '•', ol: '1.', task: '☐', outdent: '⇤', indent: '⇥', quote: '❝', code: '{ }', link: 'Link' };
 
 export function renderToolbar(note) {
@@ -57,7 +71,11 @@ export function renderToolbar(note) {
   const holder = $('tool-buttons');
   if (holder.dataset.format !== format) {
     holder.dataset.format = format;
-    holder.innerHTML = tools.map((t) => `<button class="tool t-${t.id}" data-tool="${t.id}" title="${t.label}${t.key ? ` (Ctrl+${t.key.toUpperCase()})` : ''}" aria-label="${t.label}">${LABELS[t.id] || t.label}</button>`).join('');
+    const btn = (t) => `<button class="tool t-${t.id}" data-tool="${t.id}" title="${t.label}${t.key ? ` (Ctrl+${t.key.toUpperCase()})` : ''}" aria-label="${t.label}">${LABELS[t.id] || t.label}</button>`;
+    holder.innerHTML = Object.entries(SECTIONS).map(([sec, ids]) => {
+      const mine = tools.filter((t) => ids.includes(t.id));
+      return mine.length ? `<div class="rb-sec" data-sec="${sec}" hidden>${mine.map(btn).join('')}</div>` : '';
+    }).join('');
   }
   holder.querySelectorAll('.tool').forEach((b) => { b.disabled = ro || previewOn; });
   $('btn-preview').setAttribute('aria-pressed', String(previewOn));
@@ -66,6 +84,11 @@ export function renderToolbar(note) {
   renderPreview(note);
   storyUi.renderToolbar(note, code, previewOn);
   codingUi.renderToolbar(note);
+  const fs = $('note-font');
+  fs.hidden = code;
+  fs.disabled = ro;
+  fs.value = ['display', 'echolume', 'newsreader', 'marcellus', 'sans'].includes(note.meta?.font) ? note.meta.font : 'display';
+  syncRibbon();
 }
 
 let lastRendered = null;
@@ -571,6 +594,19 @@ export function init(hooks) {
   codingUi.init(hooks);
   research.init(hooks, { renderSources, saveMeta, insertText: (t) => insertAtCaret(t), sourcesOf, styleOf, citerFor });
 
+  $('rb-chips').addEventListener('click', (e) => {
+    const chip = e.target.closest('.rb-chip');
+    if (!chip) return;
+    const sec = chip.dataset.sec;
+    if (ribbonOpen.has(sec)) ribbonOpen.delete(sec); else ribbonOpen.add(sec);
+    syncRibbon();
+  });
+  $('note-font').addEventListener('change', (e) => {
+    const note = app.note();
+    if (!note) return;
+    app.update({ meta: { ...(note.meta || {}), font: e.target.value } });
+    log.info('format', 'Note font changed', { font: e.target.value });
+  });
   $('tool-buttons').addEventListener('click', (e) => {
     const b = e.target.closest('[data-tool]');
     if (b) applyToolById(b.dataset.tool);

@@ -1,8 +1,17 @@
-# Reiimei v0.12.0
+# Reiimei v0.13.0
 
 *reiimei* (REE-h-may), n. The cold, luminous stillness peculiar to a clear winter night; especially the effect of moonlight upon frost, illuminating the night without dispelling it.
 
 An offline-first notes app for Windows and iPhone, built as a Progressive Web App (PWA). No Mac, no App Store, no developer fee.
+
+## What changed in v0.13.0
+
+- **Reiimei Display is the interface font** and the default font for notes. Reiimei Display has a limited character set (no `# @ & * + = < > _ [ ] { }`, no accented letters), so those characters are drawn in the next font in the list (Marcellus, then a system serif).
+- **One font menu, in each note.** The **Aa** button and the Fonts tab in Settings are gone. Each note has a **Font** menu in its toolbar that sets the text and headings of that note. Reiimei fonts (Reiimei Display, Echolume) are listed first, then a separate group of existing fonts (Newsreader, Marcellus, system sans-serif). The choice is saved with the note and syncs. Fonts you picked in the old Settings tab no longer apply.
+- **The toolbar is sectioned and collapsed.** A row of section chips replaces the long row of buttons, and every section starts closed. Writing notes: **Text**, **Paragraph**, **Insert**, **Tools**. Code notes: **Edit**, **Navigate**, **Tools**. Click a chip to open or close its buttons. Preview keeps the Tools section open so you can get back to editing.
+- **About page** in Settings: version, release date, how Reiimei is running, this device, credits, and a button that copies the version info.
+- **Note lists are named for what they show:** Notes, Research notes, Coding notes, Storyboard notes, and **All notes** when Show all modes is on.
+- Fixed the phone editor header running off the screen with the wider interface font.
 
 ## What changed in v0.12.0 (Coding mode)
 
@@ -116,7 +125,7 @@ Note: a device still on v0.7 would show the hidden cache record in Recently Dele
 - New look: moonlit blue and frost in light and dark themes, with ivory-gold for tags and pinned notes
 - New icon: a reiimei cut open, on a winter night sky
 - The definition of reiimei appears when no note is open
-- Fonts (Marcellus and Newsreader) are saved for offline use after the first online launch
+- Newsreader and Marcellus (the existing fonts in the Font menu) are saved for offline use after the first online launch; Reiimei Display and Echolume are built in
 - Backups from Inkwell v0.1.0 can still be imported
 
 ## Features
@@ -169,9 +178,9 @@ Then open http://localhost:8000 in Edge or Chrome. Notes work immediately, saved
 
 The iPhone needs an HTTPS address. GitHub Pages hosts the app for free. Only the app's code goes to GitHub; your notes never do.
 
-1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.12.0` folder.
+1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.13.0` folder.
 2. **Create the repository.** In Safari, sign in at github.com, tap **+** › **New repository**. Name it `reiimei`, set it to **Public** (free Pages needs a public repository), and tap **Create repository**.
-3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.12.0` folder, tap **Select**, select all 36 files, and tap **Open**. Scroll down and tap **Commit changes**.
+3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.13.0` folder, tap **Select**, select all 36 files, and tap **Open**. Scroll down and tap **Commit changes**.
    - If you don't see the upload link, tap the **aA** button in Safari's address bar › **Request Desktop Website** and try again.
 4. **Turn on Pages.** In the repository, open **Settings** › **Pages**. Under **Build and deployment**, set Source to **Deploy from a branch**, Branch to **main** and **/ (root)**, then tap **Save**.
 5. **Wait a minute or two**, then reload the Pages screen. It shows your address, which looks like `https://yourname.github.io/reiimei/`.
@@ -274,7 +283,7 @@ The service worker caches the app files. When you change any file, bump `VERSION
 - **Settings › Log** › Download gives a text log of everything the app did, including sync results and errors.
 - **"Test connection"** in Settings › Sync confirms the URL, key, sign-in, and tables are all correct.
 
-## Known limits in v0.12.0
+## Known limits in v0.13.0
 
 - Images can be linked but not attached
 - Sources belong to one note; there is no shared library yet

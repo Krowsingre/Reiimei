@@ -61,7 +61,7 @@
         <button class="icon-btn mobile-only" id="btn-back-sidebar" aria-label="Folders">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
         </button>
-        <h2 class="pane-title" id="list-title">All Notes</h2>
+        <h2 class="pane-title" id="list-title">Notes</h2>
         <button class="text-btn" id="btn-empty-trash" hidden>Empty</button>
         <button class="icon-btn" id="btn-view" title="Sort and show" aria-label="Sort and show notes"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 12h4M12 12h8M4 17h12M20 17h0"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="17" r="2"/></svg><i class="view-dot" id="view-dot" hidden></i></button>
         <button class="text-btn" id="btn-select" title="Select several notes">Select</button>
@@ -128,27 +128,56 @@
             <option value="sql">SQL</option>
           </optgroup>
         </select>
-        <div class="tool-group" id="tool-buttons"></div>
-        <div class="tool-group" id="code-tools" hidden>
-          <button class="tool" data-code="tidy" title="Fix indentation and spacing">Tidy</button>
-          <button class="tool" data-code="indent" title="Indent (Tab)">Indent</button>
-          <button class="tool" data-code="outdent" title="Outdent (Shift+Tab)">Outdent</button>
-          <button class="tool" data-code="comment" title="Comment or uncomment (Ctrl+/)">Comment</button>
-          <button class="tool" id="btn-find" aria-pressed="false" title="Find and replace (Ctrl+F)">Find</button>
-          <button class="tool" id="btn-snippets" title="Snippets saved in this project">Snippets</button>
-          <button class="tool" id="btn-code-outline" aria-pressed="false" title="Outline of functions, classes, headings">Outline</button>
+        <select id="note-font" aria-label="Font for this note" title="Font for this note">
+          <optgroup label="Reiimei fonts">
+            <option value="display">Reiimei Display</option>
+            <option value="echolume">Echolume</option>
+          </optgroup>
+          <optgroup label="Other fonts">
+            <option value="newsreader">Newsreader</option>
+            <option value="marcellus">Marcellus</option>
+            <option value="sans">System sans-serif</option>
+          </optgroup>
+        </select>
+        <div class="rb-chips" id="rb-chips" role="group" aria-label="Toolbar sections">
+          <button class="rb-chip" data-sec="text" aria-expanded="false" hidden>Text</button>
+          <button class="rb-chip" data-sec="para" aria-expanded="false" hidden>Paragraph</button>
+          <button class="rb-chip" data-sec="insert" aria-expanded="false" hidden>Insert</button>
+          <button class="rb-chip" data-sec="edit" aria-expanded="false" hidden>Edit</button>
+          <button class="rb-chip" data-sec="nav" aria-expanded="false" hidden>Navigate</button>
+          <button class="rb-chip" data-sec="tools" aria-expanded="false" hidden>Tools</button>
         </div>
-        <span class="tool-sep"></span>
-        <button class="tool" id="btn-fonts" title="Choose fonts">Aa</button>
-        <button class="tool" id="btn-preview" aria-pressed="false" title="Preview">Preview</button>
-        <button class="tool" id="btn-sources" title="Sources and citations">Sources</button>
-        <button class="tool story-only" id="btn-board" aria-pressed="true" title="Switch between scene cards and text" hidden>Board</button>
-        <button class="tool story-only" id="btn-registers" title="Characters, locations, items and settings for this project" hidden>Registers</button>
-        <button class="tool story-only" id="btn-continuity" title="Check this story against its registers" hidden>Continuity</button>
-        <button class="tool research-only" id="btn-quote" title="Quote a source" hidden>Quote</button>
-        <button class="tool research-only" id="btn-outline" aria-pressed="false" title="Outline of headings" hidden>Outline</button>
-        <button class="tool" id="btn-paper" title="Format as an MLA or APA paper">Paper</button>
-        <button class="tool" id="btn-copy" title="Copy for Populi or as Markdown">Copy</button>
+        <div class="rb-panels" id="rb-panels">
+          <div class="rb-group" id="tool-buttons"></div>
+          <div class="rb-group" id="code-tools" hidden>
+            <div class="rb-sec" data-sec="edit" hidden>
+              <button class="tool" data-code="tidy" title="Fix indentation and spacing">Tidy</button>
+              <button class="tool" data-code="indent" title="Indent (Tab)">Indent</button>
+              <button class="tool" data-code="outdent" title="Outdent (Shift+Tab)">Outdent</button>
+              <button class="tool" data-code="comment" title="Comment or uncomment (Ctrl+/)">Comment</button>
+            </div>
+            <div class="rb-sec" data-sec="nav" hidden>
+              <button class="tool" id="btn-find" aria-pressed="false" title="Find and replace (Ctrl+F)">Find</button>
+              <button class="tool" id="btn-snippets" title="Snippets saved in this project">Snippets</button>
+              <button class="tool" id="btn-code-outline" aria-pressed="false" title="Outline of functions, classes, headings">Outline</button>
+            </div>
+          </div>
+          <div class="rb-group">
+            <div class="rb-sec" data-sec="insert" hidden>
+              <button class="tool" id="btn-sources" title="Sources and citations">Sources</button>
+              <button class="tool research-only" id="btn-quote" title="Quote a source" hidden>Quote</button>
+            </div>
+            <div class="rb-sec" data-sec="tools" hidden>
+              <button class="tool" id="btn-preview" aria-pressed="false" title="Preview">Preview</button>
+              <button class="tool research-only" id="btn-outline" aria-pressed="false" title="Outline of headings" hidden>Outline</button>
+              <button class="tool story-only" id="btn-board" aria-pressed="true" title="Switch between scene cards and text" hidden>Board</button>
+              <button class="tool story-only" id="btn-registers" title="Characters, locations, items and settings for this project" hidden>Registers</button>
+              <button class="tool story-only" id="btn-continuity" title="Check this story against its registers" hidden>Continuity</button>
+              <button class="tool" id="btn-paper" title="Format as an MLA or APA paper">Paper</button>
+              <button class="tool" id="btn-copy" title="Copy for Populi or as Markdown">Copy</button>
+            </div>
+          </div>
+        </div>
       </div>
       <div class="trash-bar" id="trash-bar" hidden>
         This note is in Recently Deleted.
@@ -209,11 +238,11 @@
       <nav class="tabs" role="tablist" aria-label="Settings sections">
         <button class="tab active" data-tab="sync" role="tab">Sync</button>
         <button class="tab" data-tab="security" role="tab">Security</button>
-        <button class="tab" data-tab="fonts" role="tab">Fonts</button>
         <button class="tab" data-tab="writing" role="tab">Writing</button>
         <button class="tab" data-tab="diag" role="tab">Diagnostics</button>
         <button class="tab" data-tab="log" role="tab">Log</button>
         <button class="tab" data-tab="data" role="tab">Backup</button>
+        <button class="tab" data-tab="about" role="tab">About</button>
       </nav>
     </section>
     <main class="pane settings-main" id="settings-main" aria-label="Setting options" hidden>
@@ -301,28 +330,16 @@
       </ul>
     </section>
 
-    <section class="tab-panel" data-panel="fonts" hidden>
-      <p class="hint">Pick one face for headings and the Reiimei wordmark, and another for your notes. The choice is saved on this device.</p>
-      <label>Headings and wordmark
-        <select id="pref-head-font">
-          <option value="reiimei">Marcellus (original Reiimei look)</option>
-          <option value="display">Reiimei Display</option>
-          <option value="echolume">Echolume</option>
-        </select>
-      </label>
-      <label>Note text
-        <select id="pref-note-font">
-          <option value="newsreader">Newsreader (original Reiimei look)</option>
-          <option value="display">Reiimei Display (small caps; best for short notes)</option>
-          <option value="echolume">Echolume (capitals and small caps)</option>
-          <option value="sans">System sans-serif</option>
-        </select>
-      </label>
-      <div class="font-preview">
-        <p class="fp-head" id="font-sample-head">Reiimei</p>
-        <p class="font-sample" id="font-sample">The cold, luminous stillness peculiar to a clear winter night; especially the effect of moonlight upon frost.</p>
-      </div>
-      <p class="hint">Reiimei Display and Echolume are built into the app, so they work offline.</p>
+    <section class="tab-panel" data-panel="about" hidden>
+      <p class="about-name">Reiimei</p>
+      <table class="about-table">
+        <tr><th>Version</th><td id="about-version"></td></tr>
+        <tr><th>Released</th><td id="about-date"></td></tr>
+        <tr><th>Running as</th><td id="about-mode"></td></tr>
+        <tr><th>This device</th><td id="about-device"></td></tr>
+      </table>
+      <div class="row"><button class="btn" id="btn-copy-version">Copy version info</button></div>
+      <p class="hint">Reiimei &copy; Krowsingre Publishing LLC. Reiimei Display and Echolume are Krowsingre Publishing fonts built into the app. Newsreader and Marcellus are open fonts (SIL Open Font License) loaded from Google Fonts; the app uses similar system fonts until they have loaded once.</p>
     </section>
 
     <section class="tab-panel" data-panel="writing" hidden>

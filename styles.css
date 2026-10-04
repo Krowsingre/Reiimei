@@ -28,13 +28,13 @@
   --danger: #a3363a;
   --ok: #2f7a5c;
   --warn: #9a6a12;
-  --ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --display: "Marcellus", "Optima", "Candara", "Palatino Linotype", serif;
+  --display: "Reiimei Display", "Marcellus", "Optima", "Candara", "Palatino Linotype", Georgia, serif;
+  --ui: var(--display);
   --serif: "Newsreader", "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
   --mono: ui-monospace, "Cascadia Mono", Consolas, Menlo, monospace;
   /* Chosen in Settings › Writing: headings and note text can use different faces. */
-  --head-font: var(--serif);
-  --note-font: var(--serif);
+  --head-font: var(--display);
+  --note-font: var(--display);
   --radius: 10px;
   color-scheme: light;
 }
@@ -293,10 +293,8 @@ code { font-family: var(--mono); font-size: .9em; background: var(--paper-2); pa
   display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 6px 14px;
   border-bottom: 1px solid var(--rule);
 }
-.tool-group { flex-wrap: wrap; }
 .toolbar::-webkit-scrollbar { display: none; }
 .toolbar select { padding: 4px 6px; border: 1px solid var(--rule); border-radius: 7px; background: var(--paper); font-size: 13px; }
-.tool-group { display: flex; gap: 2px; }
 .tool {
   flex: none; min-width: 32px; height: 32px; padding: 0 8px; border: 0; border-radius: 7px;
   background: transparent; color: var(--ink-2); cursor: pointer; font-size: 13.5px; white-space: nowrap;
@@ -436,8 +434,6 @@ fieldset.authors legend { font-size: 13px; color: var(--ink-2); padding: 0 4px; 
   /* Phone: actions on the first row, formatting buttons scroll on the second. */
   .toolbar { flex-wrap: wrap; padding: 6px 10px; gap: 2px; }
   .toolbar .tool-sep { display: none; }
-  .tool-group { order: 2; flex: 1 0 100%; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-top: 4px; }
-  .tool-group::-webkit-scrollbar { display: none; }
   #btn-preview, #btn-sources, #btn-paper, #btn-copy { padding: 0 7px; }
   .preview { padding: 18px 16px 40vh; font-size: 17px; }
 }
@@ -555,11 +551,15 @@ fieldset.authors legend { font-size: 13px; color: var(--ink-2); padding: 0 4px; 
 .fp-head { margin: 0 0 6px; font: 400 26px/1.1 var(--display); letter-spacing: .12em; }
 .font-preview .font-sample { margin: 0; }
 /* Reiimei Display has one weight: keep it from being faked bolder. */
-html[data-head-font="display"] .pane-title, html[data-head-font="display"] .dialog h3, html[data-head-font="display"] .sec-head,
-html[data-head-font="display"] .preview h1, html[data-head-font="display"] .preview h2, html[data-head-font="display"] .preview h3 { font-weight: 400; font-synthesis: none; }
-html[data-note-font="display"] .note-item .title, html[data-note-font="display"] #body, html[data-note-font="display"] .preview { font-synthesis: none; }
-html[data-note-font="display"] .note-item .title { font-weight: 400; }
-html[data-note-font="display"] #body { line-height: 1.7; letter-spacing: .01em; }
+body { font-synthesis: none; }
+.pane-title, .dialog h3, .sec-head { font-weight: 400; }
+#editor[data-font="display"] #body { line-height: 1.7; letter-spacing: .01em; }
+/* One font choice per note (Font menu in the toolbar): note text and headings follow it. */
+#editor[data-font="echolume"] { --note-font: "Echolume", "Marcellus", system-ui, sans-serif; --head-font: var(--note-font); }
+#editor[data-font="newsreader"] { --note-font: "Newsreader", "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif; --head-font: var(--note-font); font-synthesis: weight style; }
+#editor[data-font="marcellus"] { --note-font: "Marcellus", "Optima", "Candara", "Palatino Linotype", serif; --head-font: var(--note-font); }
+#editor[data-font="sans"] { --note-font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; --head-font: var(--note-font); font-synthesis: weight style; }
+
 
 /* ---- v0.7.0: sort and show ---- */
 .icon-btn { position: relative; }
@@ -693,4 +693,22 @@ html[data-note-font="display"] #body { line-height: 1.7; letter-spacing: .01em; 
 #snip-dialog textarea.mono, #snip-dialog pre { font-family: var(--mono); font-size: 13px; }
 #snip-dialog pre { margin: 4px 0 0; padding: 6px 8px; max-height: 120px; overflow: auto; background: var(--accent-soft); border-radius: 8px; white-space: pre; }
 #snip-dialog textarea, #snip-dialog input:not([type=checkbox]), #snip-dialog select { width: 100%; box-sizing: border-box; font: inherit; }
-@media (max-width: 760px) { #code-tools { flex-wrap: wrap; overflow-x: visible; } }
+
+/* ---- v0.13.0: collapsible toolbar sections, About page ---- */
+.rb-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-left: 4px; }
+.rb-chip { border: 1px solid var(--rule); background: transparent; color: var(--ink-2); border-radius: 999px; padding: 3px 10px; font-size: 13px; cursor: pointer; }
+.rb-chip::after { content: " \25B8"; font-size: 10px; }
+.rb-chip[aria-expanded="true"] { background: var(--accent-soft); color: var(--ink); }
+.rb-chip[aria-expanded="true"]::after { content: " \25BE"; }
+.rb-panels { flex: 1 0 100%; display: flex; flex-wrap: wrap; gap: 0 8px; }
+.rb-group { display: contents; }
+.rb-sec { display: flex; flex-wrap: wrap; gap: 2px; align-items: center; padding: 2px 0; }
+.toolbar select#note-font { max-width: 150px; }
+.about-name { margin: 0 0 8px; font: 400 26px/1.1 var(--display); letter-spacing: .12em; }
+.about-table { border-collapse: collapse; margin: 0 0 12px; font-size: 14px; }
+.about-table th { text-align: left; font-weight: 400; color: var(--ink-3); padding: 4px 18px 4px 0; }
+.about-table td { padding: 4px 0; }
+@media (max-width: 760px) { .rb-chip { padding: 6px 12px; font-size: 14px; } .toolbar select#note-font { max-width: 120px; } }
+/* Reiimei Display is wide; keep the editor header inside a phone screen. */
+.editor-head select { min-width: 0; text-overflow: ellipsis; }
+@media (max-width: 760px) { #note-folder, #note-mode { max-width: 27vw; } .save-state { display: none; } }
