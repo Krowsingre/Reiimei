@@ -12,7 +12,7 @@ import * as codeIntel from './codeintel.js';
 import { isCode } from './code.js';
 import { noteTitle, noteSnippet, sharedFileCheck } from './share.js';
 
-export const APP_VERSION = '0.13.1';
+export const APP_VERSION = '0.13.2';
 export const BUILD_DATE = '2026-10-03';
 
 const $ = (id) => document.getElementById(id);
@@ -60,8 +60,8 @@ function prefs() {
 
 // Fonts: interface text and new notes use Reiimei Display. Each note can pick its own font from the
 // Font menu in the toolbar (meta.font); the editor shows it through #editor[data-font].
-const NOTE_FONTS = ['display', 'echolume', 'newsreader', 'marcellus', 'sans'];
-const FONT_LABELS = { display: 'Reiimei Display', echolume: 'Echolume', newsreader: 'Newsreader', marcellus: 'Marcellus', sans: 'System sans-serif' };
+const NOTE_FONTS = ['display', 'echolume', 'serif', 'sans'];
+const FONT_LABELS = { display: 'Reiimei Display', echolume: 'Echolume', serif: 'System serif', sans: 'System sans-serif' };
 const fontOf = (n) => (NOTE_FONTS.includes(n?.meta?.font) ? n.meta.font : 'display');
 function setPrefs(patch) {
   try { localStorage.setItem(PREFS_KEY, JSON.stringify({ ...prefs(), ...patch })); } catch { /* storage blocked */ }

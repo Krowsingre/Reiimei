@@ -1,8 +1,14 @@
-# Reiimei v0.13.1
+# Reiimei v0.13.2
 
 *reiimei* (REE-h-may), n. The cold, luminous stillness peculiar to a clear winter night; especially the effect of moonlight upon frost, illuminating the night without dispelling it.
 
 An offline-first notes app for Windows and iPhone, built as a Progressive Web App (PWA). No Mac, no App Store, no developer fee.
+
+## What changed in v0.13.2
+
+- **Reiimei Display v1.1.** The app now uses all six styles (Light, Regular, Bold, and an italic of each). The new version has 405 characters, including `# @ & * + = < > _ [ ] { }`, accented letters, curly quotes and dashes, so Markdown and code now show in your own font instead of a stand-in. Lowercase letters still appear as small caps by design.
+- **Marcellus and Newsreader are gone.** The app no longer loads anything from Google Fonts and needs no internet for fonts. The Font menu now offers Reiimei Display, Echolume, System serif and System sans-serif. Notes that were set to Marcellus or Newsreader now show in Reiimei Display. The definition screen and source lists use Reiimei Display too.
+- 41 files now (five new font files).
 
 ## What changed in v0.13.1
 
@@ -129,7 +135,7 @@ Note: a device still on v0.7 would show the hidden cache record in Recently Dele
 - New look: moonlit blue and frost in light and dark themes, with ivory-gold for tags and pinned notes
 - New icon: a reiimei cut open, on a winter night sky
 - The definition of reiimei appears when no note is open
-- Newsreader and Marcellus (the existing fonts in the Font menu) are saved for offline use after the first online launch; Reiimei Display and Echolume are built in
+- Every font is built into the app and works offline
 - Backups from Inkwell v0.1.0 can still be imported
 
 ## Features
@@ -182,9 +188,9 @@ Then open http://localhost:8000 in Edge or Chrome. Notes work immediately, saved
 
 The iPhone needs an HTTPS address. GitHub Pages hosts the app for free. Only the app's code goes to GitHub; your notes never do.
 
-1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.13.1` folder.
+1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.13.2` folder.
 2. **Create the repository.** In Safari, sign in at github.com, tap **+** › **New repository**. Name it `reiimei`, set it to **Public** (free Pages needs a public repository), and tap **Create repository**.
-3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.13.1` folder, tap **Select**, select all 36 files, and tap **Open**. Scroll down and tap **Commit changes**.
+3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.13.2` folder, tap **Select**, select all 41 files, and tap **Open**. Scroll down and tap **Commit changes**.
    - If you don't see the upload link, tap the **aA** button in Safari's address bar › **Request Desktop Website** and try again.
 4. **Turn on Pages.** In the repository, open **Settings** › **Pages**. Under **Build and deployment**, set Source to **Deploy from a branch**, Branch to **main** and **/ (root)**, then tap **Save**.
 5. **Wait a minute or two**, then reload the Pages screen. It shows your address, which looks like `https://yourname.github.io/reiimei/`.

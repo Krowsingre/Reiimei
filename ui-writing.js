@@ -87,7 +87,7 @@ export function renderToolbar(note) {
   const fs = $('note-font');
   fs.hidden = code;
   fs.disabled = ro;
-  fs.value = ['display', 'echolume', 'newsreader', 'marcellus', 'sans'].includes(note.meta?.font) ? note.meta.font : 'display';
+  fs.value = ['display', 'echolume', 'serif', 'sans'].includes(note.meta?.font) ? note.meta.font : 'display';
   syncRibbon();
 }
 

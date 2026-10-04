@@ -1,7 +1,6 @@
 // Reiimei service worker: caches the app shell so it opens with no connection.
 // Bump VERSION whenever any app file changes so devices pick up the update.
-const VERSION = 'reiimei-v0.13.1';
-const FONT_CACHE = 'reiimei-fonts';
+const VERSION = 'reiimei-v0.13.2';
 const SHELL = [
   './',
   './index.html',
@@ -31,7 +30,12 @@ const SHELL = [
   './render.html',
   './render.js',
   './Echolume-VF.woff2',
+  './ReiimeiDisplay-Light.woff',
+  './ReiimeiDisplay-LightItalic.woff',
   './ReiimeiDisplay-Regular.woff',
+  './ReiimeiDisplay-Italic.woff',
+  './ReiimeiDisplay-Bold.woff',
+  './ReiimeiDisplay-BoldItalic.woff',
   './Echolume-Italic-VF.woff2',
   './icon-maskable-512.png',
   './icon-192.png',
@@ -55,7 +59,7 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== VERSION && k !== FONT_CACHE).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => k !== VERSION).map((k) => caches.delete(k))))
       .then(() => self.clients.claim()),
   );
 });
@@ -64,17 +68,6 @@ self.addEventListener('fetch', (event) => {
   const req = event.request;
   const url = new URL(req.url);
   if (req.method !== 'GET') return;
-
-  // Web fonts: keep a copy after the first online launch so they work offline.
-  if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') {
-    event.respondWith(
-      caches.open(FONT_CACHE).then((c) => c.match(req).then((hit) => hit || fetch(req).then((res) => {
-        if (res.ok || res.type === 'opaque') c.put(req, res.clone());
-        return res;
-      }))).catch(() => new Response('', { status: 504 })),
-    );
-    return;
-  }
 
   // Only handle our own files. Sync requests to Supabase go straight to the network.
   if (url.origin !== self.location.origin) return;

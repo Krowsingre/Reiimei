@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co https://*.supabase.in; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co https://*.supabase.in; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'">
   <meta name="referrer" content="no-referrer">
   <title>Reiimei</title>
   <meta name="description" content="Reiimei: private, offline-first notes with folders, tags, sync, formatting, and MLA and APA citations.">
@@ -16,9 +16,6 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon-192.png">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Marcellus&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&display=swap">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -133,9 +130,8 @@
             <option value="display">Reiimei Display</option>
             <option value="echolume">Echolume</option>
           </optgroup>
-          <optgroup label="Other fonts">
-            <option value="newsreader">Newsreader</option>
-            <option value="marcellus">Marcellus</option>
+          <optgroup label="Device fonts">
+            <option value="serif">System serif</option>
             <option value="sans">System sans-serif</option>
           </optgroup>
         </select>
@@ -339,7 +335,7 @@
         <tr><th>This device</th><td id="about-device"></td></tr>
       </table>
       <div class="row"><button class="btn" id="btn-copy-version">Copy version info</button></div>
-      <p class="hint">Reiimei &copy; Krowsingre Publishing LLC. Reiimei Display and Echolume are Krowsingre Publishing fonts built into the app. Newsreader and Marcellus are open fonts (SIL Open Font License) loaded from Google Fonts; the app uses similar system fonts until they have loaded once.</p>
+      <p class="hint">Reiimei &copy; Krowsingre Publishing LLC. Reiimei Display and Echolume are Krowsingre Publishing fonts built into the app. Both ship inside the app, so every font works offline.</p>
     </section>
 
     <section class="tab-panel" data-panel="writing" hidden>
