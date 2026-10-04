@@ -10,9 +10,10 @@ import * as modes from './modes.js';
 import * as story from './storyboard.js';
 import * as codeIntel from './codeintel.js';
 import { isCode } from './code.js';
+import * as fonts from './fonts.js';
 import { noteTitle, noteSnippet, ownTitle, fallbackTitle, sharedFileCheck } from './share.js';
 
-export const APP_VERSION = '0.14.3';
+export const APP_VERSION = '0.14.5';
 export const BUILD_DATE = '2026-10-04';
 
 const $ = (id) => document.getElementById(id);
@@ -65,9 +66,7 @@ function prefs() {
 
 // Fonts: interface text and new notes use Reiimei Display. Each note can pick its own font from the
 // Font menu in the toolbar (meta.font); the editor shows it through #editor[data-font].
-const NOTE_FONTS = ['display', 'echolume', 'serif', 'sans'];
-const FONT_LABELS = { display: 'Reiimei Display', echolume: 'Echolume', serif: 'System serif', sans: 'System sans-serif' };
-const fontOf = (n) => (NOTE_FONTS.includes(n?.meta?.font) ? n.meta.font : 'display');
+const fontOf = (n) => fonts.fontId(n?.meta?.font);
 function setPrefs(patch) {
   try { localStorage.setItem(PREFS_KEY, JSON.stringify({ ...prefs(), ...patch })); } catch { /* storage blocked */ }
 }
@@ -497,9 +496,9 @@ function renderList() {
       <div class="title">${n.pinned ? ICONS.pin : ''}<span>${esc(titleOf(n))}</span></div>
       <div class="meta"><span class="date">${esc(formatDate(view().sort === 'created' ? (n.created_at || n.updated_at) : n.updated_at))}</span>${multi ? `<span class="dev">${esc(deviceOf(n).name)}</span>` : ''}${state.showAll ? `<span class="kind">${esc(modes.modeName(modes.kindOf(n)))}</span>` : ''}<span class="snippet">${esc(snippetOf(n))}</span></div>
       ${tagsOf(n).length ? `<div class="tags">${tagsOf(n).map((t) => `<span class="mini-tag">#${esc(t)}</span>`).join('')}</div>` : ''}
-      <div class="swipe-actions" aria-hidden="true">${state.filter.type === 'trash'
-        ? '<button type="button" data-swipe="restore" tabindex="-1">Restore</button><button type="button" class="danger" data-swipe="purge" tabindex="-1">Delete</button>'
-        : `<button type="button" data-swipe="pin" tabindex="-1">${n.pinned ? 'Unpin' : 'Pin'}</button><button type="button" class="danger" data-swipe="delete" tabindex="-1">Delete</button>`}</div>
+      ${state.filter.type === 'trash'
+        ? '<div class="swipe-actions left" aria-hidden="true"><button type="button" data-swipe="restore" tabindex="-1">Restore</button></div><div class="swipe-actions right" aria-hidden="true"><button type="button" class="danger" data-swipe="purge" tabindex="-1">Delete</button></div>'
+        : `<div class="swipe-actions left" aria-hidden="true"><button type="button" class="pin" data-swipe="pin" tabindex="-1">${n.pinned ? 'Unpin' : 'Pin'}</button><button type="button" data-swipe="share" tabindex="-1">Share</button></div><div class="swipe-actions right" aria-hidden="true"><button type="button" class="danger" data-swipe="delete" tabindex="-1">Delete</button></div>`}
     </li>`;
   }).join('');
   const v = view();
@@ -1216,15 +1215,20 @@ function bindSplash() {
 }
 
 // ---- Swipes (phone) ------------------------------------------------------------------
-// Swipe in from the left edge to go back a screen. Swipe a note to the left to show Pin and
-// Delete (Restore and Delete in Recently Deleted); swipe it back, or tap it, to hide them.
-const SWIPE_W = 150;
+// In the note list, swipe a note left to show Delete (swipe all the way to delete it, with Undo),
+// or right to show Pin and Share (all the way pins it). In Recently Deleted, left is Delete
+// forever and right is Restore. Swipe back, or tap the note, to hide the buttons.
+// Swiping in from the left edge goes back a screen, except on a note in the list, where a swipe
+// to the right is the note's own.
+const SWIPE_L = () => (state.filter.type === 'trash' ? 100 : 150); // buttons on the left (swipe right)
+const SWIPE_R = 100;                                               // button on the right (swipe left)
 let swipeOpen = null;
 let swipedAt = 0;
 function setSwipe(item, x, moving) {
   item.style.setProperty('--sx', `${x}px`);
   item.classList.toggle('swiping', moving);
-  item.classList.toggle('swiped', x < 0);
+  item.classList.toggle('swiped-left', x < 0);
+  item.classList.toggle('swiped-right', x > 0);
 }
 function closeSwipe() { if (swipeOpen) { setSwipe(swipeOpen, 0, false); swipeOpen = null; } }
 
@@ -1243,7 +1247,9 @@ async function swipeAction(act, id) {
   const n = state.notes.find((x) => x.id === id);
   closeSwipe();
   if (!n) return;
+  log.info('swipe', 'Note action', { act });
   if (act === 'pin') { replaceNote(await db.saveNote(n, { pinned: !n.pinned })); render(); scheduleSync(); toast(n.pinned ? 'Unpinned' : 'Pinned'); return; }
+  if (act === 'share') { await flushSave(); shareUi.open([state.notes.find((x) => x.id === id)], { single: true }); return; }
   if (act === 'restore') { replaceNote(await db.restoreNote(n)); render(); scheduleSync(); toast('Restored'); return; }
   if (act === 'purge') {
     const c = await ask({ title: 'Delete this note forever?', text: 'This cannot be undone.', okText: 'Delete forever' });
@@ -1265,7 +1271,7 @@ async function swipeAction(act, id) {
   }
 }
 
-// A tap that ends a swipe is not a tap on the note; a tap on a shown action runs it.
+// A tap that ends a swipe is not a tap on the note; a tap on a shown button runs it.
 function swipeClick(e, item) {
   if (Date.now() - swipedAt < 250) return true;
   const btn = e.target.closest('[data-swipe]');
@@ -1278,7 +1284,8 @@ function bindSwipes(cancelPress) {
   let edge = null;
   document.addEventListener('touchstart', (e) => {
     const t = e.touches[0];
-    edge = isPhone() && e.touches.length === 1 && t.clientX <= 24 ? { x: t.clientX, y: t.clientY } : null;
+    const onNote = !!e.target.closest?.('#note-list .note-item');
+    edge = isPhone() && e.touches.length === 1 && t.clientX <= 24 && !onNote ? { x: t.clientX, y: t.clientY } : null;
   }, { passive: true });
   document.addEventListener('touchend', (e) => {
     if (!edge) return;
@@ -1293,8 +1300,9 @@ function bindSwipes(cancelPress) {
   el.noteList.addEventListener('touchstart', (e) => {
     const item = e.target.closest('.note-item');
     if (swipeOpen && swipeOpen !== item) closeSwipe();
-    if (!item || state.selecting || e.touches.length !== 1 || e.touches[0].clientX <= 24) { sw = null; return; }
-    sw = { item, x0: e.touches[0].clientX, y0: e.touches[0].clientY, base: item === swipeOpen ? -SWIPE_W : 0, dir: null, dx: 0 };
+    if (!item || state.selecting || e.touches.length !== 1 || e.target.closest('[data-swipe]')) { sw = null; return; }
+    const cur = parseFloat(item.style.getPropertyValue('--sx')) || 0;
+    sw = { item, x0: e.touches[0].clientX, y0: e.touches[0].clientY, base: item === swipeOpen ? cur : 0, dir: null, dx: 0, w: item.offsetWidth };
   }, { passive: true });
   el.noteList.addEventListener('touchmove', (e) => {
     if (!sw) return;
@@ -1302,22 +1310,29 @@ function bindSwipes(cancelPress) {
     const dx = t.clientX - sw.x0;
     const dy = t.clientY - sw.y0;
     if (!sw.dir) {
-      if (Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy) && (dx < 0 || sw.base < 0)) sw.dir = 'h';
-      else if (Math.abs(dy) > 8 || Math.abs(dx) > 8) { sw = null; return; }
+      if (Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy)) sw.dir = 'h';
+      else if (Math.abs(dy) > 8) { sw = null; return; }
       else return;
     }
     e.preventDefault();
     cancelPress();
     sw.dx = dx;
-    setSwipe(sw.item, Math.max(-SWIPE_W - 30, Math.min(0, sw.base + dx)), true);
+    setSwipe(sw.item, Math.max(-sw.w, Math.min(sw.w, sw.base + dx)), true);
   }, { passive: false });
   const end = () => {
     if (!sw) return;
-    const { item, dir, base, dx } = sw;
+    const { item, dir, base, dx, w } = sw;
     sw = null;
     if (dir !== 'h') return;
     swipedAt = Date.now();
-    if (base + dx < -SWIPE_W / 2) { setSwipe(item, -SWIPE_W, false); swipeOpen = item; }
+    const x = base + dx;
+    const trash = state.filter.type === 'trash';
+    // All the way across: do the main thing straight away.
+    if (x < -w * 0.55) { setSwipe(item, -w, false); swipeAction(trash ? 'purge' : 'delete', item.dataset.id); return; }
+    if (x > w * 0.55) { setSwipe(item, 0, false); swipeAction(trash ? 'restore' : 'pin', item.dataset.id); return; }
+    // Part of the way: show the buttons on that side.
+    if (x < -SWIPE_R / 2) { setSwipe(item, -SWIPE_R, false); swipeOpen = item; }
+    else if (x > SWIPE_L() / 2) { setSwipe(item, SWIPE_L(), false); swipeOpen = item; }
     else { setSwipe(item, 0, false); if (swipeOpen === item) swipeOpen = null; }
   };
   el.noteList.addEventListener('touchend', end);
@@ -1512,6 +1527,7 @@ function openSettings(tab = 'sync', explicitTab = tab !== 'sync') {
   security.renderSettings();
   $('pref-format').value = prefs().format;
   $('pref-style').value = prefs().style;
+  $('pref-ui-font').value = fonts.fontId(prefs().uiFont);
   renderDiagnostics();
   $('log-view').textContent = log.exportText() || '(empty)';
   showTab(tab);
@@ -1677,6 +1693,12 @@ function bindEvents() {
   });
   $('pref-format').addEventListener('change', (e) => { setPrefs({ format: e.target.value }); log.info('prefs', 'Default format changed', { format: e.target.value }); });
   $('pref-style').addEventListener('change', (e) => { setPrefs({ style: e.target.value }); log.info('prefs', 'Default citation style changed', { style: e.target.value }); });
+  fonts.fillFontSelect($('pref-ui-font'));
+  $('pref-ui-font').addEventListener('change', (e) => {
+    setPrefs({ uiFont: e.target.value });
+    fonts.applyUiFont(e.target.value);
+    log.info('prefs', 'Interface font changed', { font: e.target.value });
+  });
   $('btn-new-note').addEventListener('click', newNote);
   $('btn-new-folder').addEventListener('click', newFolder);
   $('btn-back-sidebar').addEventListener('click', () => setMobileView('sidebar'));
@@ -1948,6 +1970,7 @@ async function boot() {
   const t0 = performance.now();
   log.info('boot', `Reiimei ${APP_VERSION} starting`);
   try {
+    fonts.applyUiFont(prefs().uiFont);
     bindEvents();
     trackViewport();
     writing.init(hooks);

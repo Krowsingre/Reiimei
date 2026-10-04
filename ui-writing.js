@@ -13,6 +13,7 @@ import * as storyUi from './ui-storyboard.js';
 import * as codingUi from './ui-coding.js';
 import * as modes from './modes.js';
 import * as rich from './ui-rich.js';
+import * as fonts from './fonts.js';
 
 const $ = (id) => document.getElementById(id);
 let app = null; // hooks supplied by app.js
@@ -85,7 +86,7 @@ export function renderToolbar(note) {
   const fs = $('note-font');
   $('note-font-row').hidden = code;
   fs.disabled = ro;
-  fs.value = ['display', 'echolume', 'serif', 'sans'].includes(note.meta?.font) ? note.meta.font : 'display';
+  fs.value = fonts.fontId(note.meta?.font);
   rich.render(note);
   syncRibbon();
 }
@@ -602,6 +603,7 @@ export function init(hooks) {
   codeUi.init(hooks);
   storyUi.init(hooks);
   rich.init(hooks);
+  fonts.fillFontSelect($('note-font'));
   codingUi.init(hooks);
   research.init(hooks, { renderSources, saveMeta, insertText: (t) => insertAtCaret(t), sourcesOf, styleOf, citerFor });
 

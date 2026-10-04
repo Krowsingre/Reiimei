@@ -872,17 +872,95 @@ body { font-synthesis: none; }
   #note-title { font-size: 19px; }
 }
 
-/* ---- v0.14.3: swipe a note to show its actions (phone) ---- */
+/* ---- Swipe a note to show its buttons (phone): Delete on the right, Pin and Share on the left ---- */
 .swipe-actions { display: none; }
 @media (max-width: 760px) {
   .note-item { overflow: hidden; touch-action: pan-y; }
   .note-item > :not(.swipe-actions) { transform: translateX(var(--sx, 0px)); transition: transform .2s ease; }
-  .swipe-actions {
-    display: flex; position: absolute; top: 0; bottom: 0; right: 0; width: 150px;
-    transform: translateX(calc(150px + var(--sx, 0px))); transition: transform .2s ease;
-  }
+  .swipe-actions { display: flex; position: absolute; top: 0; bottom: 0; transition: transform .2s ease; }
+  .swipe-actions.left { left: 0; width: 150px; transform: translateX(calc(-100% + max(0px, var(--sx, 0px)))); }
+  .note-item:has(.swipe-actions.left button:only-child) .swipe-actions.left { width: 100px; }
+  .swipe-actions.right { right: 0; width: 100px; transform: translateX(calc(100% + min(0px, var(--sx, 0px)))); }
   .note-item.swiping > *, .note-item.swiping .swipe-actions { transition: none; }
-  .note-item:not(.swiped):not(.swiping) .swipe-actions { visibility: hidden; }
+  .note-item:not(.swiped-left) .swipe-actions.right, .note-item:not(.swiped-right) .swipe-actions.left { visibility: hidden; }
   .swipe-actions button { flex: 1; border: 0; font: inherit; font-size: 14px; color: #ffffff; background: var(--accent); cursor: pointer; }
+  .swipe-actions button.pin { background: var(--gold); }
   .swipe-actions button.danger { background: var(--danger); }
 }
+
+/* ---- v0.14.4: Lunarian fonts (Krowsingre Publishing), and a choice of interface font ---- */
+@font-face { font-family: "Lunarian Chancery"; src: url("LunarianChancery-Regular.woff") format("woff"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "Lunarian Cipher Hand"; src: url("LunarianCipherHand-Regular.woff") format("woff"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "Lunarian Codex Capitals"; src: url("LunarianCodexCapitals-Regular.woff") format("woff"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "Lunarian Earthshine"; src: url("LunarianEarthshine-Regular.woff") format("woff"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "Lunarian Flow"; src: url("LunarianFlow-Bold.woff") format("woff"); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: "Lunarian Flow"; src: url("LunarianFlow-BoldItalic.woff") format("woff"); font-weight: 700; font-style: italic; font-display: swap; }
+@font-face { font-family: "Lunarian Flow"; src: url("LunarianFlow-ExtraBold.woff") format("woff"); font-weight: 800; font-style: normal; font-display: swap; }
+@font-face { font-family: "Lunarian Flow"; src: url("LunarianFlow-Italic.woff") format("woff"); font-weight: 400; font-style: italic; font-display: swap; }
+@font-face { font-family: "Lunarian Flow"; src: url("LunarianFlow-Regular.woff") format("woff"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "Lunarian Flow"; src: url("LunarianFlow-Thin.woff") format("woff"); font-weight: 100; font-style: normal; font-display: swap; }
+@font-face { font-family: "Lunarian Flow"; src: url("LunarianFlow-ThinItalic.woff") format("woff"); font-weight: 100; font-style: italic; font-display: swap; }
+@font-face { font-family: "Lunarian Flow Codex"; src: url("LunarianFlowCodex-Bold.woff") format("woff"); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: "Lunarian Flow Codex"; src: url("LunarianFlowCodex-BoldItalic.woff") format("woff"); font-weight: 700; font-style: italic; font-display: swap; }
+@font-face { font-family: "Lunarian Flow Codex"; src: url("LunarianFlowCodex-ExtraBold.woff") format("woff"); font-weight: 800; font-style: normal; font-display: swap; }
+@font-face { font-family: "Lunarian Flow Codex"; src: url("LunarianFlowCodex-Italic.woff") format("woff"); font-weight: 400; font-style: italic; font-display: swap; }
+@font-face { font-family: "Lunarian Flow Codex"; src: url("LunarianFlowCodex-Regular.woff") format("woff"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "Lunarian Flow Codex"; src: url("LunarianFlowCodex-Thin.woff") format("woff"); font-weight: 100; font-style: normal; font-display: swap; }
+@font-face { font-family: "Lunarian Flow Codex"; src: url("LunarianFlowCodex-ThinItalic.woff") format("woff"); font-weight: 100; font-style: italic; font-display: swap; }
+@font-face { font-family: "Lunarian Flow Sigil"; src: url("LunarianFlowSigil-Bold.woff") format("woff"); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: "Lunarian Flow Sigil"; src: url("LunarianFlowSigil-BoldItalic.woff") format("woff"); font-weight: 700; font-style: italic; font-display: swap; }
+@font-face { font-family: "Lunarian Flow Sigil"; src: url("LunarianFlowSigil-ExtraBold.woff") format("woff"); font-weight: 800; font-style: normal; font-display: swap; }
+@font-face { font-family: "Lunarian Flow Sigil"; src: url("LunarianFlowSigil-Italic.woff") format("woff"); font-weight: 400; font-style: italic; font-display: swap; }
+@font-face { font-family: "Lunarian Flow Sigil"; src: url("LunarianFlowSigil-Regular.woff") format("woff"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "Lunarian Flow Sigil"; src: url("LunarianFlowSigil-Thin.woff") format("woff"); font-weight: 100; font-style: normal; font-display: swap; }
+@font-face { font-family: "Lunarian Flow Sigil"; src: url("LunarianFlowSigil-ThinItalic.woff") format("woff"); font-weight: 100; font-style: italic; font-display: swap; }
+@font-face { font-family: "Lunarian Moonlit Hand"; src: url("LunarianMoonlitHand-Regular.woff") format("woff"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "Lunarian Phase Line"; src: url("LunarianPhaseLine-Regular.woff") format("woff"); font-weight: 400; font-style: normal; font-display: swap; }
+/* Each note's Font menu. Characters a Lunarian face lacks are drawn in Reiimei Display. */
+#editor[data-font="flow"] { --note-font: "Lunarian Flow", "Reiimei Display", Georgia, serif; --head-font: var(--note-font); }
+#editor[data-font="flow-codex"] { --note-font: "Lunarian Flow Codex", "Reiimei Display", Georgia, serif; --head-font: var(--note-font); }
+#editor[data-font="flow-sigil"] { --note-font: "Lunarian Flow Sigil", "Reiimei Display", Georgia, serif; --head-font: var(--note-font); }
+#editor[data-font="moonlit"] { --note-font: "Lunarian Moonlit Hand", "Reiimei Display", Georgia, serif; --head-font: var(--note-font); }
+#editor[data-font="cipher"] { --note-font: "Lunarian Cipher Hand", "Reiimei Display", Georgia, serif; --head-font: var(--note-font); }
+#editor[data-font="chancery"] { --note-font: "Lunarian Chancery", "Reiimei Display", Georgia, serif; --head-font: var(--note-font); }
+#editor[data-font="earthshine"] { --note-font: "Lunarian Earthshine", "Reiimei Display", Georgia, serif; --head-font: var(--note-font); }
+#editor[data-font="phaseline"] { --note-font: "Lunarian Phase Line", "Reiimei Display", Georgia, serif; --head-font: var(--note-font); }
+#editor[data-font="codex-caps"] { --note-font: "Lunarian Codex Capitals", "Reiimei Display", Georgia, serif; --head-font: var(--note-font); }
+/* Settings › Writing › Interface font: menus, lists, settings and dialogs. The Reiimei name, the
+   definition page and notes set in Reiimei Display keep Reiimei Display. */
+:root[data-ui-font="flow"] { --ui: "Lunarian Flow", "Reiimei Display", Georgia, serif; --head-font: var(--ui); }
+:root[data-ui-font="flow-codex"] { --ui: "Lunarian Flow Codex", "Reiimei Display", Georgia, serif; --head-font: var(--ui); }
+:root[data-ui-font="flow-sigil"] { --ui: "Lunarian Flow Sigil", "Reiimei Display", Georgia, serif; --head-font: var(--ui); }
+:root[data-ui-font="moonlit"] { --ui: "Lunarian Moonlit Hand", "Reiimei Display", Georgia, serif; --head-font: var(--ui); }
+:root[data-ui-font="cipher"] { --ui: "Lunarian Cipher Hand", "Reiimei Display", Georgia, serif; --head-font: var(--ui); }
+:root[data-ui-font="chancery"] { --ui: "Lunarian Chancery", "Reiimei Display", Georgia, serif; --head-font: var(--ui); }
+:root[data-ui-font="earthshine"] { --ui: "Lunarian Earthshine", "Reiimei Display", Georgia, serif; --head-font: var(--ui); }
+:root[data-ui-font="phaseline"] { --ui: "Lunarian Phase Line", "Reiimei Display", Georgia, serif; --head-font: var(--ui); }
+:root[data-ui-font="codex-caps"] { --ui: "Lunarian Codex Capitals", "Reiimei Display", Georgia, serif; --head-font: var(--ui); }
+:root[data-ui-font="echolume"] { --ui: "Echolume", "Reiimei Display", system-ui, sans-serif; --head-font: var(--ui); }
+:root[data-ui-font="serif"] { --ui: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif; --head-font: var(--ui); }
+:root[data-ui-font="sans"] { --ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; --head-font: var(--ui); }
+:root[data-ui-font="serif"], :root[data-ui-font="sans"] { font-synthesis: weight style; }
+#editor[data-font="display"] { --head-font: var(--display); }
+.note-item .title { font-family: var(--ui); }
+.font-choice-sample { margin: -4px 0 12px; font: 17px/1.4 var(--ui); color: var(--ink-2); }
+
+/* ---- v0.14.5: Lunarian v1.1 adds Flow New Moon and Flow Eclipse (Flow's two stylistic sets as families) ---- */
+@font-face { font-family: "Lunarian Flow New Moon"; src: url("LunarianFlowNewMoon-Bold.woff") format("woff"); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: "Lunarian Flow New Moon"; src: url("LunarianFlowNewMoon-BoldItalic.woff") format("woff"); font-weight: 700; font-style: italic; font-display: swap; }
+@font-face { font-family: "Lunarian Flow New Moon"; src: url("LunarianFlowNewMoon-ExtraBold.woff") format("woff"); font-weight: 800; font-style: normal; font-display: swap; }
+@font-face { font-family: "Lunarian Flow New Moon"; src: url("LunarianFlowNewMoon-Italic.woff") format("woff"); font-weight: 400; font-style: italic; font-display: swap; }
+@font-face { font-family: "Lunarian Flow New Moon"; src: url("LunarianFlowNewMoon-Regular.woff") format("woff"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "Lunarian Flow New Moon"; src: url("LunarianFlowNewMoon-Thin.woff") format("woff"); font-weight: 100; font-style: normal; font-display: swap; }
+@font-face { font-family: "Lunarian Flow New Moon"; src: url("LunarianFlowNewMoon-ThinItalic.woff") format("woff"); font-weight: 100; font-style: italic; font-display: swap; }
+@font-face { font-family: "Lunarian Flow Eclipse"; src: url("LunarianFlowEclipse-Bold.woff") format("woff"); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: "Lunarian Flow Eclipse"; src: url("LunarianFlowEclipse-BoldItalic.woff") format("woff"); font-weight: 700; font-style: italic; font-display: swap; }
+@font-face { font-family: "Lunarian Flow Eclipse"; src: url("LunarianFlowEclipse-ExtraBold.woff") format("woff"); font-weight: 800; font-style: normal; font-display: swap; }
+@font-face { font-family: "Lunarian Flow Eclipse"; src: url("LunarianFlowEclipse-Italic.woff") format("woff"); font-weight: 400; font-style: italic; font-display: swap; }
+@font-face { font-family: "Lunarian Flow Eclipse"; src: url("LunarianFlowEclipse-Regular.woff") format("woff"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "Lunarian Flow Eclipse"; src: url("LunarianFlowEclipse-Thin.woff") format("woff"); font-weight: 100; font-style: normal; font-display: swap; }
+@font-face { font-family: "Lunarian Flow Eclipse"; src: url("LunarianFlowEclipse-ThinItalic.woff") format("woff"); font-weight: 100; font-style: italic; font-display: swap; }
+#editor[data-font="flow-newmoon"] { --note-font: "Lunarian Flow New Moon", "Reiimei Display", Georgia, serif; --head-font: var(--note-font); }
+#editor[data-font="flow-eclipse"] { --note-font: "Lunarian Flow Eclipse", "Reiimei Display", Georgia, serif; --head-font: var(--note-font); }
+:root[data-ui-font="flow-newmoon"] { --ui: "Lunarian Flow New Moon", "Reiimei Display", Georgia, serif; --head-font: var(--ui); }
+:root[data-ui-font="flow-eclipse"] { --ui: "Lunarian Flow Eclipse", "Reiimei Display", Georgia, serif; --head-font: var(--ui); }

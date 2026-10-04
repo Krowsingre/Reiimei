@@ -1,8 +1,20 @@
-# Reiimei v0.14.3
+# Reiimei v0.14.5
 
 *reiimei* (REE-h-may), n. The cold, luminous stillness peculiar to a clear winter night; especially the effect of moonlight upon frost, illuminating the night without dispelling it.
 
 An offline-first notes app for Windows and iPhone, built as a Progressive Web App (PWA). No Mac, no App Store, no developer fee.
+
+## What changed in v0.14.5
+
+- **Lunarian fonts v1.1.** Two new families, **Lunarian Flow New Moon** (faceted sigil forms) and **Lunarian Flow Eclipse** (swashes and tails), each in Thin, Regular, Bold, ExtraBold, Thin Italic, Italic and Bold Italic. They are in each note's Font menu and in Settings › Writing › Interface font, next to Lunarian Flow. Lunarian Flow Sigil is updated to v1.1. The other Lunarian fonts are unchanged.
+- 14 new font files: 84 files now. No Supabase changes.
+
+## What changed in v0.14.4
+
+- **The Lunarian fonts are built in.** Lunarian Flow, Flow Codex and Flow Sigil (each in Thin, Regular, Bold, ExtraBold, Thin Italic, Italic and Bold Italic), and Moonlit Hand, Cipher Hand, Chancery, Earthshine, Phase Line and Codex Capitals. They are in each note's **Font** menu, after Reiimei Display and Echolume, and work offline. Lunarian covers Latin-1 accented letters but not ® ™ € £ § ¶ · × ÷; those characters are drawn in Reiimei Display.
+- **Interface font.** **Settings › Writing › Interface font** sets the font for menus, lists, settings and buttons. It starts as Reiimei Display. The Reiimei name and the definition page always use Reiimei Display, and each note keeps its own Font. The choice belongs to this device, like the other settings.
+- **Swipes changed.** Swipe a note left to show **Delete**, or all the way left to delete it (with Undo). Swipe right to show **Pin** and **Share**, or all the way right to pin it. In Recently Deleted, right is **Restore** and left is **Delete** forever (you are asked first). Swiping in from the left edge still goes back a screen, except when you start on a note in the list, where it swipes the note.
+- 28 new files (27 fonts and `fonts.js`): 70 files now. No Supabase changes.
 
 ## What changed in v0.14.3
 
@@ -190,7 +202,9 @@ Note: a device still on v0.7 would show the hidden cache record in Recently Dele
 | `codeintel.js`, `ui-coding.js` | Coding mode: name check, autocomplete, find and replace, outline, snippets |
 | `render.html`, `render.js` | The sealed-off frame that renders HTML notes |
 | `Echolume-VF.woff2`, `Echolume-Italic-VF.woff2` | Echolume font (variable weight), © Krowsingre Publishing LLC |
-| `ReiimeiDisplay-Regular.woff` | Reiimei Display font, © Krowsingre Publishing LLC |
+| `ReiimeiDisplay-*.woff` | Reiimei Display font (six styles), © Krowsingre Publishing LLC |
+| `Lunarian*.woff` | Lunarian fonts (41 files), © Krowsingre Publishing LLC |
+| `fonts.js` | The list of fonts for the Font menu and the interface font setting |
 | `share.js`, `ui-share.js` | Sharing as text, combined documents, and archives |
 | `format.js` | Markdown and Populi markup engine |
 | `cite.js` | MLA 9 and APA 7 citation rules |
@@ -218,9 +232,9 @@ Then open http://localhost:8000 in Edge or Chrome. Notes work immediately, saved
 
 The iPhone needs an HTTPS address. GitHub Pages hosts the app for free. Only the app's code goes to GitHub; your notes never do.
 
-1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.14.3` folder.
+1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.14.5` folder.
 2. **Create the repository.** In Safari, sign in at github.com, tap **+** › **New repository**. Name it `reiimei`, set it to **Public** (free Pages needs a public repository), and tap **Create repository**.
-3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.14.3` folder, tap **Select**, select all 42 files, and tap **Open**. Scroll down and tap **Commit changes**.
+3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.14.5` folder, tap **Select**, select all 84 files, and tap **Open**. Scroll down and tap **Commit changes**.
    - If you don't see the upload link, tap the **aA** button in Safari's address bar › **Request Desktop Website** and try again.
 4. **Turn on Pages.** In the repository, open **Settings** › **Pages**. Under **Build and deployment**, set Source to **Deploy from a branch**, Branch to **main** and **/ (root)**, then tap **Save**.
 5. **Wait a minute or two**, then reload the Pages screen. It shows your address, which looks like `https://yourname.github.io/reiimei/`.
@@ -325,7 +339,7 @@ The service worker caches the app files. When you change any file, bump `VERSION
 - **Settings › Log** › Download gives a text log of everything the app did, including sync results and errors.
 - **"Test connection"** in Settings › Sync confirms the URL, key, sign-in, and tables are all correct.
 
-## Known limits in v0.14.3
+## Known limits in v0.14.5
 
 - Images can be linked but not attached
 - Sources belong to one note; there is no shared library yet
