@@ -1136,14 +1136,10 @@ body { font-synthesis: none; }
   .app[data-list-narrow="on"] .note-item .meta, .app[data-list-narrow="on"] .note-item .tags { display: none; }
   .app[data-list-narrow="on"] .mode-all { width: calc(100% - 16px); margin: 0 8px 8px; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .app[data-list-narrow="on"] .select-bar { flex-wrap: wrap; padding: 6px 8px; }
-  /* Focus: only the note, filling the window, its text in one comfortable centred column. */
+  /* Focus: only the note, filling the window. It keeps the usual layout, just wider: the folder
+     and the text on the left, the buttons on the right, folded parts side by side. */
   .app[data-focus="on"] { grid-template-columns: 1fr; }
   .app[data-focus="on"] .sidebar, .app[data-focus="on"] .list { display: none; }
-  .app[data-focus="on"] .editor { --col: max(24px, calc((100% - 780px) / 2)); }
-  .app[data-focus="on"] .editor-head { padding-left: max(12px, calc(var(--col) - 12px)); padding-right: max(12px, calc(var(--col) - 12px)); border-bottom-color: transparent; }
-  .app[data-focus="on"] .title-row, .app[data-focus="on"] .tag-row, .app[data-focus="on"] .toolbar, .app[data-focus="on"] .trash-bar,
-  .app[data-focus="on"] .editor-area:not(.code) > #body, .app[data-focus="on"] .rich, .app[data-focus="on"] .preview { padding-left: var(--col); padding-right: var(--col); }
-  .app[data-focus="on"] .tag-row, .app[data-focus="on"] .toolbar { border-bottom-color: transparent; }
   .app[data-focus="on"] #btn-close-note { display: none; }
 }
 @media (min-width: 761px) and (max-width: 1000px) {
@@ -1200,7 +1196,7 @@ input.switch:disabled { opacity: .5; cursor: default; }
   .ed-head:hover { color: var(--ink); }
   .ed-head svg { width: 12px; height: 12px; transition: transform .15s; }
   .tag-row > .ed-head, .toolbar > .ed-head { flex-basis: 100%; justify-content: flex-start; }
-  .ed-part.closed { flex: 0 0 auto; padding: 8px 4px 8px 20px; border-top: 0 !important; }
+  .ed-part.closed { flex: 0 0 auto; display: flex; align-items: center; min-height: 34px; padding: 0 4px 0 20px; border-top: 0 !important; }
   .ed-part.closed + .ed-part.closed { padding-left: 14px; }
   .ed-part.closed > :not(.ed-head) { display: none !important; }
   .ed-part.closed > .ed-head { margin: 0; flex-basis: auto; }

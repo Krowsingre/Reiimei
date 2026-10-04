@@ -1,12 +1,17 @@
-# Reiimei v0.16.0
+# Reiimei v0.16.1
 
 *reiimei* (REE-h-may), n. The cold, luminous stillness peculiar to a clear winter night; especially the effect of moonlight upon frost, illuminating the night without dispelling it.
 
 An offline-first notes app for Windows and iPhone, built as a Progressive Web App (PWA). No Mac, no App Store, no developer fee.
 
+## What changed in v0.16.1
+
+- **Focus uses the whole width.** In Focus the note now keeps its usual layout, just wider: the folder name and the text start at the left, the Focus and **⋯** buttons sit at the far right, and folded Title, Tags and Formatting line up side by side on one line. (v0.16.0 put everything in a narrow column in the middle.)
+- Still 86 files. No Supabase changes.
+
 ## What changed in v0.16.0
 
-- **Focus (computer).** The new button next to a note's **⋯** (or **Ctrl+Shift+F**) lets the note fill the whole window: the sidebar and the note list step aside, and the title, tags, toolbar and text sit in one comfortable column in the middle. The same button, **Esc** or Ctrl+Shift+F brings everything back exactly as it was, with your place in the note kept. It is not the browser's full screen, and Reiimei always opens with it off.
+- **Focus (computer).** The new button next to a note's **⋯** (or **Ctrl+Shift+F**) lets the note fill the whole window: the sidebar and the note list step aside, and the note keeps its usual layout across the whole width. The same button, **Esc** or Ctrl+Shift+F brings everything back exactly as it was, with your place in the note kept. It is not the browser's full screen, and Reiimei always opens with it off.
 - **A narrower note list (computer).** Drag the right edge of the note list to make it narrower, down to about an inch; its usual width is the widest. Double-click the edge to put it back, or use the arrow keys on it. When it is narrow the list shows just the titles, and **Sort and show**, **Select** and **Share** move into a **⋯** menu. Each device remembers the width.
 - **Spacing.** **Spacing** in a note's toolbar (next to Format and Font) sets the note's line height, the space between letters and the space between words, with sliders, and **Use the defaults** to go back. The defaults for every note are in **Settings › Fonts & Styles › Spacing**. Spacing applies to the whole note.
 - **Brackets, for lyrics and any writing in sections.** Turn on **Brackets** next to Format and Font, and every [label] in the note, such as [Verse 1], [Chorus] or [Refrain], shows as a note in the background: muted, on a soft tint. You still type in it like any other text, and copying, sharing and exports keep the brackets as they are. Citations ([@smith2020, 42]), links, checklist boxes and font marks are never treated as labels. Brackets is set for each note (and syncs with it); **Settings › Formatting › Brackets** turns it on for new notes. It works in Text and Markdown notes, and in Preview.
@@ -279,9 +284,9 @@ Then open http://localhost:8000 in Edge or Chrome. Notes work immediately, saved
 
 The iPhone needs an HTTPS address. GitHub Pages hosts the app for free. Only the app's code goes to GitHub; your notes never do.
 
-1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.16.0` folder.
+1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.16.1` folder.
 2. **Create the repository.** In Safari, sign in at github.com, tap **+** › **New repository**. Name it `reiimei`, set it to **Public** (free Pages needs a public repository), and tap **Create repository**.
-3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.16.0` folder, tap **Select**, select all 86 files, and tap **Open**. Scroll down and tap **Commit changes**.
+3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.16.1` folder, tap **Select**, select all 86 files, and tap **Open**. Scroll down and tap **Commit changes**.
    - If you don't see the upload link, tap the **aA** button in Safari's address bar › **Request Desktop Website** and try again.
 4. **Turn on Pages.** In the repository, open **Settings** › **Pages**. Under **Build and deployment**, set Source to **Deploy from a branch**, Branch to **main** and **/ (root)**, then tap **Save**.
 5. **Wait a minute or two**, then reload the Pages screen. It shows your address, which looks like `https://yourname.github.io/reiimei/`.
@@ -386,7 +391,7 @@ The service worker caches the app files. When you change any file, bump `VERSION
 - **Settings › Log** › Download gives a text log of everything the app did, including sync results and errors.
 - **"Test connection"** in Settings › Sync confirms the URL, key, sign-in, and tables are all correct.
 
-## Known limits in v0.16.0
+## Known limits in v0.16.1
 
 - Images can be linked but not attached
 - Sources belong to one note; there is no shared library yet
