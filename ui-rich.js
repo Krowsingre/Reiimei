@@ -5,6 +5,7 @@
 // and a note can switch between Text and Markdown without losing anything.
 import { parseMarkdown, inlineToMarkdown, noteToHtml, escapeHtml as esc } from './format.js';
 import { plainText } from './share.js';
+import { stripFragment, stripLabels, labelsIn } from './brackets.js';
 
 const $ = (id) => document.getElementById(id);
 let app = null;
@@ -593,6 +594,47 @@ function autoList(e) {
   pushToBody();
 }
 
+// The Aa button on a Text note: capitals for the selected words, or the whole note. recaseFn is
+// capitals.recase. Returns what was done and a way to undo it.
+export function recase(recaseFn) {
+  if (!active() || box.contentEditable !== 'true') return { mode: null };
+  restoreCaret();
+  tidyBlocks();
+  const s = sel();
+  const hasSel = s.rangeCount && inBox(s.anchorNode) && !s.isCollapsed;
+  const selected = hasSel ? new Set(textsIn(s.getRangeAt(0))) : null;
+  const leaf = (b) => b.tagName !== 'PRE' && !(b.tagName === 'DIV' && b.querySelector('p,div,h1,h2,h3,h4,h5,h6,li,ul,ol,blockquote'));
+  const pieces = [];
+  for (const b of [...box.querySelectorAll('p,div,h1,h2,h3,h4,h5,h6,li')].filter(leaf)) {
+    // The block's own text, line by line (a line break inside it starts a new line).
+    const map = [];
+    let text = '';
+    const walk = document.createTreeWalker(b, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT, {
+      acceptNode: (n) => {
+        if (n.nodeType === 3 || n.tagName === 'BR') return NodeFilter.FILTER_ACCEPT;
+        return /^(UL|OL|CODE|PRE)$/.test(n.tagName) && n !== b ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_SKIP;
+      },
+    });
+    let n;
+    while ((n = walk.nextNode())) {
+      if (n.nodeType === 1) { if (text) text += '\n'; continue; } // a line break starts a new line
+      map.push({ node: n, from: text.length });
+      text += n.nodeValue;
+    }
+    if (!text.trim()) continue;
+    if (selected && !map.some((m) => selected.has(m.node))) continue;
+    const owner = (i) => { let hit = null; for (const m of map) { if (i >= m.from && i < m.from + m.node.nodeValue.length) { hit = m.node; break; } } return hit; };
+    pieces.push({ text, map, markdown: false, editable: selected ? (i) => selected.has(owner(i)) : null });
+  }
+  const r = recaseFn(pieces);
+  if (!r.mode) return { mode: null };
+  const before = $('body').value;
+  pieces.forEach((p, k) => { for (const m of p.map) m.node.nodeValue = r.texts[k].slice(m.from, m.from + m.node.nodeValue.length); });
+  if (selected) selectTexts([...selected].filter((t) => t.isConnected));
+  pushToBody();
+  return { mode: r.mode, undo: () => { const ta = $('body'); ta.value = before; ta.dispatchEvent(new Event('input', { bubbles: true })); } };
+}
+
 // Citations and quotes go in where the caret was before the dialog opened.
 export function insertText(text) {
   restoreCaret();
@@ -614,6 +656,54 @@ export function scrollToHeading(i) {
   sel().removeAllRanges();
   sel().addRange(r);
   return true;
+}
+
+// With Brackets on and "Copy [ ]" unticked, labels stay out of copies and pastes.
+const dropLabels = () => { const n = app.note(); return !!n?.meta?.brackets && n.format === 'text' && app.prefs().bracketCopy === false; };
+const stripLabelsPlain = (text) => stripLabels(text);
+// Plain text over several lines: each line a line, and each empty line a blank line. Put in by
+// hand: the browser's own command can try to write inline styles (blocked by the app's security
+// policy) when the lines go into the middle of a line that already has text.
+function pastePlain(text) {
+  const lines = text.replace(/\r\n?/g, '\n').replace(/\n+$/, '').split('\n');
+  const s = sel();
+  const BLK = 'p,div,h1,h2,h3,h4,h5,h6,li';
+  const r = s.rangeCount ? s.getRangeAt(0) : null;
+  const blk = r && closest(r.startContainer, BLK);
+  if (lines.length < 2 || !blk || !box.contains(blk) || blk.closest('pre')) {
+    document.execCommand('insertText', false, lines.join('\n'));
+    pushToBody();
+    return;
+  }
+  r.deleteContents();
+  // What follows the caret in its line moves to the end of the last pasted line.
+  const rest = document.createRange();
+  rest.setStart(r.startContainer, r.startOffset);
+  rest.setEnd(blk, blk.childNodes.length);
+  const tail = rest.extractContents();
+  for (const x of [...blk.querySelectorAll('br')]) if (!x.nextSibling) x.remove();
+  if (lines[0]) blk.appendChild(document.createTextNode(lines[0]));
+  let after = blk;
+  let last = null;
+  for (let k = 1; k < lines.length; k++) {
+    const line = document.createElement(blk.tagName === 'LI' ? 'li' : 'p');
+    if (lines[k]) { last = document.createTextNode(lines[k]); line.appendChild(last); } else last = null;
+    if (k === lines.length - 1) {
+      const end = document.createRange();
+      if (last) end.setStartAfter(last); else end.setStart(line, 0);
+      end.collapse(true);
+      line.appendChild(tail);
+      r.setStart(end.startContainer, end.startOffset);
+    }
+    after.after(line);
+    after = line;
+  }
+  for (const el of [blk, ...box.querySelectorAll(BLK)]) if (el.isConnected && !el.textContent && !el.querySelector('br')) el.appendChild(document.createElement('br'));
+  r.collapse(true);
+  s.removeAllRanges();
+  s.addRange(r);
+  tidyBlocks();
+  pushToBody();
 }
 
 // ---- Wiring ------------------------------------------------------------------------------
@@ -667,6 +757,7 @@ export function init(hooks) {
     // A selection inside one list item or heading comes out as bare text; keep its kind.
     const one = closest(s.getRangeAt(0).commonAncestorContainer, 'li, h1, h2, h3, h4, h5, h6');
     if (one && !holder.querySelector('li, h1, h2, h3, h4, h5, h6')) { const w = document.createElement(one.tagName === 'LI' ? 'p' : one.tagName); while (holder.firstChild) w.appendChild(holder.firstChild); holder.appendChild(w); }
+    if (dropLabels()) stripFragment(holder);
     const md = htmlToMarkdown(holder);
     e.clipboardData.setData('text/plain', plainText({ body: md, format: 'text', meta: {} }, {}).replace(/\n/g, '\r\n').replace(/\r\r\n/g, '\r\n'));
     // Lines, not spaced paragraphs: other apps should not add a gap after each line.
@@ -702,18 +793,15 @@ export function init(hooks) {
       tpl.innerHTML = html.replace(/<style[\s\S]*?<\/style>/gi, '').replace(/\sstyle="[^"]*"/gi, (m) => (/font-weight:\s*(bold|[6-9]00)|font-style:\s*italic/i.test(m) ? ` data-style="${m.slice(8, -1)}"` : ''));
       const tmp = tpl.content;
       tmp.querySelectorAll('script,style,meta,link,img,iframe,object,title').forEach((x) => x.remove());
+      if (dropLabels()) stripFragment(tmp);
       const blocks = parseMarkdown(htmlToMarkdown(tmp));
       const single = blocks.length === 1 && blocks[0].t === 'p';
       document.execCommand('insertHTML', false, single ? blocks[0].lines.map(inlineHtml).join('<br>') : blocksHtml(blocks));
+    } else if (dropLabels() && labelsIn(text).length) {
+      // Leave the labels out of pasted text (each line a line, as below).
+      return pastePlain(stripLabelsPlain(text));
     } else if (/\n/.test(text)) {
-      // Plain text over several lines: each line a line, and each empty line a blank line.
-      const parts = text.replace(/\r\n?/g, '\n').replace(/\n+$/, '').split(/(\n+)/);
-      let html = '';
-      for (const part of parts) {
-        if (/^\n+$/.test(part)) { for (let k = 1; k < part.length; k++) html += '<p><br></p>'; continue; }
-        html += `<p>${esc(part) || '<br>'}</p>`;
-      }
-      document.execCommand('insertHTML', false, html);
+      return pastePlain(text);
     } else {
       document.execCommand('insertText', false, text);
     }

@@ -15,6 +15,7 @@ import * as modes from './modes.js';
 import * as rich from './ui-rich.js';
 import * as fonts from './fonts.js';
 import * as brackets from './brackets.js';
+import * as capitals from './capitals.js';
 
 const $ = (id) => document.getElementById(id);
 let app = null; // hooks supplied by app.js
@@ -113,6 +114,10 @@ export function renderToolbar(note) {
   rich.render(note);
   // Brackets and Spacing belong to writing notes.
   $('note-brackets-row').hidden = code;
+  $('note-case-row').hidden = code;
+  $('btn-case').disabled = ro;
+  $('note-brackets-copy-wrap').hidden = code || !note.meta?.brackets;
+  $('note-brackets-copy').checked = app.prefs().bracketCopy !== false;
   $('note-spacing-row').hidden = code;
   $('note-brackets').checked = !!note.meta?.brackets;
   $('note-brackets').disabled = ro;
@@ -170,6 +175,38 @@ function spacingInput() {
 }
 
 // ---- Brackets --------------------------------------------------------------------
+// True when copying and pasting should leave the [labels] out: Brackets on, "Copy [ ]" unticked.
+export function dropLabels() {
+  const note = app.note();
+  return !!note && !isCodeNote(note) && !!note.meta?.brackets && app.prefs().bracketCopy === false;
+}
+
+// ---- Capitals (the Aa button) --------------------------------------------------------
+async function changeCase() {
+  const note = app.note();
+  if (!note || note.deleted || isCodeNote(note)) return;
+  let mode = null;
+  let undo = null;
+  if (rich.active()) {
+    ({ mode, undo } = rich.recase(capitals.recase));
+  } else {
+    const ta = $('body');
+    const a = ta.selectionStart;
+    const b = ta.selectionEnd;
+    const sel = b > a;
+    const before = ta.value;
+    const r = capitals.recase([{ text: ta.value, markdown: note.format === 'markdown', editable: sel ? (i) => i >= a && i < b : null }]);
+    mode = r.mode;
+    if (mode) {
+      ta.focus();
+      applyEdit(ta, r.texts[0], a, b); // stays undoable with Ctrl+Z too
+      undo = () => { applyEdit(ta, before, a, b); };
+    }
+  }
+  if (!mode) { app.toast('Nothing to change.'); return; }
+  log.info('format', 'Capitals', { mode });
+  app.toast(mode === 'capitalize' ? 'Capitalized' : 'Made lowercase', 'Undo', undo);
+}
 let bracketTimer = null;
 export function paintBrackets() {
   const note = app.note();
@@ -366,6 +403,7 @@ async function copyAs(target) {
   if (isCodeNote(note)) text = note.body;
   else if (target === 'plain') text = S.titleLine(note) + plainText(note, ctx) + referencesText(note, 'plain');
   else text = S.titleLine(note, target) + F.exportNote(note.body, fmtOf(note), target, ctx) + referencesText(note, target);
+  if (dropLabels()) text = brackets.stripLabels(text);
   const ok = await writeClipboard(text);
   $('copy-msg').textContent = ok ? `Copied ${target === 'populi' ? 'for Populi' : target === 'markdown' ? 'as Markdown' : 'as plain text'}.` : 'Copying was blocked. Try again.';
   $('copy-msg').className = `msg ${ok ? 'ok' : 'error'}`;
@@ -735,6 +773,30 @@ export function init(hooks) {
     sec.prepend(b);
   });
   document.querySelectorAll('.ed-head').forEach((h) => h.addEventListener('click', () => toggleIn('closedParts', h.dataset.part)));
+  // Copy [ ]: with Brackets on, whether copying and pasting keep the labels (this device).
+  $('note-brackets-copy').addEventListener('change', (e) => { app.setPrefs({ bracketCopy: e.target.checked }); log.info('format', 'Copy with brackets', { on: e.target.checked }); });
+  $('note-brackets-copy-wrap').addEventListener('click', (e) => e.stopPropagation());
+  $('btn-case').addEventListener('click', changeCase);
+  // Markdown and Populi notes: copying, cutting and pasting without the labels.
+  const ta = $('body');
+  const plainCopy = (e) => {
+    if (!dropLabels() || rich.active() || ta.selectionEnd <= ta.selectionStart || !e.clipboardData) return;
+    const note = app.note();
+    e.clipboardData.setData('text/plain', brackets.stripLabels(ta.value.slice(ta.selectionStart, ta.selectionEnd), { markdown: note?.format === 'markdown' }));
+    e.preventDefault();
+    if (e.type === 'cut' && !ta.readOnly) applyEdit(ta, ta.value.slice(0, ta.selectionStart) + ta.value.slice(ta.selectionEnd), ta.selectionStart, ta.selectionStart);
+  };
+  ta.addEventListener('copy', plainCopy);
+  ta.addEventListener('cut', plainCopy);
+  ta.addEventListener('paste', (e) => {
+    if (!dropLabels() || rich.active() || ta.readOnly || !e.clipboardData) return;
+    const text = e.clipboardData.getData('text/plain');
+    if (!text) return;
+    e.preventDefault();
+    const kept = brackets.stripLabels(text);
+    const a = ta.selectionStart;
+    applyEdit(ta, ta.value.slice(0, a) + kept + ta.value.slice(ta.selectionEnd), a + kept.length, a + kept.length);
+  });
   $('note-brackets').addEventListener('change', (e) => {
     const note = app.note();
     if (!note) return;

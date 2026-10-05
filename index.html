@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-version="0.16.3">
+<html lang="en" data-version="0.16.4">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -222,7 +222,11 @@
               </label>
               <label class="rb-row rb-small" id="note-brackets-row" title="Show [section labels] such as [Verse 1] or [Chorus] as notes in the background"><span>Brackets</span>
                 <input type="checkbox" class="switch" id="note-brackets" role="switch">
+                <span class="rb-sub" id="note-brackets-copy-wrap" hidden title="When ticked, copying and pasting keep the [labels]. Untick to leave them out (this device)."><input type="checkbox" id="note-brackets-copy"> Copy [ ]</span>
               </label>
+              <div class="rb-row rb-small" id="note-case-row"><span>Case</span>
+                <button type="button" class="tool spacing-btn case-btn" id="btn-case" title="Capitalize the first letter of every line and sentence, and I. If that is already done, make everything lowercase. Works on the selection, or the whole note.">Aa</button>
+              </div>
               <div class="rb-row rb-small" id="note-spacing-row"><span>Spacing</span>
                 <button type="button" class="tool spacing-btn" id="btn-spacing" aria-haspopup="dialog" title="Line height, letter spacing and word spacing for this note">Line 1.7</button>
               </div>

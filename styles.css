@@ -1250,3 +1250,9 @@ input.switch:disabled { opacity: .5; cursor: default; }
   .splash .definition { text-align: center; align-items: center; }
   .splash .definition > p { max-width: 30rem; }
 }
+
+/* ---- v0.16.4: Copy [ ] beside Brackets, and the Aa button ---- */
+.rb-sub { display: inline-flex; align-items: center; gap: 5px; margin-left: 10px; font-size: 12.5px; color: var(--ink-2); white-space: nowrap; cursor: pointer; }
+.rb-sub input { margin: 0; width: 14px; height: 14px; accent-color: var(--accent); }
+.toolbar .rb-row.rb-small:has(.rb-sub:not([hidden])) { grid-template-columns: auto auto auto; }
+.toolbar .case-btn { min-width: 44px; font-variant-caps: normal; letter-spacing: .02em; }

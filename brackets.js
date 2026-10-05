@@ -1,6 +1,6 @@
 // Reiimei Brackets: with Brackets on, [section labels] such as [Verse 1], [Chorus] or [Bridge] are
 // drawn as notes in the background (muted, on a soft tint). They stay ordinary text: you type in
-// them as usual, and copying, sharing and exports keep the brackets as they are.
+// them as usual. Sharing and exports keep the brackets; copying does too unless "Copy [ ]" is unticked.
 // Not labels: citations [@smith2020, 42], Markdown links [text](https://…) and images,
 // checklist boxes [ ] and [x], font marks [[f:…]], and escaped \[ brackets.
 
@@ -66,4 +66,38 @@ export function paintBehind(layer, ta, on) {
   layer.innerHTML = html;
   layer.hidden = false;
   layer.scrollTop = ta.scrollTop;
+}
+
+// ---- Copying and pasting without the labels ------------------------------------------------
+// With Brackets on and "Copy [ ]" off, labels are left out of what you copy, cut or paste. A line
+// that held only a label goes with it; blank lines you typed stay.
+const dropIn = (text, markdown) => {
+  let out = '';
+  let at = 0;
+  for (const [a, b] of labelsIn(text, { markdown })) {
+    let start = a;
+    let end = b;
+    if (text[end] === ' ') end++; else if (start > 0 && text[start - 1] === ' ') start--;
+    out += text.slice(at, start);
+    at = end;
+  }
+  return out + text.slice(at);
+};
+export function stripLabels(text, { markdown = false } = {}) {
+  return String(text).split('\n').flatMap((line) => {
+    if (!line.trim()) return [line];
+    const kept = dropIn(line, markdown);
+    return kept.trim() ? [kept] : [];
+  }).join('\n');
+}
+// The same, on a piece of a page (a copied selection or pasted HTML).
+export function stripFragment(root) {
+  const blocks = 'p,div,li,h1,h2,h3,h4,h5,h6,blockquote';
+  const hadText = new Set([...root.querySelectorAll(blocks)].filter((b) => b.textContent.trim()));
+  const doc = root.ownerDocument || document;
+  const walk = doc.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const texts = [];
+  while (walk.nextNode()) texts.push(walk.currentNode);
+  for (const t of texts) if (labelsIn(t.nodeValue).length) t.nodeValue = dropIn(t.nodeValue, false);
+  for (const b of [...root.querySelectorAll(blocks)].reverse()) if (hadText.has(b) && !b.textContent.trim()) b.remove();
 }
