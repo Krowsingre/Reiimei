@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-version="0.17.1">
+<html lang="en" data-version="0.17.2">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -103,16 +103,19 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>
         </button>
         <button type="button" class="folder-btn" id="note-folder" aria-haspopup="dialog" title="Folder"><span id="note-folder-name"></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+        <span class="ed-heads desktop-only" id="ed-heads">
+          <button type="button" class="ed-head" data-part="meta" aria-expanded="true" aria-controls="ed-meta"><span>Title &amp; Tags</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+          <button type="button" class="ed-head" data-part="format" aria-expanded="true" aria-controls="toolbar"><span>Formatting</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+        </span>
         <span class="spacer"></span>
         <span class="save-state" id="save-state" role="status"></span>
         <button class="icon-btn desktop-only" id="btn-focus" title="Focus: the note fills the window (Ctrl+Shift+F)" aria-label="Focus on this note" aria-pressed="false"><svg class="i-expand" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg><svg class="i-collapse" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg></button>
         <button class="icon-btn" id="btn-note-menu" title="Share, pin or delete" aria-label="Note menu" aria-haspopup="dialog"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/></svg><i class="pin-dot" id="pin-dot" hidden></i></button>
       </header>
-      <!-- Two parts on a computer: Title & Tags, and Formatting. One opens at a time; a folded part
-           shows just its name, and folded ones sit side by side. -->
+      <!-- Two parts on a computer: Title & Tags, and Formatting. Their names sit in the header row,
+           beside the folder; one opens at a time, below the header. -->
       <div class="ed-top" id="ed-top">
       <div class="ed-meta ed-part" id="ed-meta" data-part="meta">
-        <button type="button" class="ed-head" data-part="meta" aria-expanded="true" aria-controls="title-row tag-row"><span>Title &amp; Tags</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
       <div class="title-row" id="title-row">
         <textarea id="note-title" rows="1" maxlength="200" placeholder="Title" aria-label="Title" autocomplete="off" spellcheck="true"></textarea>
       </div>
@@ -125,7 +128,6 @@
       <!-- Formatting. On a computer every group is shown, each in its own labelled box. On a phone
            the chips open one section at a time (data-sec says which chip a group belongs to). -->
       <div class="toolbar ed-part" id="toolbar" role="toolbar" aria-label="Formatting" data-part="format">
-        <button type="button" class="ed-head" data-part="format" aria-expanded="true" aria-controls="rb-panels"><span>Formatting</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
         <div class="rb-chips" id="rb-chips" role="group" aria-label="Toolbar sections">
           <button class="rb-chip" data-sec="text" aria-expanded="false" hidden>Text</button>
           <button class="rb-chip" data-sec="para" aria-expanded="false" hidden>Paragraph</button>
@@ -160,11 +162,7 @@
                   <button class="tool" data-tool="sub" title="Subscript" aria-label="Subscript">x₂</button>
                 </div>
                 <div class="rb-sec" data-sec="para" data-label="Lists" hidden>
-                  <button class="tool" data-tool="ul" title="Bulleted list (Ctrl+Shift+8)" aria-label="Bulleted list">•</button>
-                  <button class="tool" data-tool="ol" title="Numbered list (Ctrl+Shift+7)" aria-label="Numbered list">1.</button>
-                  <button class="tool" data-tool="task" title="Checklist" aria-label="Checklist">☐</button>
-                </div>
-                <div class="rb-sec" data-sec="para" data-label="Indent" hidden>
+                  <button class="tool t-list" data-tool="list" title="List: each press goes bullets, numbers, checklist, no list (Ctrl+Shift+8 bullets, Ctrl+Shift+7 numbers)" aria-label="List">•≡</button>
                   <button class="tool" data-tool="outdent" title="Move list item out (Shift+Tab)" aria-label="Move list item out">⇤</button>
                   <button class="tool" data-tool="indent" title="Move list item in (Tab)" aria-label="Move list item in">⇥</button>
                 </div>
@@ -184,12 +182,12 @@
               </div>
               <div class="rb-group">
                 <div class="rb-sec" data-sec="insert" data-label="Insert" hidden>
+                  <button type="button" class="tool insert-menu" id="btn-insert-menu" aria-haspopup="dialog" title="Insert a quote, code, a link or a citation">Add ▾</button>
                   <button class="tool" data-tool="quote" title="Quote" aria-label="Quote">❝</button>
                   <button class="tool" data-tool="code" title="Code" aria-label="Code">{ }</button>
                   <button class="tool" data-tool="link" title="Link" aria-label="Link">Link</button>
                   <button class="tool" id="btn-sources" title="Sources and citations">Sources</button>
                   <button class="tool research-only" id="btn-quote" title="Quote a source" hidden>Quote</button>
-                  <button class="tool" id="btn-paper" title="Format as an MLA or APA paper">Paper</button>
                 </div>
                 <div class="rb-sec" data-sec="view" data-label="View" hidden>
                   <button class="tool" id="btn-preview" aria-pressed="false" title="Preview">Preview</button>
@@ -200,6 +198,7 @@
                   <button class="tool story-only" id="btn-registers" title="Characters, locations, items and settings for this project" hidden>Registers</button>
                   <button class="tool story-only" id="btn-continuity" title="Check this story against its registers" hidden>Continuity</button>
                   <button class="tool" id="btn-copy" title="Copy for Populi or as Markdown">Copy</button>
+                  <button class="tool" id="btn-paper" title="Format as an MLA or APA paper">Paper</button>
                 </div>
               </div>
             </div>

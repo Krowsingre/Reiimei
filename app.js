@@ -18,7 +18,7 @@ import { noteToHtml } from './format.js';
 import { createHistory, lookOf, sameLook, LOOK_KEYS } from './history.js';
 import { noteTitle, noteSnippet, ownTitle, fallbackTitle, sharedFileCheck } from './share.js';
 
-export const APP_VERSION = '0.17.1';
+export const APP_VERSION = '0.17.2';
 // boot.js compares this with the page's version to catch a launch that mixes two releases.
 window.__reiimeiVersion = APP_VERSION;
 export const BUILD_DATE = '2026-10-04';
@@ -2388,6 +2388,7 @@ function setEditorText(text) {
 const hooks = {
   note: () => currentNote(),
   update: (changes) => updateCurrent(changes),
+  menu: (anchor, title, items) => openMenu(anchor, title, items),
   flushSave: () => flushSave(),
   setEditorText,
   ask: (o) => ask(o),

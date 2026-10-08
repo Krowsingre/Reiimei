@@ -304,11 +304,16 @@ function selectedBlocks() {
   });
 }
 
+// An element replaced by another (a list item that became a paragraph, a list of another kind),
+// so a caret that was in the old one can go into the new one.
+const movedTo = new WeakMap();
+const current = (n) => { while (n && !n.isConnected && movedTo.has(n)) n = movedTo.get(n); return n; };
 function keepSelection(fn) {
   const s = sel();
   const r = s.rangeCount ? s.getRangeAt(0) : null;
   const a = r && [r.startContainer, r.startOffset, r.endContainer, r.endOffset];
   fn();
+  if (a) { a[0] = current(a[0]); a[2] = current(a[2]); }
   if (!a || !box.contains(a[0]) || !box.contains(a[2])) return;
   const len = (n) => (n.nodeType === 3 ? n.length : n.childNodes.length);
   const nr = document.createRange();
@@ -323,6 +328,7 @@ function rename(el, tag) {
   for (const a of el.attributes) n.setAttribute(a.name, a.value);
   moveKids(el, n);
   el.replaceWith(n);
+  movedTo.set(el, n);
   return n;
 }
 const nestedLists = (li) => [...li.children].filter(isList);
@@ -341,6 +347,7 @@ function unlist(li) {
   for (const k of kids) { last.after(k); last = k; }
   if (after.length) { const rest = document.createElement(list.tagName); after.forEach((x) => rest.appendChild(x)); last.after(rest); }
   li.remove();
+  movedTo.set(li, p);
   if (!list.children.length) list.remove();
   return p;
 }
@@ -408,6 +415,43 @@ function toggleQuote(blocks) {
   tops.forEach((t) => bq.appendChild(t));
   const prev = bq.previousElementSibling;
   if (prev?.tagName === 'BLOCKQUOTE') { while (bq.firstChild) prev.appendChild(bq.firstChild); bq.remove(); }
+}
+
+// The List button: no list → bullets → numbers → checklist → no list, judged by where the caret is.
+export function listKind() {
+  const s = sel();
+  const li = s.rangeCount ? closest(s.anchorNode, 'li') : null;
+  if (!li) return 'none';
+  if (li.classList.contains('task')) return 'task';
+  return li.parentElement.tagName === 'OL' ? 'ol' : 'ul';
+}
+// Only the chosen items change kind: they move into a list of their own when the rest of their
+// list stays as it was.
+function retag(items, tag) {
+  const groups = new Map();
+  for (const li of items) { const l = li.parentElement; if (!groups.has(l)) groups.set(l, []); groups.get(l).push(li); }
+  for (const [list, lis] of groups) {
+    if (list.tagName === tag) continue;
+    const kids = [...list.children];
+    if (lis.length === kids.length) { rename(list, tag); continue; }
+    const i0 = kids.indexOf(lis[0]);
+    const i1 = kids.indexOf(lis[lis.length - 1]);
+    const mid = document.createElement(tag);
+    kids.slice(i0, i1 + 1).forEach((k) => mid.appendChild(k));
+    const after = kids.slice(i1 + 1);
+    list.after(mid);
+    if (after.length) { const rest = document.createElement(list.tagName); after.forEach((k) => rest.appendChild(k)); mid.after(rest); }
+    if (!list.children.length) list.remove();
+  }
+}
+function cycleList(blocks) {
+  const kind = listKind();
+  const items = blocks.filter((b) => b.tagName === 'LI');
+  if (kind === 'none' || !items.length) { toList('UL', blocks); return; }
+  if (kind === 'ul') { retag(items, 'OL'); return; }
+  if (kind === 'ol') { retag(items, 'UL'); items.forEach((li) => { li.classList.add('task'); li.dataset.done = 'false'; }); return; }
+  items.forEach((li) => { li.classList.remove('task'); delete li.dataset.done; });
+  toList('UL', items);
 }
 
 function toggleTask(blocks) {
@@ -558,6 +602,7 @@ export async function apply(id, { typing = false } = {}) {
   }
   switch (id) {
     case 'h': keepSelection(() => { if (!cycleHeading(blocks)) app.toast('Headings work on paragraphs, not list items.'); }); break;
+    case 'list': keepSelection(() => cycleList(blocks)); break;
     case 'ul': keepSelection(() => toList('UL', blocks)); break;
     case 'ol': keepSelection(() => toList('OL', blocks)); break;
     case 'task': keepSelection(() => toggleTask(blocks)); break;

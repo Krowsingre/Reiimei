@@ -1344,3 +1344,44 @@ input.switch:disabled { opacity: .5; cursor: default; }
 @media (max-width: 760px) {
   .versions-body { grid-template-columns: 1fr; grid-template-rows: minmax(120px, 34vh) minmax(160px, 1fr); }
 }
+
+/* ---- v0.17.2: headings in the header, one List button, the Insert menu, a shorter toolbar ---- */
+@media (min-width: 761px) {
+  /* Title & Tags and Formatting: names in the header row, beside the folder. */
+  .editor-head .ed-heads { display: inline-flex; align-items: center; gap: 14px; margin-left: 14px; min-width: 0; }
+  .editor-head .ed-head { margin: 0; white-space: nowrap; }
+  .editor-head .ed-head[aria-expanded="false"] svg { transform: rotate(-90deg); }
+  .ed-meta > .title-row { padding-top: 14px; }
+  .ed-top > .ed-part.closed { display: none !important; }
+  .ed-top:not(:has(> .ed-part:not(.closed))) { display: none; }
+  .ed-top > .toolbar { border-top: 0; }
+  .ed-meta:not(.closed) + .toolbar { border-top: 1px solid var(--rule); }
+  /* Insert is one menu; its buttons stay for the menu (and for the phone's Insert sheet). */
+  .rb-sec[data-label="Insert"] > .tool:not(.insert-menu) { display: none; }
+  /* Format & Font are narrower, and Options sits beside them. */
+  .rb-line[data-line="note"], .rb-line[data-line="options"] { flex: 0 1 auto; }
+  .rb-line[data-line="note"]:not(.closed) { margin-right: 18px; }
+  .rb-boxes .rb-box { flex: 0 1 auto; width: auto; padding-left: 6px; padding-right: 6px; }
+  .rb-box[data-box="Format"] select { width: 118px; }
+  .rb-box[data-box="Font"] select { width: 150px; }
+  .rb-line[data-line="options"] .rb-rows { flex-wrap: nowrap; align-items: center; min-height: 100%; gap: 6px 14px; }
+  .rb-line[data-line="options"] .rb-row { gap: 8px; }
+  .rb-line[data-line="options"] .rb-line-body { align-items: center; flex: 1; }
+}
+.insert-menu { display: none; }
+@media (min-width: 761px) { .insert-menu { display: inline-flex; } }
+.toolbar .t-list { letter-spacing: -.05em; }
+/* The phone: the mode drop-down in place of the four buttons and Show all modes, and the Note
+   sheet in two parts with their names. */
+@media (max-width: 760px) {
+  .mode-switch { display: none; }
+  .mode-pick { display: block; padding: 0 16px 12px; }
+  .mode-pick select { width: 100%; font: inherit; font-size: 16px; padding: 10px 10px; border-radius: 10px; border: 1px solid var(--accent); background: var(--accent-soft); color: var(--ink); }
+  .mode-all { display: none !important; }
+  .rb-line[data-line="note"]:has(.rb-sec:not([hidden])) > .rb-line-head,
+  .rb-line[data-line="options"]:has(.rb-sec:not([hidden])) > .rb-line-head {
+    display: block; flex: 1 0 100%; margin: 4px 0 0; padding: 0; border: 0; background: none; pointer-events: none;
+    color: var(--ink-3); font: 600 12px/1.2 var(--ui); letter-spacing: .12em; font-variant-caps: all-small-caps; text-align: left;
+  }
+  .rb-line-head svg { display: none; }
+}

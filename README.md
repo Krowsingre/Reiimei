@@ -1,8 +1,19 @@
-# Reiimei v0.17.1
+# Reiimei v0.17.2
 
 *reiimei* (REE-h-may), n. The cold, luminous stillness peculiar to a clear winter night; especially the effect of moonlight upon frost, illuminating the night without dispelling it.
 
 An offline-first notes app for Windows and iPhone, built as a Progressive Web App (PWA). No Mac, no App Store, no developer fee.
+
+## What changed in v0.17.2
+
+- **Title & Tags and Formatting are named in the header row** (computer), beside the folder name, which frees a whole row. Click one to open it below the header; opening one folds the other. Focus works as before.
+- **One List button.** Each press steps through bullets, numbers, a checklist and back to plain text (Markdown and Populi notes too; Populi has no checklist). Inside a longer list only the chosen lines change. **Ctrl+Shift+8** and **Ctrl+Shift+7** still go straight to bullets and numbers. Moving items in and out sits in the same box.
+- **Insert is one menu** (computer): **Add ▾** offers Quote, Code, Link and Sources (and Quote a source in Research). **Paper** moved to **Tools**. On a phone the Insert sheet is unchanged.
+- **A shorter toolbar.** Format and Font are narrower, and **Options** (Brackets, Copy [ ], Case, Spacing) sits beside them on the same row; each still folds by itself. In a narrow window Options moves below.
+- **On a phone**, the modes are one drop-down at the top of the home page (with All modes), in place of the four buttons and Show all modes, and the **Note** sheet names its two parts: Format & Font, and Options.
+- **A phone checklist** (below, *Checking a new version on a phone*) lists what to try on an iPhone after each update.
+- Still 90 files. No Supabase changes.
+- **Upload these files** (changed since v0.17.1): `app.js`, `index.html`, `styles.css`, `sw.js`, `ui-rich.js`, `ui-writing.js`, `README.md`.
 
 ## What changed in v0.17.1
 
@@ -340,15 +351,30 @@ Then open http://localhost:8000 in Edge or Chrome. Notes work immediately, saved
 
 The iPhone needs an HTTPS address. GitHub Pages hosts the app for free. Only the app's code goes to GitHub; your notes never do.
 
-1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.17.1` folder.
+1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.17.2` folder.
 2. **Create the repository.** In Safari, sign in at github.com, tap **+** › **New repository**. Name it `reiimei`, set it to **Public** (free Pages needs a public repository), and tap **Create repository**.
-3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.17.1` folder, tap **Select**, select all 90 files, and tap **Open**. Scroll down and tap **Commit changes**.
+3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.17.2` folder, tap **Select**, select all 90 files, and tap **Open**. Scroll down and tap **Commit changes**.
    - If you don't see the upload link, tap the **aA** button in Safari's address bar › **Request Desktop Website** and try again.
 4. **Turn on Pages.** In the repository, open **Settings** › **Pages**. Under **Build and deployment**, set Source to **Deploy from a branch**, Branch to **main** and **/ (root)**, then tap **Save**.
 5. **Wait a minute or two**, then reload the Pages screen. It shows your address, which looks like `https://yourname.github.io/reiimei/`.
 
 On a laptop, Netlify Drop (app.netlify.com/drop) is another option: drag the folder onto the page.
 
+
+## Checking a new version on a phone
+
+Chrome on a computer can only imitate an iPhone, so after each update try these on the phone itself (a minute or two):
+
+1. **It updated.** Settings › About shows the new version (open the app twice if it still shows the old one).
+2. **Typing.** In a new note, type a few lines past the bottom of the screen: the line you are on stays above the keyboard and above the formatting chips, and the chips never cover the text.
+3. **Dictation.** Dictate a sentence into a new note: the words appear as you speak, and switching the microphone off leaves one copy, not two.
+4. **Holding Delete** keeps deleting, faster the longer you hold it.
+5. **Undo.** Shake the phone (or swipe left with three fingers) to undo what you typed; Undo and Redo are also in the **Text** sheet.
+6. **Line breaks.** A blank line typed with Return twice is still there after closing and reopening the note, and after a sync.
+7. **The layout.** The mode drop-down is at the top of the home page; the **Note** sheet shows Format & Font, then Options; **Insert** opens its own sheet; the List button steps bullets → numbers → checklist → none.
+8. **Sync.** A change made on the phone shows on the computer, and the other way round.
+
+Anything that looks wrong: a screenshot and the step number is all that is needed.
 
 ## Trying a new version first (beta copy)
 
@@ -464,7 +490,7 @@ The service worker caches the app files. When you change any file, bump `VERSION
 - **Settings › Log** › Download gives a text log of everything the app did, including sync results and errors.
 - **"Test connection"** in Settings › Sync confirms the URL, key, sign-in, and tables are all correct.
 
-## Known limits in v0.17.1
+## Known limits in v0.17.2
 
 - Images can be linked but not attached
 - Sources belong to one note; there is no shared library yet

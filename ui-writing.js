@@ -44,6 +44,9 @@ const ribbonOpen = new Set(); // sections open now; every section starts closed
 const isPhone = () => window.matchMedia('(max-width: 760px)').matches;
 function syncRibbon() {
   const panels = $('rb-panels');
+  // The Insert menu is there only when something can be inserted in this note.
+  const ins = $('btn-insert-menu');
+  ins.hidden = ![...ins.parentElement.querySelectorAll('.tool:not(.insert-menu)')].some((b) => !b.hidden);
   document.querySelectorAll('#rb-chips .rb-chip').forEach((chip) => {
     const secs = [...panels.querySelectorAll(`.rb-sec[data-sec="${chip.dataset.sec}"]`)];
     const live = secs.filter((x) => !x.parentElement.hidden && [...x.querySelectorAll('.tool, .rb-row')].some((b) => !b.hidden));
@@ -102,7 +105,7 @@ export function renderToolbar(note) {
   codeUi.render(note);
   // Writing buttons the note's format has (Populi has no headings, lists of tasks, quotes or code).
   const ids = new Set(F.TOOLBAR[format].map((t) => t.id));
-  $('rb-panels').querySelectorAll('[data-tool]').forEach((b) => { b.hidden = code || !ids.has(b.dataset.tool); b.disabled = ro || previewOn; });
+  $('rb-panels').querySelectorAll('[data-tool]').forEach((b) => { b.hidden = code || !ids.has(b.dataset.tool === 'list' ? 'ul' : b.dataset.tool); b.disabled = ro || previewOn; });
   $('btn-preview').setAttribute('aria-pressed', String(previewOn));
   $('btn-preview').textContent = previewOn ? 'Edit' : pl || 'Preview';
   $('btn-sources').textContent = sourcesOf(note).length ? `Sources (${sourcesOf(note).length})` : 'Sources';
@@ -242,7 +245,7 @@ function applyParts() {
   document.querySelectorAll('.ed-part').forEach((p) => {
     const closed = p.dataset.part !== open;
     p.classList.toggle('closed', closed);
-    p.querySelector(':scope > .ed-head')?.setAttribute('aria-expanded', String(!closed));
+    document.querySelector(`#ed-heads .ed-head[data-part="${p.dataset.part}"]`)?.setAttribute('aria-expanded', String(!closed));
   });
   document.querySelectorAll('#rb-panels .rb-line').forEach((l) => {
     const closed = lines.includes(l.dataset.line);
@@ -319,10 +322,40 @@ export function applyEdit(ta, value, start, end) {
   ta.setSelectionRange(start, end);
 }
 
-function applyToolById(id) {
+// The List button in a Markdown or Populi note: the lines the selection touches step through
+// bullets, numbers, a checklist (Markdown) and back to plain lines.
+const LIST_KIND = (line) => (/^\s*[-*+]\s+\[[ xX]\]\s/.test(line) ? 'task' : /^\s*[-*+]\s/.test(line) ? 'ul' : /^\s*\d+[.)]\s/.test(line) ? 'ol' : 'none');
+const stripList = (l) => l.replace(/^(\s*)([-*+]\s+(\[[ xX]\]\s+)?|\d+[.)]\s+)/, '$1');
+export function cycleListText(value, start, end, { tasks = true } = {}) {
+  const ls = value.lastIndexOf('\n', start - 1) + 1;
+  let le = value.indexOf('\n', end);
+  if (le < 0) le = value.length;
+  const lines = value.slice(ls, le).split('\n');
+  const order = tasks ? ['none', 'ul', 'ol', 'task'] : ['none', 'ul', 'ol'];
+  const next = order[(order.indexOf(LIST_KIND(lines[0])) + 1) % order.length];
+  let n = 0;
+  const out = lines.map((l) => {
+    if (!l.trim()) return l;
+    const [, lead, rest] = /^(\s*)([\s\S]*)$/.exec(stripList(l));
+    if (next === 'none') return lead + rest;
+    if (next === 'ul') return `${lead}- ${rest}`;
+    if (next === 'ol') return `${lead}${++n}. ${rest}`;
+    return `${lead}- [ ] ${rest}`;
+  }).join('\n');
+  return { value: value.slice(0, ls) + out + value.slice(le), start: ls, end: ls + out.length, kind: next };
+}
+
+export function applyToolById(id) {
   const note = app.note();
   if (!note || note.deleted) return;
   if (rich.active()) { rich.apply(id); return; }
+  if (id === 'list') {
+    const ta = $('body');
+    const r = cycleListText(ta.value, ta.selectionStart, ta.selectionEnd, { tasks: F.TOOLBAR[fmtOf(note)].some((t) => t.id === 'task') });
+    ta.focus();
+    applyEdit(ta, r.value, r.start, r.end);
+    return;
+  }
   const tool = F.TOOLBAR[fmtOf(note)].find((t) => t.id === id);
   if (!tool) return;
   const ta = $('body');
@@ -803,6 +836,17 @@ export function init(hooks) {
   $('note-brackets-copy').addEventListener('change', (e) => { app.setPrefs({ bracketCopy: e.target.checked }); log.info('format', 'Copy with brackets', { on: e.target.checked }); });
   $('note-brackets-copy-wrap').addEventListener('click', (e) => e.stopPropagation());
   $('btn-case').addEventListener('click', changeCase);
+  // Insert on a computer is one menu of the Insert buttons that apply to this note.
+  $('btn-insert-menu').addEventListener('click', (e) => {
+    const sec = e.currentTarget.closest('.rb-sec');
+    const items = [...sec.querySelectorAll('.tool:not(.insert-menu)')].filter((b) => !b.hidden).map((b) => ({
+      label: { quote: 'Quote', code: 'Code', link: 'Link…' }[b.dataset.tool] || (b.id === 'btn-quote' ? 'Quote a source…' : b.id === 'btn-sources' ? `${b.textContent.trim()}…` : b.textContent.trim()),
+      hint: b.dataset.tool === 'quote' ? 'A quoted passage' : b.dataset.tool === 'code' ? 'Code in the text' : b.id === 'btn-sources' ? 'Add sources and cite them' : '',
+      disabled: b.disabled,
+      run: () => b.click(),
+    }));
+    app.menu(e.currentTarget, 'Insert', items);
+  });
   // Markdown and Populi notes: copying, cutting and pasting without the labels.
   const ta = $('body');
   const plainCopy = (e) => {
@@ -861,6 +905,7 @@ export function init(hooks) {
   $('toolbar').addEventListener('pointerdown', (e) => { if (e.pointerType !== 'mouse' && e.target.closest('.tool, .rb-chip') && (document.activeElement === $('body') || document.activeElement === $('rich'))) e.preventDefault(); });
   $('toolbar').addEventListener('mousedown', (e) => { if (e.target.closest('.tool, .rb-chip') && (document.activeElement === $('body') || document.activeElement === $('rich'))) e.preventDefault(); });
   $('ed-top').addEventListener('mousedown', (e) => { if (e.target.closest('.rb-label, .ed-head, .rb-line-head') && document.activeElement === $('rich')) e.preventDefault(); });
+  $('ed-heads').addEventListener('mousedown', (e) => { if (e.target.closest('.ed-head') && document.activeElement === $('rich')) e.preventDefault(); });
   // With words selected, the Font menu sets the font of those words only (Text and Markdown notes);
   // with nothing selected it sets the font of the whole note.
   $('note-font').addEventListener('change', async (e) => {
