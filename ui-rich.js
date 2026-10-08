@@ -770,6 +770,68 @@ function pastePlain(text) {
   pushToBody();
 }
 
+// ---- Find and replace (Text notes) --------------------------------------------------------
+// Matches are found line by line (a match never runs from one paragraph into the next), shown
+// with highlights that leave the text itself alone, and replaced as ordinary edits.
+const FIND_BLOCKS = 'p,div,h1,h2,h3,h4,h5,h6,li,pre,blockquote';
+export function findRanges(re) {
+  const out = [];
+  if (!active() || !re) return out;
+  const leaf = (b) => !b.querySelector(':scope > p, :scope > div, :scope > h1, :scope > h2, :scope > h3, :scope > h4, :scope > h5, :scope > h6, :scope > blockquote');
+  for (const b of [...box.querySelectorAll(FIND_BLOCKS)].filter(leaf)) {
+    const map = [];
+    let text = '';
+    const walk = document.createTreeWalker(b, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT, {
+      acceptNode: (n) => (n.nodeType === 1 ? (n !== b && (/^(UL|OL)$/.test(n.tagName) || n.matches(FIND_BLOCKS)) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_SKIP) : NodeFilter.FILTER_ACCEPT),
+    });
+    let n;
+    while ((n = walk.nextNode())) { map.push({ node: n, from: text.length }); text += n.nodeValue; }
+    if (!text) continue;
+    const at = (i, end) => {
+      for (const m of map) { const len = m.node.nodeValue.length; if (i < m.from + len || (end && i === m.from + len)) return [m.node, i - m.from]; }
+      const last = map[map.length - 1];
+      return [last.node, last.node.nodeValue.length];
+    };
+    re.lastIndex = 0;
+    let m;
+    while ((m = re.exec(text))) {
+      if (!m[0].length) { re.lastIndex++; continue; }
+      const r = document.createRange();
+      const [sn, so] = at(m.index, false);
+      const [en, eo] = at(m.index + m[0].length, true);
+      r.setStart(sn, so);
+      r.setEnd(en, eo);
+      out.push(r);
+    }
+  }
+  return out;
+}
+export function paintFind(ranges, cur) {
+  if (typeof CSS === 'undefined' || !CSS.highlights) return;
+  if (!ranges.length) { CSS.highlights.delete('rm-find'); CSS.highlights.delete('rm-find-cur'); return; }
+  CSS.highlights.set('rm-find', new Highlight(...ranges.filter((_, i) => i !== cur)));
+  if (cur >= 0 && ranges[cur]) CSS.highlights.set('rm-find-cur', new Highlight(ranges[cur])); else CSS.highlights.delete('rm-find-cur');
+}
+// Bring a match into view and select it (the find box keeps the focus).
+export function showRange(r) {
+  const s = sel();
+  s.removeAllRanges();
+  s.addRange(r.cloneRange());
+  savedRange = r.cloneRange();
+  const rect = r.getBoundingClientRect();
+  const b = box.getBoundingClientRect();
+  if (rect.top < b.top + 40 || rect.bottom > b.bottom - 40) box.scrollTop += rect.top - b.top - b.height / 3;
+}
+export function replaceRanges(ranges, text) {
+  if (!ranges.length) return;
+  for (const r of [...ranges].reverse()) {
+    r.deleteContents();
+    if (text) r.insertNode(document.createTextNode(text));
+  }
+  box.normalize();
+  pushToBody();
+}
+
 // ---- Following the caret (phone) ----------------------------------------------------------
 // The keyboard covers the bottom of the screen, and dictation adds words without key presses, so
 // the browser does not always scroll to follow them. The caret is kept inside the part of the

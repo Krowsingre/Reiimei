@@ -16,9 +16,9 @@ import * as versions from './versions.js';
 import { BETA, KEY, NAME } from './channel.js';
 import { noteToHtml } from './format.js';
 import { createHistory, lookOf, sameLook, LOOK_KEYS } from './history.js';
-import { noteTitle, noteSnippet, ownTitle, fallbackTitle, sharedFileCheck } from './share.js';
+import { noteTitle, noteSnippet, ownTitle, fallbackTitle, sharedFileCheck, plainText } from './share.js';
 
-export const APP_VERSION = '0.17.3';
+export const APP_VERSION = '0.17.4';
 // boot.js compares this with the page's version to catch a launch that mixes two releases.
 window.__reiimeiVersion = APP_VERSION;
 export const BUILD_DATE = '2026-10-04';
@@ -407,6 +407,20 @@ function filteredNotes() {
 }
 
 const firstTag = (n) => [...tagsOf(n)].sort((a, b) => a.localeCompare(b))[0] || '';
+// In search results, the line where the words were found, with the words marked.
+function matchSnippet(n, q) {
+  let text;
+  try { text = isCode(n.format) ? n.body : plainText({ ...n, meta: n.meta || {} }, {}); } catch { text = n.body; }
+  const low = text.toLowerCase();
+  const at = low.indexOf(q.toLowerCase());
+  if (at < 0) return esc(snippetOf(n));
+  const ls = text.lastIndexOf('\n', at - 1) + 1;
+  let le = text.indexOf('\n', at);
+  if (le < 0) le = text.length;
+  const from = Math.max(ls, at - 30);
+  const to = Math.min(le, at + q.length + 70);
+  return `${from > ls ? '…' : ''}${esc(text.slice(from, at))}<mark>${esc(text.slice(at, at + q.length))}</mark>${esc(text.slice(at + q.length, to))}${to < le ? '…' : ''}`;
+}
 function sortKey(n, sort) {
   if (sort === 'tag') return firstTag(n);
   if (sort === 'device') return deviceOf(n).name || '';
@@ -685,7 +699,7 @@ function renderSidebar() {
   wrap.id = 'trash-section';
   $('tag-section').insertAdjacentElement('beforebegin', wrap);
 
-  el.tagSuggest.innerHTML = tags.map(([t]) => `<option value="${esc(t)}">`).join('');
+
 }
 
 // ---- Modes -----------------------------------------------------------------
@@ -794,7 +808,7 @@ function renderList() {
     return head + `
     <li class="note-item${n.id === state.currentId && !state.selecting ? ' active' : ''}${state.selected.has(n.id) ? ' selected' : ''}" data-id="${n.id}" role="option" aria-selected="${state.selected.has(n.id)}">
       <div class="title">${n.pinned ? ICONS.pin : ''}<span>${esc(titleOf(n))}</span></div>
-      <div class="meta"><span class="date">${esc(formatDate(view().sort === 'created' ? (n.created_at || n.updated_at) : n.updated_at))}</span>${multi ? `<span class="dev">${esc(deviceOf(n).name)}</span>` : ''}${state.showAll ? `<span class="kind">${esc(modes.modeName(modes.kindOf(n)))}</span>` : ''}<span class="snippet">${esc(snippetOf(n))}</span></div>
+      <div class="meta"><span class="date">${esc(formatDate(view().sort === 'created' ? (n.created_at || n.updated_at) : n.updated_at))}</span>${multi ? `<span class="dev">${esc(deviceOf(n).name)}</span>` : ''}${state.showAll ? `<span class="kind">${esc(modes.modeName(modes.kindOf(n)))}</span>` : ''}<span class="snippet">${state.query.trim() ? matchSnippet(n, state.query.trim()) : esc(snippetOf(n))}</span></div>
       ${tagsOf(n).length ? `<div class="tags">${tagsOf(n).map((t) => `<span class="mini-tag">#${esc(t)}</span>`).join('')}</div>` : ''}
       ${state.filter.type === 'trash'
         ? '<div class="swipe-actions left" aria-hidden="true"><button type="button" data-swipe="restore" tabindex="-1">Restore</button></div><div class="swipe-actions right" aria-hidden="true"><button type="button" class="danger" data-swipe="purge" tabindex="-1">Delete</button></div>'
@@ -996,6 +1010,7 @@ async function selectNote(id) {
   await flushSave();
   const prev = state.currentId;
   if (prev && prev !== id) keepVersion(prev, 'left'); // in the background: opening the next note does not wait
+  if (prev !== id) writing.closeTextFind({ focus: false });
   if (prev && prev !== id) await discardIfBlank(prev);
   state.currentId = id;
   setSaveState('');
@@ -1003,6 +1018,8 @@ async function selectNote(id) {
   renderList();
   renderEditor();
   if (id) setMobileView('editor');
+  // Opened from a search: the words found are highlighted in the note.
+  if (id && state.query.trim()) writing.showSearch(state.query.trim());
 }
 
 async function selectFilter(filter) {
@@ -2290,19 +2307,62 @@ function bindEvents() {
     log.info('editor', 'Note restored', { id: state.currentId });
   });
 
+  // Tags you have used, offered as soon as you click into the box, narrowing as you type; a tag the
+  // note already has is not offered, and the list goes when nothing matches.
+  let tagPick = -1;
+  const tagChoices = () => {
+    const n = currentNote();
+    if (!n || n.deleted) return [];
+    const q = normTag(el.tagInput.value);
+    const have = tagsOf(n);
+    const all = tagCounts().map(([t]) => t).filter((t) => !have.includes(t));
+    if (!q) return all;
+    return [...all.filter((t) => t.startsWith(q)), ...all.filter((t) => !t.startsWith(q) && t.includes(q))];
+  };
+  const hideTags = () => { el.tagSuggest.hidden = true; el.tagInput.setAttribute('aria-expanded', 'false'); tagPick = -1; };
+  const showTags = () => {
+    const list = tagChoices().slice(0, 12);
+    if (!list.length || document.activeElement !== el.tagInput) { hideTags(); return; }
+    tagPick = Math.min(tagPick, list.length - 1);
+    el.tagSuggest.innerHTML = list.map((t, i) => `<li role="option" class="tag-opt" data-tag="${esc(t)}" aria-selected="${i === tagPick}">#${esc(t)}</li>`).join('');
+    el.tagSuggest.hidden = false;
+    el.tagInput.setAttribute('aria-expanded', 'true');
+  };
+  el.tagInput.addEventListener('focus', () => { tagPick = -1; showTags(); });
+  el.tagInput.addEventListener('input', () => { tagPick = -1; showTags(); });
+  el.tagInput.addEventListener('blur', () => setTimeout(hideTags, 120));
+  el.tagSuggest.addEventListener('mousedown', (e) => e.preventDefault());
+  el.tagSuggest.addEventListener('click', async (e) => {
+    const li = e.target.closest('.tag-opt');
+    if (!li) return;
+    el.tagInput.value = '';
+    await addTag(li.dataset.tag);
+    el.tagInput.focus();
+    showTags();
+  });
   el.tagInput.addEventListener('keydown', (e) => {
+    const open = !el.tagSuggest.hidden;
+    const opts = [...el.tagSuggest.querySelectorAll('.tag-opt')];
+    if (open && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+      e.preventDefault();
+      if (e.key === 'ArrowDown') tagPick = tagPick + 1 >= opts.length ? -1 : tagPick + 1;
+      else tagPick = tagPick - 1 < -1 ? opts.length - 1 : tagPick - 1;
+      opts.forEach((o, i) => o.setAttribute('aria-selected', String(i === tagPick)));
+      return;
+    }
+    if (e.key === 'Escape' && open) { e.preventDefault(); hideTags(); return; }
     if (e.key === 'Enter' || e.key === ',') {
       e.preventDefault();
-      const v = el.tagInput.value;
+      const v = open && tagPick >= 0 && opts[tagPick] ? opts[tagPick].dataset.tag : el.tagInput.value;
       el.tagInput.value = '';
-      addTag(v);
+      addTag(v).then(showTags);
     } else if (e.key === 'Backspace' && !el.tagInput.value) {
       const n = currentNote();
       if (n?.tags?.length) removeTag(n.tags[n.tags.length - 1]);  // own tags only; the project tag is not in n.tags
     }
   });
   el.tagInput.addEventListener('change', () => {
-    // Picking a suggestion from the datalist fires change.
+    // A tag typed and left (tapping elsewhere) is added.
     if (el.tagInput.value.trim()) { const v = el.tagInput.value; el.tagInput.value = ''; addTag(v); }
   });
   el.chips.addEventListener('click', (e) => {

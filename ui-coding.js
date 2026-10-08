@@ -254,6 +254,7 @@ function onKeyCapture(e) {
 const opts = () => ({ matchCase: $('f-case').checked, wholeWord: $('f-word').checked });
 
 function refreshFind(jump = true) {
+  if (!lang) return; // writing notes have their own find (ui-writing.js)
   find.q = $('f-find').value;
   find.matches = find.open && lang ? I.findAll($('body').value, find.q, opts()) : [];
   if (!find.matches.length) find.cur = -1;
@@ -278,7 +279,7 @@ function reveal(index) {
   $('code-layer').scrollTop = ta.scrollTop; $('code-layer').scrollLeft = ta.scrollLeft;
 }
 function goFind(d) {
-  if (!find.matches.length) return;
+  if (!lang || !find.matches.length) return;
   find.cur = (find.cur + d + find.matches.length) % find.matches.length;
   const m = find.matches[find.cur];
   $('body').setSelectionRange(m, m + find.q.length);
@@ -286,7 +287,7 @@ function goFind(d) {
   paintMarks();
   reveal(m);
 }
-function openFind(text = '') {
+export function openFind(text = '') {
   if (!lang) return;
   find.open = true;
   $('findbar').hidden = false;
@@ -297,6 +298,7 @@ function openFind(text = '') {
   refreshFind(true);
 }
 function closeFind() {
+  if (!lang && !find.open) return;
   find.open = false;
   $('findbar').hidden = true;
   $('btn-find').setAttribute('aria-pressed', 'false');
@@ -306,7 +308,7 @@ function closeFind() {
 }
 function replaceOne() {
   const ta = $('body');
-  if (!find.matches.length || find.cur < 0) return;
+  if (!lang || !find.matches.length || find.cur < 0) return;
   const m = find.matches[find.cur];
   const repl = $('f-repl').value;
   setValue(I.replaceAt(ta.value, m, find.q.length, repl), m + repl.length);
@@ -318,6 +320,7 @@ function replaceOne() {
   log.info('code', 'Replaced one');
 }
 function replaceEvery() {
+  if (!lang) return;
   const ta = $('body');
   const before = ta.value;
   const r = I.replaceAll(before, $('f-find').value, $('f-repl').value, opts());
@@ -456,7 +459,7 @@ export function renderToolbar(note) {
   lang = next;
   noteId = note ? note.id : null;
   if (!lang) {
-    $('findbar').hidden = true;
+    if ($('findbar').dataset.owner !== 'text') $('findbar').hidden = true;
     $('spell-bar').hidden = true;
     $('mark-layer').hidden = true;
     hideAc();

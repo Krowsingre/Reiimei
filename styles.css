@@ -1413,3 +1413,16 @@ input.switch:disabled { opacity: .5; cursor: default; }
   .toolbar:not([data-more="on"]) .rb-chips { display: none; }
   .toolbar .rb-chips { order: 2; padding-top: 0; }
 }
+
+/* ---- v0.17.4: find in writing notes, search results, tag suggestions ---- */
+::highlight(rm-find) { background-color: rgba(240, 190, 40, .35); }
+::highlight(rm-find-cur) { background-color: rgba(240, 150, 20, .75); color: var(--ink); }
+.note-item .snippet mark { background: var(--gold-soft); color: var(--ink); border-radius: 3px; padding: 0 1px; }
+.tag-input-wrap { position: relative; display: inline-flex; flex: 1; min-width: 120px; }
+.tag-input-wrap #tag-input { flex: 1; min-width: 0; }
+.tag-suggest {
+  position: absolute; top: calc(100% + 4px); left: 0; z-index: 12; min-width: 180px; max-width: min(320px, 80vw); max-height: 240px; overflow-y: auto;
+  margin: 0; padding: 4px; list-style: none; background: var(--sheet); border: 1px solid var(--rule); border-radius: 12px; box-shadow: 0 10px 30px rgba(6, 10, 18, .18);
+}
+.tag-opt { padding: 7px 10px; border-radius: 8px; cursor: pointer; font-size: 14px; color: var(--ink-2); }
+.tag-opt:hover, .tag-opt[aria-selected="true"] { background: var(--accent-soft); color: var(--ink); }

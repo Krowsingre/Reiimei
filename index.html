@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-version="0.17.3">
+<html lang="en" data-version="0.17.4">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -123,8 +123,10 @@
       </div>
       <div class="tag-row ed-part" id="tag-row" data-part="tags">
         <div class="chips" id="chips"></div>
-        <input id="tag-input" placeholder="Add tag" autocomplete="off" autocapitalize="off" aria-label="Add tag" list="tag-suggest">
-        <datalist id="tag-suggest"></datalist>
+        <span class="tag-input-wrap">
+          <input id="tag-input" placeholder="Add tag" autocomplete="off" autocapitalize="off" aria-label="Add tag" aria-autocomplete="list" aria-controls="tag-suggest" role="combobox" aria-expanded="false">
+          <ul class="tag-suggest" id="tag-suggest" role="listbox" aria-label="Tags you have used" hidden></ul>
+        </span>
       </div>
       <!-- Formatting. On a computer every group is shown, each in its own labelled box. On a phone
            the chips open one section at a time (data-sec says which chip a group belongs to). -->
@@ -214,6 +216,7 @@
                   <button class="tool story-only" id="btn-continuity" title="Check this story against its registers" hidden>Continuity</button>
                   <button class="tool" id="btn-copy" title="Copy for Populi or as Markdown">Copy</button>
                   <button class="tool" id="btn-paper" title="Format as an MLA or APA paper">Paper</button>
+                  <button class="tool" id="btn-text-find" title="Find and replace (Ctrl+F)" aria-pressed="false">Find</button>
                 </div>
               </div>
             </div>

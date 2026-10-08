@@ -126,6 +126,9 @@ export function renderToolbar(note) {
   $('note-brackets-copy').checked = app.prefs().bracketCopy !== false;
   $('note-spacing-row').hidden = code;
   $('note-brackets').checked = !!note.meta?.brackets;
+  $('btn-text-find').hidden = code;
+  if (tf.open) { if (code || note.deleted) closeTextFind({ focus: false }); else if (lastFindNote !== note.id) { tf.cur = -1; refreshTextFind(false); } }
+  lastFindNote = note.id;
   // The phone's bar shows what applies to this note.
   for (const b of $('phone-bar').querySelectorAll('.pb')) {
     const w = b.dataset.pb;
@@ -189,6 +192,110 @@ function spacingInput() {
   applySpacing(app.note(), v);
   clearTimeout(spacingTimer);
   spacingTimer = setTimeout(() => { const n = app.note(); if (n) app.update({ meta: { ...(n.meta || {}), lh: v.lh, ls: v.ls, ws: v.ws } }); }, 300);
+}
+
+// ---- Find and replace (Text, Markdown and Populi notes) --------------------------------------
+// The same bar as code notes (ui-coding.js has its own for those).
+const tf = { open: false, matches: [], cur: -1 };
+let lastFindNote = null;
+function findRe() {
+  const q = $('f-find').value;
+  if (!q) return null;
+  const esc = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp($('f-word').checked ? `(?<![\\p{L}\\p{N}_])${esc}(?![\\p{L}\\p{N}_])` : esc, $('f-case').checked ? 'gu' : 'giu');
+}
+function findCount() {
+  $('f-count').textContent = !$('f-find').value ? '' : tf.matches.length ? `${tf.cur + 1} of ${tf.matches.length}` : 'No matches';
+}
+function refreshTextFind(jump = true) {
+  if (!tf.open) return;
+  const re = findRe();
+  const ta = $('body');
+  if (rich.active()) tf.matches = rich.findRanges(re);
+  else {
+    tf.matches = [];
+    if (re) { let m; re.lastIndex = 0; while ((m = re.exec(ta.value))) { if (!m[0].length) { re.lastIndex++; continue; } tf.matches.push({ i: m.index, len: m[0].length }); } }
+  }
+  if (!tf.matches.length) tf.cur = -1;
+  else if (tf.cur < 0 || tf.cur >= tf.matches.length) tf.cur = 0;
+  if (rich.active()) rich.paintFind(tf.matches, tf.cur);
+  findCount();
+  if (jump && tf.cur >= 0) revealMatch();
+}
+function revealMatch() {
+  const m = tf.matches[tf.cur];
+  if (!m) return;
+  if (rich.active()) { rich.paintFind(tf.matches, tf.cur); rich.showRange(m); return; }
+  const ta = $('body');
+  const back = document.activeElement;
+  ta.focus({ preventScroll: false });
+  ta.setSelectionRange(m.i, m.i + m.len);
+  if (back && back !== ta && back.focus) back.focus({ preventScroll: true });
+}
+function stepFind(d) {
+  if (!tf.open || !tf.matches.length) return;
+  tf.cur = (tf.cur + d + tf.matches.length) % tf.matches.length;
+  findCount();
+  revealMatch();
+}
+export function openTextFind(text = '') {
+  const note = app.note();
+  if (!note || isCodeNote(note)) return;
+  tf.open = true;
+  tf.cur = -1;
+  const bar = $('findbar');
+  bar.dataset.owner = 'text';
+  bar.hidden = false;
+  $('btn-text-find').setAttribute('aria-pressed', 'true');
+  if (text) $('f-find').value = text;
+  $('f-find').focus();
+  $('f-find').select();
+  refreshTextFind(true);
+}
+export function closeTextFind({ focus = true } = {}) {
+  if (!tf.open) return;
+  tf.open = false;
+  tf.matches = [];
+  const bar = $('findbar');
+  delete bar.dataset.owner;
+  bar.hidden = true;
+  $('btn-text-find').setAttribute('aria-pressed', 'false');
+  rich.paintFind([], -1);
+  if (focus) { if (rich.active()) $('rich').focus(); else $('body').focus(); }
+}
+function replaceOneText() {
+  if (!tf.open || tf.cur < 0 || !tf.matches.length) return;
+  const repl = $('f-repl').value;
+  const m = tf.matches[tf.cur];
+  const keep = tf.cur;
+  if (rich.active()) rich.replaceRanges([m], repl);
+  else { const ta = $('body'); applyEdit(ta, ta.value.slice(0, m.i) + repl + ta.value.slice(m.i + m.len), m.i + repl.length, m.i + repl.length); }
+  tf.cur = keep;
+  refreshTextFind(true);
+}
+function replaceAllText() {
+  if (!tf.open || !tf.matches.length) { if (tf.open) app.toast('Nothing to replace'); return; }
+  const repl = $('f-repl').value;
+  const count = tf.matches.length;
+  if (rich.active()) rich.replaceRanges(tf.matches, repl);
+  else {
+    const ta = $('body');
+    let v = ta.value;
+    for (const m of [...tf.matches].reverse()) v = v.slice(0, m.i) + repl + v.slice(m.i + m.len);
+    applyEdit(ta, v, 0, 0);
+  }
+  tf.cur = -1;
+  refreshTextFind(false);
+  app.toast(`Replaced ${count} ${count === 1 ? 'match' : 'matches'}`, 'Undo', () => $('btn-undo').click());
+}
+// A search in the note list: the note opens with the words found and highlighted.
+export function showSearch(q) {
+  const note = app.note();
+  if (!note || !q || !note.body.toLowerCase().includes(q.toLowerCase())) return;
+  $('f-case').checked = false;
+  $('f-word').checked = false;
+  if (isCodeNote(note)) codingUi.openFind(q);
+  else openTextFind(q);
 }
 
 // ---- Brackets --------------------------------------------------------------------
@@ -848,6 +955,33 @@ export function init(hooks) {
   $('note-brackets-copy').addEventListener('change', (e) => { app.setPrefs({ bracketCopy: e.target.checked }); log.info('format', 'Copy with brackets', { on: e.target.checked }); });
   $('note-brackets-copy-wrap').addEventListener('click', (e) => e.stopPropagation());
   $('btn-case').addEventListener('click', changeCase);
+  // Find and replace in writing notes.
+  $('btn-text-find').addEventListener('click', () => (tf.open ? closeTextFind() : openTextFind(rich.active() ? (getSelection().toString().split('\n')[0] || '') : '')));
+  $('f-find').addEventListener('input', () => { tf.cur = -1; refreshTextFind(true); });
+  [$('f-case'), $('f-word')].forEach((c) => c.addEventListener('change', () => { tf.cur = -1; refreshTextFind(true); }));
+  $('f-next').addEventListener('click', () => stepFind(1));
+  $('f-prev').addEventListener('click', () => stepFind(-1));
+  $('f-one').addEventListener('click', replaceOneText);
+  $('f-all').addEventListener('click', replaceAllText);
+  $('f-close').addEventListener('click', () => closeTextFind());
+  $('findbar').addEventListener('keydown', (e) => {
+    if (!tf.open) return;
+    if (e.key === 'Escape') { e.preventDefault(); closeTextFind(); }
+    else if (e.key === 'Enter' && e.target.id === 'f-find') { e.preventDefault(); stepFind(e.shiftKey ? -1 : 1); }
+    else if (e.key === 'Enter' && e.target.id === 'f-repl') { e.preventDefault(); replaceOneText(); }
+  });
+  let findTimer = null;
+  $('body').addEventListener('input', () => { if (tf.open) { clearTimeout(findTimer); findTimer = setTimeout(() => refreshTextFind(false), 150); } });
+  document.addEventListener('keydown', (e) => {
+    if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey || e.key.toLowerCase() !== 'f') return;
+    const note = app.note();
+    if (!note || isCodeNote(note) || document.querySelector('dialog[open]')) return;
+    const a = document.activeElement;
+    if (a !== $('rich') && a !== $('body') && !a?.closest?.('#editor')) return;
+    e.preventDefault();
+    const s = rich.active() ? getSelection().toString() : $('body').value.slice($('body').selectionStart, $('body').selectionEnd);
+    openTextFind(s && !s.includes('\n') ? s : '');
+  });
   // The phone's bar: the everyday tools straight away, the rest under More.
   const bar = $('phone-bar');
   bar.addEventListener('pointerdown', (e) => { if (e.target.closest('button.pb') && (document.activeElement === $('body') || document.activeElement === $('rich'))) e.preventDefault(); });
