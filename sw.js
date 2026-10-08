@@ -1,6 +1,6 @@
 // Reiimei service worker: caches the app shell so it opens with no connection.
 // Bump VERSION whenever any app file changes so devices pick up the update.
-const VERSION = 'reiimei-v0.16.6';
+const VERSION = 'reiimei-v0.16.7';
 const SHELL = [
   './',
   './index.html',

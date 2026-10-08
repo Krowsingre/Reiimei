@@ -1314,3 +1314,10 @@ input.switch:disabled { opacity: .5; cursor: default; }
   .rb-box.closed > .rb-label { position: static; }
   .rb-line[data-line="options"] .rb-rows { padding: 0; }
 }
+
+/* ---- v0.16.7: the formatting chips on a phone always sit in front of the note ---- */
+/* The note's area is positioned (for its placeholder and brackets), which draws it over anything
+   that is not; on an iPhone its last line could show through the chips. */
+@media (max-width: 760px) {
+  .editor .toolbar { position: relative; z-index: 5; }
+}

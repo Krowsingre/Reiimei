@@ -727,7 +727,7 @@ function pastePlain(text) {
 // ---- Following the caret (phone) ----------------------------------------------------------
 // The keyboard covers the bottom of the screen, and dictation adds words without key presses, so
 // the browser does not always scroll to follow them. The caret is kept inside the part of the
-// note you can see, above the keyboard.
+// note you can see: above the keyboard and above the formatting chips.
 const isPhoneView = () => window.matchMedia('(max-width: 760px)').matches;
 let followFrame = 0;
 function followCaret() {
@@ -744,7 +744,9 @@ export function keepCaretVisible() {
   if (!rect) return false;
   const b = box.getBoundingClientRect();
   const vv = window.visualViewport;
-  const bottom = Math.min(b.bottom, vv ? vv.offsetTop + vv.height : window.innerHeight) - 28;
+  const bar = $('toolbar');
+  const barTop = bar && !bar.hidden && bar.offsetParent ? bar.getBoundingClientRect().top : Infinity;
+  const bottom = Math.min(b.bottom, barTop > b.top ? barTop : Infinity, vv ? vv.offsetTop + vv.height : window.innerHeight) - 28;
   const top = Math.max(b.top, vv ? vv.offsetTop : 0) + 8;
   if (rect.bottom > bottom) box.scrollTop += rect.bottom - bottom;
   else if (rect.top < top) box.scrollTop -= top - rect.top;
