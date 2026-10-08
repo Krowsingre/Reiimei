@@ -11,9 +11,11 @@ import * as story from './storyboard.js';
 import * as codeIntel from './codeintel.js';
 import { isCode } from './code.js';
 import * as fonts from './fonts.js';
+import * as rich from './ui-rich.js';
+import { createHistory, lookOf, sameLook, LOOK_KEYS } from './history.js';
 import { noteTitle, noteSnippet, ownTitle, fallbackTitle, sharedFileCheck } from './share.js';
 
-export const APP_VERSION = '0.16.7';
+export const APP_VERSION = '0.17.0';
 // boot.js compares this with the page's version to catch a launch that mixes two releases.
 window.__reiimeiVersion = APP_VERSION;
 export const BUILD_DATE = '2026-10-04';
@@ -179,15 +181,78 @@ function formatDate(iso) {
   return d.toLocaleDateString([], { month: 'numeric', day: 'numeric', year: '2-digit' });
 }
 
-// The editor is one text box shared by every note. Its built-in undo history must
-// not reach back into a previously open note, so undo stops at the text the note
-// had when it was opened.
-let baseline = '';
-let undoneSteps = 0;
+// The editor is one text box shared by every note.
 function setBody(text) {
   el.body.value = text;
-  baseline = text;
-  undoneSteps = 0;
+}
+
+// ---- Undo and Redo (history.js) ----------------------------------------
+// Every change to the open note, whichever way it was made, is a step in that note's history:
+// Ctrl+Z / Ctrl+Y (Cmd on a Mac), Undo and Redo in the toolbar, and the phone's own Undo (shake,
+// or three fingers) all walk through it.
+const history = createHistory();
+const TYPING = new Set(['insertText', 'insertCompositionText', 'insertReplacementText', 'deleteContentBackward', 'deleteContentForward', 'deleteWordBackward', 'deleteWordForward']);
+let restoring = false;    // Undo or Redo is putting a state back: it is not a new step
+let lastInput = null;     // { type, at } of the last thing typed
+let boundary = false;     // the next change is a step of its own (a button, a paste, a cut)
+let caretMark = null;     // where the caret was just before the change
+function caretNow() {
+  if (rich.active()) { const c = rich.caretOffsets(); return c ? { rich: true, a: c[0], b: c[1] } : null; }
+  return { rich: false, a: el.body.selectionStart, b: el.body.selectionEnd };
+}
+const stateNow = (kind) => ({ body: el.body.value, look: lookOf(currentNote()), caret: caretNow(), caretBefore: caretMark, kind });
+function recordChange(kind) {
+  const n = currentNote();
+  if (!n || restoring) return;
+  if (!kind) kind = !boundary && lastInput && Date.now() - lastInput.at < 250 && TYPING.has(lastInput.type) ? 'typing' : 'edit';
+  history.record(n.id, stateNow(kind));
+  boundary = false;
+  lastInput = null;
+  caretMark = null;
+  renderUndoButtons();
+}
+function markChange(e) {
+  caretMark = caretNow();
+  if (e?.inputType) lastInput = { type: e.inputType, at: Date.now() };
+  else boundary = true;
+}
+function renderUndoButtons() {
+  const n = currentNote();
+  const off = !n || n.deleted || n.locked;
+  $('btn-undo').disabled = off || !history.canUndo(n.id);
+  $('btn-redo').disabled = off || !history.canRedo(n.id);
+}
+function placeCaret(c) {
+  if (!c) return;
+  if (c.rich && rich.active()) { rich.setCaretOffsets([c.a, c.b]); return; }
+  if (!c.rich && !rich.active() && !el.body.hidden) {
+    el.body.focus({ preventScroll: true });
+    const len = el.body.value.length;
+    el.body.setSelectionRange(Math.min(c.a, len), Math.min(c.b, len));
+  }
+}
+async function stepHistory(dir) {
+  const n = currentNote();
+  if (!n || n.deleted || n.locked || restoring) return;
+  const s = dir < 0 ? history.undo(n.id) : history.redo(n.id);
+  if (!s) return;
+  restoring = true;
+  try {
+    if (el.body.value !== s.body) {
+      el.body.value = s.body;
+      el.body.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    if (!sameLook(lookOf(currentNote()), s.look)) {
+      const meta = { ...(currentNote().meta || {}) };
+      for (const k of LOOK_KEYS) { if (s.look[k] == null) delete meta[k]; else meta[k] = s.look[k]; }
+      await updateCurrent({ meta });
+    }
+    placeCaret(s.caret);
+    log.info('editor', dir < 0 ? 'Undo' : 'Redo', { id: n.id });
+  } finally {
+    restoring = false;
+  }
+  renderUndoButtons();
 }
 
 function replaceNote(updated) {
@@ -645,6 +710,8 @@ function renderEditor() {
     setBody(n.body);
     if (focused) el.body.setSelectionRange(Math.min(selectionStart, n.body.length), Math.min(selectionEnd, n.body.length));
   }
+  if (!restoring) history.open(n.id, { body: el.body.value, look: lookOf(n), caret: null });
+  renderUndoButtons();
   el.body.readOnly = n.deleted;
   el.tagInput.disabled = n.deleted;
   el.title.readOnly = n.deleted;
@@ -802,7 +869,12 @@ async function updateCurrent(changes) {
   const n = currentNote();
   if (!n) return;
   replaceNote(await db.saveNote(n, changes));
+  if (!restoring) {
+    if ('body' in changes || 'format' in changes) { history.forget(n.id); history.open(n.id, { body: currentNote().body, look: lookOf(currentNote()), caret: null }); }
+    else if (changes.meta) recordChange('look');
+  }
   render();
+  renderUndoButtons();
   scheduleSync();
 }
 
@@ -2026,17 +2098,30 @@ function bindEvents() {
     searchTimer = setTimeout(() => { state.query = el.search.value; renderList(); }, 120);
   });
 
-  el.body.addEventListener('beforeinput', (e) => {
-    if (e.inputType === 'historyUndo') {
-      if (el.body.value === baseline) e.preventDefault(); else undoneSteps++;
-    } else if (e.inputType === 'historyRedo') {
-      if (undoneSteps <= 0) e.preventDefault(); else undoneSteps--;
-    } else {
-      undoneSteps = 0;
-    }
-  });
+  // Undo and Redo: the browser's own (the phone's shake, a menu) is turned into the note's.
+  for (const box of [el.body, $('rich')]) {
+    box.addEventListener('beforeinput', (e) => {
+      if (e.inputType === 'historyUndo' || e.inputType === 'historyRedo') { e.preventDefault(); stepHistory(e.inputType === 'historyUndo' ? -1 : 1); return; }
+      markChange(e);
+    });
+    for (const t of ['paste', 'cut', 'drop']) box.addEventListener(t, () => markChange(), true);
+    box.addEventListener('keydown', (e) => { if (e.key === 'Enter') markChange(); }, true);
+  }
+  document.addEventListener('keydown', (e) => {
+    if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+    const k = e.key.toLowerCase();
+    if (k !== 'z' && k !== 'y') return;
+    if (document.activeElement !== el.body && document.activeElement !== $('rich')) return;
+    e.preventDefault();
+    stepHistory(k === 'z' && !e.shiftKey ? -1 : 1);
+  }, true);
+  // A button or menu in the toolbar makes a step of its own.
+  $('toolbar').addEventListener('pointerdown', (e) => { if (!e.target.closest('#btn-undo, #btn-redo')) markChange(); }, true);
+  $('btn-undo').addEventListener('click', () => stepHistory(-1));
+  $('btn-redo').addEventListener('click', () => stepHistory(1));
   el.body.addEventListener('input', () => {
     if (!state.currentId) return;
+    recordChange();
     pending = { id: state.currentId, body: el.body.value };
     setSaveState('unsaved');
     clearTimeout(saveTimer);

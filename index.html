@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-version="0.16.7">
+<html lang="en" data-version="0.17.0">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -140,7 +140,13 @@
           <div class="rb-line" data-line="buttons">
             <button type="button" class="rb-line-head" data-line="buttons" aria-expanded="true"><span>Buttons</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
             <div class="rb-line-body">
-              <div class="rb-group" id="tool-buttons">
+              <div class="rb-group" id="undo-tools">
+            <div class="rb-sec" data-sec="text" data-label="Undo" hidden>
+              <button class="tool t-undo" id="btn-undo" title="Undo (Ctrl+Z)" aria-label="Undo" disabled>↶</button>
+              <button class="tool t-redo" id="btn-redo" title="Redo (Ctrl+Y or Ctrl+Shift+Z)" aria-label="Redo" disabled>↷</button>
+            </div>
+          </div>
+          <div class="rb-group" id="tool-buttons">
                 <div class="rb-sec" data-sec="text" data-label="Text" hidden>
                   <button class="tool t-b" data-tool="b" title="Bold (Ctrl+B)" aria-label="Bold">B</button>
                   <button class="tool t-i" data-tool="i" title="Italic (Ctrl+I)" aria-label="Italic">I</button>

@@ -753,6 +753,71 @@ export function keepCaretVisible() {
   return true;
 }
 
+// ---- The caret as a place in the text (for Undo) -------------------------------------------
+// Counted the same way both ways: each character, each line break and the start of each block.
+const COUNTED = /^(P|DIV|H[1-6]|LI|PRE|BLOCKQUOTE|UL|OL|TABLE|TR|HR)$/;
+function countIn(node) {
+  let n = 0;
+  for (const c of node.childNodes) {
+    if (c.nodeType === 3) n += c.length;
+    else if (c.nodeType === 1) { if (c.tagName === 'BR') n += 1; else { if (COUNTED.test(c.tagName)) n += 1; n += countIn(c); } }
+  }
+  return n;
+}
+function offsetAt(node, off) {
+  const r = document.createRange();
+  r.setStart(box, 0);
+  r.setEnd(node, off);
+  return countIn(r.cloneContents());
+}
+function pointAt(n) {
+  let count = 0;
+  let hit = null;
+  const visit = (el) => {
+    for (const c of el.childNodes) {
+      if (hit) return;
+      if (c.nodeType === 3) {
+        if (count + c.length >= n) { hit = [c, Math.max(0, n - count)]; return; }
+        count += c.length;
+      } else if (c.nodeType === 1) {
+        if (c.tagName === 'BR') {
+          if (count >= n) { hit = [el, [...el.childNodes].indexOf(c)]; return; }
+          count += 1;
+        } else {
+          if (COUNTED.test(c.tagName)) count += 1;
+          visit(c);
+        }
+      }
+    }
+  };
+  visit(box);
+  if (hit) return hit;
+  const r = endOf(box);
+  return [r.startContainer, r.startOffset];
+}
+export function caretOffsets() {
+  if (!active()) return null;
+  const s = sel();
+  const r = s.rangeCount && inBox(s.anchorNode) ? s.getRangeAt(0) : savedRange && inBox(savedRange.startContainer) ? savedRange : null;
+  if (!r) return null;
+  return [offsetAt(r.startContainer, r.startOffset), offsetAt(r.endContainer, r.endOffset)];
+}
+export function setCaretOffsets(pair) {
+  if (!active() || !pair) return false;
+  const a = pointAt(pair[0]);
+  const b = pair[1] === pair[0] ? a : pointAt(pair[1]);
+  const r = document.createRange();
+  r.setStart(a[0], a[1]);
+  r.setEnd(b[0], b[1]);
+  box.focus({ preventScroll: true });
+  const s = sel();
+  s.removeAllRanges();
+  s.addRange(r);
+  savedRange = r.cloneRange();
+  keepCaretVisible();
+  return true;
+}
+
 // ---- Wiring ------------------------------------------------------------------------------
 export function init(hooks) {
   app = hooks;
