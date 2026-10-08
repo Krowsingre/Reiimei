@@ -1,8 +1,22 @@
-# Reiimei v0.16.4
+# Reiimei v0.16.6
 
 *reiimei* (REE-h-may), n. The cold, luminous stillness peculiar to a clear winter night; especially the effect of moonlight upon frost, illuminating the night without dispelling it.
 
 An offline-first notes app for Windows and iPhone, built as a Progressive Web App (PWA). No Mac, no App Store, no developer fee.
+
+## What changed in v0.16.6
+
+- **Dictation no longer writes words twice (phone).** Speaking into a note could show the first word, then write the whole sentence again when the microphone was switched off ("thethe quick brown dog"). In an empty line, Reiimei put the cursor just after the invisible mark that holds the line open, and words being formed from there go wrong (on a computer the same thing left a stray letter). The cursor now goes before it. Reiimei also leaves the text box alone while you type or dictate (it used to touch it when saving and syncing in the background), and never redraws the note while words are still being formed.
+- **The note follows the cursor above the keyboard (phone).** When typing or dictating takes the cursor below the keyboard, the note now scrolls so the line you are on stays in view.
+- **A Shift+Enter at the end of a line is kept.** A line break at the end of a line, followed by Enter, leaves an empty line. That empty line was being lost when the note was saved, so it disappeared once the note was shown again (after a sync, on your other device, or after reopening). It is now kept. Line breaks in the middle of a line, blank lines and copying and pasting work as before.
+- Still 87 files. No Supabase changes.
+
+## What changed in v0.16.5
+
+- **Modes in one drop-down (computer).** Notes, Research, Coding and Storyboard are now one drop-down at the top of the sidebar, with the number of notes in each. Its last choice, **All modes**, lists the notes from every mode and takes the place of the **Show all modes** button. Ctrl+1 to Ctrl+4 still switch modes. When the sidebar is folded to icons, and on a phone, the mode buttons stay as they were.
+- **Title & Tags, then Formatting (computer).** The note header has two parts now: **Title & Tags**, which open and close together, and **Formatting** beneath them. One opens at a time: opening one folds the other. Both can be folded, and then their names sit side by side. Each device remembers which one is open.
+- **Formatting in three rows (computer).** **Buttons** (Text, Headings, Lists, Indent, Insert and Tools), then **Format & Font**, then **Options** (Brackets, Copy [ ], Case and Spacing). Each row folds to its name by itself, and folded rows sit side by side. Format and Font are now boxes like the button groups, and each folds to its name the same way. The phone keeps its layout.
+- Still 87 files. No Supabase changes.
 
 ## What changed in v0.16.4
 
@@ -303,9 +317,9 @@ Then open http://localhost:8000 in Edge or Chrome. Notes work immediately, saved
 
 The iPhone needs an HTTPS address. GitHub Pages hosts the app for free. Only the app's code goes to GitHub; your notes never do.
 
-1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.16.4` folder.
+1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.16.6` folder.
 2. **Create the repository.** In Safari, sign in at github.com, tap **+** › **New repository**. Name it `reiimei`, set it to **Public** (free Pages needs a public repository), and tap **Create repository**.
-3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.16.4` folder, tap **Select**, select all 87 files, and tap **Open**. Scroll down and tap **Commit changes**.
+3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.16.6` folder, tap **Select**, select all 87 files, and tap **Open**. Scroll down and tap **Commit changes**.
    - If you don't see the upload link, tap the **aA** button in Safari's address bar › **Request Desktop Website** and try again.
 4. **Turn on Pages.** In the repository, open **Settings** › **Pages**. Under **Build and deployment**, set Source to **Deploy from a branch**, Branch to **main** and **/ (root)**, then tap **Save**.
 5. **Wait a minute or two**, then reload the Pages screen. It shows your address, which looks like `https://yourname.github.io/reiimei/`.
@@ -410,7 +424,7 @@ The service worker caches the app files. When you change any file, bump `VERSION
 - **Settings › Log** › Download gives a text log of everything the app did, including sync results and errors.
 - **"Test connection"** in Settings › Sync confirms the URL, key, sign-in, and tables are all correct.
 
-## Known limits in v0.16.4
+## Known limits in v0.16.6
 
 - Images can be linked but not attached
 - Sources belong to one note; there is no shared library yet

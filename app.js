@@ -13,7 +13,7 @@ import { isCode } from './code.js';
 import * as fonts from './fonts.js';
 import { noteTitle, noteSnippet, ownTitle, fallbackTitle, sharedFileCheck } from './share.js';
 
-export const APP_VERSION = '0.16.4';
+export const APP_VERSION = '0.16.6';
 // boot.js compares this with the page's version to catch a launch that mixes two releases.
 window.__reiimeiVersion = APP_VERSION;
 export const BUILD_DATE = '2026-10-04';
@@ -521,6 +521,11 @@ function renderModeSwitch() {
     const c = act.filter((n) => modes.kindOf(n) === m.id).length;
     return `<button class="mode-btn${on ? ' on' : ''}" role="tab" aria-selected="${on}" data-mode="${m.id}" data-short="${esc(m.name[0])}" title="${m.name} (Ctrl+${m.key}) · ${c} ${c === 1 ? 'note' : 'notes'}">${esc(m.name)}</button>`;
   }).join('');
+  // The computer's drop-down: the four modes, then All modes (in place of "Show all modes").
+  const sel = $('mode-select');
+  sel.innerHTML = modes.MODES.map((m) => `<option value="${m.id}">${esc(m.name)} (${act.filter((n) => modes.kindOf(n) === m.id).length})</option>`).join('')
+    + `<option value="all">All modes (${act.length})</option>`;
+  sel.value = state.showAll ? 'all' : state.mode;
 }
 
 function renderModeAll() {
@@ -2041,6 +2046,10 @@ function bindEvents() {
 
   $('mode-switch').addEventListener('click', (e) => { const b = e.target.closest('[data-mode]'); if (b) setMode(b.dataset.mode); });
   $('mode-all').addEventListener('click', toggleShowAll);
+  $('mode-select').addEventListener('change', (e) => {
+    const v = e.target.value;
+    if (v === 'all') { if (!state.showAll) toggleShowAll(); } else setMode(v);
+  });
   document.addEventListener('keydown', (e) => {
     if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey || document.querySelector('dialog[open]')) return;
     const m = modes.MODES.find((x) => x.key === e.key);

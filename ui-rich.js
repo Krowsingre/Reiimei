@@ -12,6 +12,7 @@ let app = null;
 let box = null;          // the editable page (#rich)
 let shownId = null;      // note shown in it
 let shownSrc = null;     // the Markdown it shows
+let composing = false;   // words are being composed (dictation, a Japanese or Chinese keyboard…)
 let fromRich = false;    // true while the page itself is updating the text box
 let savedRange = null;   // where the caret was when a dialog took focus
 
@@ -108,10 +109,13 @@ function inlineMd(node, font = null) {
 // A line of a paragraph that starts like a heading, list or quote is escaped to stay text.
 const escLineStart = (line) => line.replace(/^(\s*)(#|>|[-*+](?=\s)|\d+[.)](?=\s))/, '$1\\$2');
 const dropEmptyRuns = (s) => s.replace(/\[\[f:[a-z][a-z0-9-]*\]\]\[\[\/f\]\]/g, '');
-function paraMd(el) {
-  const lines = dropEmptyRuns(inlineMd(el)).replace(/\n+$/, '').split('\n').map((l) => escLineStart(l.replace(/\s+$/, '')));
-  // An empty line inside a paragraph (two line breaks in a row: Shift+Enter twice, typing on an
-  // iPhone, pasted text) is a blank line kept on purpose, just like an empty paragraph.
+function paraParts(el) {
+  // The last line break of a paragraph only holds the line open (the browser adds one after a
+  // Shift+Enter at the end of a line), so one is dropped; any more are lines left empty on purpose.
+  const lines = dropEmptyRuns(inlineMd(el)).replace(/\n$/, '').split('\n').map((l) => escLineStart(l.replace(/\s+$/, '')));
+  // An empty line inside a paragraph (two line breaks in a row: Shift+Enter twice, Shift+Enter at
+  // the end of a line, typing on an iPhone, pasted text) is a blank line kept on purpose, just
+  // like an empty paragraph.
   const out = [];
   let cur = [];
   for (const l of lines) {
@@ -120,7 +124,7 @@ function paraMd(el) {
     out.push(BLANK_LINE);
   }
   if (cur.length) out.push(cur.join('\n'));
-  return out.join('\n\n');
+  return out;
 }
 function listMd(list, level, out) {
   let n = 0;
@@ -140,7 +144,7 @@ const BLOCK = /^(P|DIV|H[1-6]|UL|OL|BLOCKQUOTE|PRE|HR|TABLE|SECTION|ARTICLE|HEAD
 function blocksMd(parent) {
   const out = [];
   let loose = null; // inline content sitting straight in the page
-  const flushLoose = () => { if (loose && loose.textContent.trim()) out.push(paraMd(loose)); loose = null; };
+  const flushLoose = () => { if (loose && loose.textContent.trim()) out.push(...paraParts(loose)); loose = null; };
   for (const n of parent.childNodes) {
     if (n.nodeType === 1 && n.classList.contains('raw-block')) { flushLoose(); out.push(n.dataset.md || ''); continue; }
     if (n.nodeType !== 1 || !BLOCK.test(n.tagName)) {
@@ -156,7 +160,7 @@ function blocksMd(parent) {
     else if (t === 'PRE') out.push(`\`\`\`${n.dataset.lang || ''}\n${n.textContent.replace(/\n$/, '')}\n\`\`\``);
     else if (t === 'HR') out.push('---');
     else if (n.querySelector('p,div,h1,h2,h3,h4,h5,h6,ul,ol,blockquote,pre,table')) { const inner = blocksMd(n); if (inner) out.push(inner); }
-    else { const s = paraMd(n); out.push(s.trim() ? s : BLANK_LINE); }
+    else { const parts = paraParts(n); out.push(...(parts.length ? parts : [BLANK_LINE])); }
   }
   flushLoose();
   // A blank line typed on purpose is kept as "&nbsp;" (standard Markdown for an empty paragraph),
@@ -195,17 +199,33 @@ export function render(note) {
   if (!on) { shownId = null; return; }
   const ta = $('body');
   ta.hidden = true;
-  box.contentEditable = String(!note.deleted);
-  box.dataset.placeholder = ta.placeholder;
-  if (note.id !== shownId || ta.value !== shownSrc) { shownId = note.id; show(ta.value); }
+  // Only what changed is written: on an iPhone, touching the box while you dictate into it makes
+  // the words come out twice.
+  const editable = String(!note.deleted);
+  if (box.contentEditable !== editable) box.contentEditable = editable;
+  if (box.dataset.placeholder !== ta.placeholder) box.dataset.placeholder = ta.placeholder;
+  if (note.id !== shownId) { shownId = note.id; show(ta.value); }
+  else if (ta.value !== shownSrc && !composing) show(ta.value);
+}
+
+// A caret at the end of an element, but before the line break that holds an empty line open:
+// typing or dictating from after that break goes wrong (Chrome keeps a stray letter, and an iPhone
+// writes the dictated words twice).
+function endOf(el) {
+  const r = document.createRange();
+  let n = el;
+  while (n.lastChild && n.lastChild.nodeType === 1 && n.lastChild.tagName !== 'BR' && !/^(UL|OL|TABLE|HR|IMG)$/.test(n.lastChild.tagName)) n = n.lastChild;
+  if (n.lastChild?.nodeName === 'BR') r.setStartBefore(n.lastChild);
+  else { r.selectNodeContents(n); r.collapse(false); }
+  r.collapse(true);
+  return r;
 }
 
 export function focus(atStart = false) {
   if (!active()) return false;
   box.focus();
-  const r = document.createRange();
-  r.selectNodeContents(box.firstElementChild || box);
-  r.collapse(atStart);
+  let r = document.createRange();
+  if (atStart) { r.selectNodeContents(box.firstElementChild || box); r.collapse(true); } else r = endOf(box.firstElementChild || box);
   const s = getSelection();
   s.removeAllRanges();
   s.addRange(r);
@@ -243,7 +263,7 @@ function restoreCaret() {
   box.focus({ preventScroll: true });
   const s = sel();
   if (s.rangeCount && inBox(s.anchorNode)) return;
-  const r = savedRange && inBox(savedRange.startContainer) ? savedRange : (() => { const x = document.createRange(); x.selectNodeContents(box); x.collapse(false); return x; })();
+  const r = savedRange && inBox(savedRange.startContainer) ? savedRange : endOf(box);
   s.removeAllRanges();
   s.addRange(r);
 }
@@ -649,9 +669,7 @@ export function scrollToHeading(i) {
   const h = box.querySelectorAll('h1,h2,h3,h4,h5,h6')[i];
   if (!h) return false;
   h.scrollIntoView({ block: 'start' });
-  const r = document.createRange();
-  r.selectNodeContents(h);
-  r.collapse(false);
+  const r = endOf(h);
   box.focus();
   sel().removeAllRanges();
   sel().addRange(r);
@@ -706,6 +724,33 @@ function pastePlain(text) {
   pushToBody();
 }
 
+// ---- Following the caret (phone) ----------------------------------------------------------
+// The keyboard covers the bottom of the screen, and dictation adds words without key presses, so
+// the browser does not always scroll to follow them. The caret is kept inside the part of the
+// note you can see, above the keyboard.
+const isPhoneView = () => window.matchMedia('(max-width: 760px)').matches;
+let followFrame = 0;
+function followCaret() {
+  if (followFrame || !isPhoneView()) return;
+  followFrame = requestAnimationFrame(() => { followFrame = 0; keepCaretVisible(); });
+}
+export function keepCaretVisible() {
+  const s = sel();
+  if (!active() || !s.rangeCount || !inBox(s.focusNode)) return false;
+  const r = s.getRangeAt(0).cloneRange();
+  r.collapse(false);
+  let rect = [...r.getClientRects()].pop();
+  if (!rect || (!rect.height && !rect.width && !rect.top)) rect = closest(r.endContainer, 'p,div,li,h1,h2,h3,h4,h5,h6,pre,blockquote')?.getBoundingClientRect();
+  if (!rect) return false;
+  const b = box.getBoundingClientRect();
+  const vv = window.visualViewport;
+  const bottom = Math.min(b.bottom, vv ? vv.offsetTop + vv.height : window.innerHeight) - 28;
+  const top = Math.max(b.top, vv ? vv.offsetTop : 0) + 8;
+  if (rect.bottom > bottom) box.scrollTop += rect.bottom - bottom;
+  else if (rect.top < top) box.scrollTop -= top - rect.top;
+  return true;
+}
+
 // ---- Wiring ------------------------------------------------------------------------------
 export function init(hooks) {
   app = hooks;
@@ -718,7 +763,13 @@ export function init(hooks) {
   box.addEventListener('beforeinput', autoList);
   // Anything else that changes the text (citations, moving a section, Undo in a message, the
   // scene board) changes the hidden text box; show that on the page too.
-  $('body').addEventListener('input', () => { if (!fromRich && active()) show($('body').value); });
+  $('body').addEventListener('input', () => { if (!fromRich && active() && !composing) show($('body').value); });
+  box.addEventListener('compositionstart', () => { composing = true; });
+  box.addEventListener('compositionend', () => { composing = false; followCaret(); });
+  // 2. Keep the caret where you can see it while you type or dictate (phone).
+  box.addEventListener('input', followCaret);
+  document.addEventListener('selectionchange', () => { if (document.activeElement === box) followCaret(); });
+  window.visualViewport?.addEventListener('resize', () => { if (document.activeElement === box) followCaret(); });
 
   box.addEventListener('keydown', (e) => {
     if (e.isComposing) return;

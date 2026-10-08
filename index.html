@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-version="0.16.4">
+<html lang="en" data-version="0.16.6">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -32,6 +32,8 @@
         </button>
       </header>
       <div class="mode-switch" id="mode-switch" role="tablist" aria-label="Mode"></div>
+      <!-- On a computer the modes are one drop-down (with All modes); the phone keeps its buttons. -->
+      <div class="mode-pick" id="mode-pick"><select id="mode-select" aria-label="Mode" title="Mode (Ctrl+1 to Ctrl+4)"></select></div>
       <nav class="side-scroll">
         <ul class="side-list" id="smart-list"></ul>
         <div class="side-section">
@@ -106,18 +108,19 @@
         <button class="icon-btn desktop-only" id="btn-focus" title="Focus: the note fills the window (Ctrl+Shift+F)" aria-label="Focus on this note" aria-pressed="false"><svg class="i-expand" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg><svg class="i-collapse" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg></button>
         <button class="icon-btn" id="btn-note-menu" title="Share, pin or delete" aria-label="Note menu" aria-haspopup="dialog"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/></svg><i class="pin-dot" id="pin-dot" hidden></i></button>
       </header>
-      <!-- Title, Tags and Formatting: on a computer each can be folded to just its name, and
-           folded ones sit side by side. -->
+      <!-- Two parts on a computer: Title & Tags, and Formatting. One opens at a time; a folded part
+           shows just its name, and folded ones sit side by side. -->
       <div class="ed-top" id="ed-top">
-      <div class="title-row ed-part" id="title-row" data-part="title">
-        <button type="button" class="ed-head" data-part="title" aria-expanded="true" aria-controls="note-title"><span>Title</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+      <div class="ed-meta ed-part" id="ed-meta" data-part="meta">
+        <button type="button" class="ed-head" data-part="meta" aria-expanded="true" aria-controls="title-row tag-row"><span>Title &amp; Tags</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+      <div class="title-row" id="title-row">
         <textarea id="note-title" rows="1" maxlength="200" placeholder="Title" aria-label="Title" autocomplete="off" spellcheck="true"></textarea>
       </div>
-      <div class="tag-row ed-part" id="tag-row" data-part="tags">
-        <button type="button" class="ed-head" data-part="tags" aria-expanded="true" aria-controls="tag-input"><span>Tags</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+      <div class="tag-row" id="tag-row">
         <div class="chips" id="chips"></div>
         <input id="tag-input" placeholder="Add tag" autocomplete="off" autocapitalize="off" aria-label="Add tag" list="tag-suggest">
         <datalist id="tag-suggest"></datalist>
+      </div>
       </div>
       <!-- Formatting. On a computer every group is shown, each in its own labelled box. On a phone
            the chips open one section at a time (data-sec says which chip a group belongs to). -->
@@ -134,92 +137,112 @@
           <button class="rb-chip" data-sec="note" aria-expanded="false" hidden>Note</button>
         </div>
         <div class="rb-panels" id="rb-panels">
-          <div class="rb-group" id="tool-buttons">
-            <div class="rb-sec" data-sec="text" data-label="Text" hidden>
-              <button class="tool t-b" data-tool="b" title="Bold (Ctrl+B)" aria-label="Bold">B</button>
-              <button class="tool t-i" data-tool="i" title="Italic (Ctrl+I)" aria-label="Italic">I</button>
-              <button class="tool t-u" data-tool="u" title="Underline (Ctrl+U)" aria-label="Underline">U</button>
-              <button class="tool t-s" data-tool="s" title="Strikethrough" aria-label="Strikethrough">S</button>
-              <button class="tool t-mark" data-tool="mark" title="Highlight" aria-label="Highlight"><span>H</span></button>
-            </div>
-            <div class="rb-sec" data-sec="text" data-label="Headings" hidden>
-              <button class="tool t-h" data-tool="h" title="Heading (steps through Heading 1, 2, 3 and normal text)" aria-label="Heading">H</button>
-              <button class="tool" data-tool="sup" title="Superscript" aria-label="Superscript">x²</button>
-              <button class="tool" data-tool="sub" title="Subscript" aria-label="Subscript">x₂</button>
-            </div>
-            <div class="rb-sec" data-sec="para" data-label="Lists" hidden>
-              <button class="tool" data-tool="ul" title="Bulleted list (Ctrl+Shift+8)" aria-label="Bulleted list">•</button>
-              <button class="tool" data-tool="ol" title="Numbered list (Ctrl+Shift+7)" aria-label="Numbered list">1.</button>
-              <button class="tool" data-tool="task" title="Checklist" aria-label="Checklist">☐</button>
-            </div>
-            <div class="rb-sec" data-sec="para" data-label="Indent" hidden>
-              <button class="tool" data-tool="outdent" title="Move list item out (Shift+Tab)" aria-label="Move list item out">⇤</button>
-              <button class="tool" data-tool="indent" title="Move list item in (Tab)" aria-label="Move list item in">⇥</button>
+          <div class="rb-line" data-line="buttons">
+            <button type="button" class="rb-line-head" data-line="buttons" aria-expanded="true"><span>Buttons</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+            <div class="rb-line-body">
+              <div class="rb-group" id="tool-buttons">
+                <div class="rb-sec" data-sec="text" data-label="Text" hidden>
+                  <button class="tool t-b" data-tool="b" title="Bold (Ctrl+B)" aria-label="Bold">B</button>
+                  <button class="tool t-i" data-tool="i" title="Italic (Ctrl+I)" aria-label="Italic">I</button>
+                  <button class="tool t-u" data-tool="u" title="Underline (Ctrl+U)" aria-label="Underline">U</button>
+                  <button class="tool t-s" data-tool="s" title="Strikethrough" aria-label="Strikethrough">S</button>
+                  <button class="tool t-mark" data-tool="mark" title="Highlight" aria-label="Highlight"><span>H</span></button>
+                </div>
+                <div class="rb-sec" data-sec="text" data-label="Headings" hidden>
+                  <button class="tool t-h" data-tool="h" title="Heading (steps through Heading 1, 2, 3 and normal text)" aria-label="Heading">H</button>
+                  <button class="tool" data-tool="sup" title="Superscript" aria-label="Superscript">x²</button>
+                  <button class="tool" data-tool="sub" title="Subscript" aria-label="Subscript">x₂</button>
+                </div>
+                <div class="rb-sec" data-sec="para" data-label="Lists" hidden>
+                  <button class="tool" data-tool="ul" title="Bulleted list (Ctrl+Shift+8)" aria-label="Bulleted list">•</button>
+                  <button class="tool" data-tool="ol" title="Numbered list (Ctrl+Shift+7)" aria-label="Numbered list">1.</button>
+                  <button class="tool" data-tool="task" title="Checklist" aria-label="Checklist">☐</button>
+                </div>
+                <div class="rb-sec" data-sec="para" data-label="Indent" hidden>
+                  <button class="tool" data-tool="outdent" title="Move list item out (Shift+Tab)" aria-label="Move list item out">⇤</button>
+                  <button class="tool" data-tool="indent" title="Move list item in (Tab)" aria-label="Move list item in">⇥</button>
+                </div>
+              </div>
+              <div class="rb-group" id="code-tools" hidden>
+                <div class="rb-sec" data-sec="edit" data-label="Edit" hidden>
+                  <button class="tool" data-code="tidy" title="Fix indentation and spacing">Tidy</button>
+                  <button class="tool" data-code="indent" title="Indent (Tab)">Indent</button>
+                  <button class="tool" data-code="outdent" title="Outdent (Shift+Tab)">Outdent</button>
+                  <button class="tool" data-code="comment" title="Comment or uncomment (Ctrl+/)">Comment</button>
+                </div>
+                <div class="rb-sec" data-sec="nav" data-label="Navigate" hidden>
+                  <button class="tool" id="btn-find" aria-pressed="false" title="Find and replace (Ctrl+F)">Find</button>
+                  <button class="tool" id="btn-snippets" title="Snippets saved in this project">Snippets</button>
+                  <button class="tool" id="btn-code-outline" aria-pressed="false" title="Outline of functions, classes, headings">Outline</button>
+                </div>
+              </div>
+              <div class="rb-group">
+                <div class="rb-sec" data-sec="insert" data-label="Insert" hidden>
+                  <button class="tool" data-tool="quote" title="Quote" aria-label="Quote">❝</button>
+                  <button class="tool" data-tool="code" title="Code" aria-label="Code">{ }</button>
+                  <button class="tool" data-tool="link" title="Link" aria-label="Link">Link</button>
+                  <button class="tool" id="btn-sources" title="Sources and citations">Sources</button>
+                  <button class="tool research-only" id="btn-quote" title="Quote a source" hidden>Quote</button>
+                  <button class="tool" id="btn-paper" title="Format as an MLA or APA paper">Paper</button>
+                </div>
+                <div class="rb-sec" data-sec="view" data-label="View" hidden>
+                  <button class="tool" id="btn-preview" aria-pressed="false" title="Preview">Preview</button>
+                  <button class="tool research-only" id="btn-outline" aria-pressed="false" title="Outline of headings" hidden>Outline</button>
+                  <button class="tool story-only" id="btn-board" aria-pressed="true" title="Switch between scene cards and text" hidden>Board</button>
+                </div>
+                <div class="rb-sec" data-sec="tools" data-label="Tools" hidden>
+                  <button class="tool story-only" id="btn-registers" title="Characters, locations, items and settings for this project" hidden>Registers</button>
+                  <button class="tool story-only" id="btn-continuity" title="Check this story against its registers" hidden>Continuity</button>
+                  <button class="tool" id="btn-copy" title="Copy for Populi or as Markdown">Copy</button>
+                </div>
+              </div>
             </div>
           </div>
-          <div class="rb-group" id="code-tools" hidden>
-            <div class="rb-sec" data-sec="edit" data-label="Edit" hidden>
-              <button class="tool" data-code="tidy" title="Fix indentation and spacing">Tidy</button>
-              <button class="tool" data-code="indent" title="Indent (Tab)">Indent</button>
-              <button class="tool" data-code="outdent" title="Outdent (Shift+Tab)">Outdent</button>
-              <button class="tool" data-code="comment" title="Comment or uncomment (Ctrl+/)">Comment</button>
+          <div class="rb-line" data-line="note">
+            <button type="button" class="rb-line-head" data-line="note" aria-expanded="true"><span>Format &amp; Font</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+            <div class="rb-line-body">
+            <div class="rb-sec rb-rows rb-boxes" data-sec="note" hidden>
+              <div class="rb-box" data-box="Format">
+                <label class="rb-row"><span>Format</span>
+                  <select id="note-format" aria-label="Note format or language">
+                    <optgroup label="Writing">
+                      <option value="text">Text</option>
+                      <option value="markdown">Markdown</option>
+                      <option value="populi">Populi</option>
+                    </optgroup>
+                    <optgroup label="Code">
+                      <option value="python">Python</option>
+                      <option value="html">HTML5</option>
+                      <option value="xml">XML</option>
+                      <option value="javascript">JavaScript</option>
+                      <option value="css">CSS</option>
+                      <option value="json">JSON</option>
+                      <option value="sql">SQL</option>
+                    </optgroup>
+                  </select>
+                </label>
+              </div>
+              <div class="rb-box" data-box="Font" id="note-font-box">
+                <label class="rb-row" id="note-font-row"><span>Font</span>
+                  <select id="note-font" aria-label="Font for this note">
+                    <optgroup label="Reiimei fonts">
+                      <option value="display">Reiimei Display</option>
+                      <option value="echolume">Echolume</option>
+                    </optgroup>
+                    <optgroup label="Device fonts">
+                      <option value="serif">System serif</option>
+                      <option value="sans">System sans-serif</option>
+                    </optgroup>
+                  </select>
+                </label>
+              </div>
             </div>
-            <div class="rb-sec" data-sec="nav" data-label="Navigate" hidden>
-              <button class="tool" id="btn-find" aria-pressed="false" title="Find and replace (Ctrl+F)">Find</button>
-              <button class="tool" id="btn-snippets" title="Snippets saved in this project">Snippets</button>
-              <button class="tool" id="btn-code-outline" aria-pressed="false" title="Outline of functions, classes, headings">Outline</button>
             </div>
           </div>
-          <div class="rb-group">
-            <div class="rb-sec" data-sec="insert" data-label="Insert" hidden>
-              <button class="tool" data-tool="quote" title="Quote" aria-label="Quote">❝</button>
-              <button class="tool" data-tool="code" title="Code" aria-label="Code">{ }</button>
-              <button class="tool" data-tool="link" title="Link" aria-label="Link">Link</button>
-              <button class="tool" id="btn-sources" title="Sources and citations">Sources</button>
-              <button class="tool research-only" id="btn-quote" title="Quote a source" hidden>Quote</button>
-              <button class="tool" id="btn-paper" title="Format as an MLA or APA paper">Paper</button>
-            </div>
-            <div class="rb-sec" data-sec="view" data-label="View" hidden>
-              <button class="tool" id="btn-preview" aria-pressed="false" title="Preview">Preview</button>
-              <button class="tool research-only" id="btn-outline" aria-pressed="false" title="Outline of headings" hidden>Outline</button>
-              <button class="tool story-only" id="btn-board" aria-pressed="true" title="Switch between scene cards and text" hidden>Board</button>
-            </div>
-            <div class="rb-sec" data-sec="tools" data-label="Tools" hidden>
-              <button class="tool story-only" id="btn-registers" title="Characters, locations, items and settings for this project" hidden>Registers</button>
-              <button class="tool story-only" id="btn-continuity" title="Check this story against its registers" hidden>Continuity</button>
-              <button class="tool" id="btn-copy" title="Copy for Populi or as Markdown">Copy</button>
-            </div>
+          <div class="rb-line" data-line="options">
+            <button type="button" class="rb-line-head" data-line="options" aria-expanded="true"><span>Options</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+            <div class="rb-line-body">
             <div class="rb-sec rb-rows" data-sec="note" hidden>
-              <label class="rb-row"><span>Format</span>
-                <select id="note-format" aria-label="Note format or language">
-                  <optgroup label="Writing">
-                    <option value="text">Text</option>
-                    <option value="markdown">Markdown</option>
-                    <option value="populi">Populi</option>
-                  </optgroup>
-                  <optgroup label="Code">
-                    <option value="python">Python</option>
-                    <option value="html">HTML5</option>
-                    <option value="xml">XML</option>
-                    <option value="javascript">JavaScript</option>
-                    <option value="css">CSS</option>
-                    <option value="json">JSON</option>
-                    <option value="sql">SQL</option>
-                  </optgroup>
-                </select>
-              </label>
-              <label class="rb-row" id="note-font-row"><span>Font</span>
-                <select id="note-font" aria-label="Font for this note">
-                  <optgroup label="Reiimei fonts">
-                    <option value="display">Reiimei Display</option>
-                    <option value="echolume">Echolume</option>
-                  </optgroup>
-                  <optgroup label="Device fonts">
-                    <option value="serif">System serif</option>
-                    <option value="sans">System sans-serif</option>
-                  </optgroup>
-                </select>
-              </label>
               <label class="rb-row rb-small" id="note-brackets-row" title="Show [section labels] such as [Verse 1] or [Chorus] as notes in the background"><span>Brackets</span>
                 <input type="checkbox" class="switch" id="note-brackets" role="switch">
                 <span class="rb-sub" id="note-brackets-copy-wrap" hidden title="When ticked, copying and pasting keep the [labels]. Untick to leave them out (this device)."><input type="checkbox" id="note-brackets-copy"> Copy [ ]</span>
@@ -230,6 +253,7 @@
               <div class="rb-row rb-small" id="note-spacing-row"><span>Spacing</span>
                 <button type="button" class="tool spacing-btn" id="btn-spacing" aria-haspopup="dialog" title="Line height, letter spacing and word spacing for this note">Line 1.7</button>
               </div>
+            </div>
             </div>
           </div>
         </div>

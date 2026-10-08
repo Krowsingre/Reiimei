@@ -53,6 +53,8 @@ function syncRibbon() {
     secs.forEach((x) => { x.hidden = !(open && live.includes(x)); });
   });
   $('toolbar').dataset.open = String(!!panels.querySelector('.rb-sec:not([hidden])'));
+  // A row with nothing in it for this note (Options for a code note) is left out.
+  panels.querySelectorAll('.rb-line').forEach((l) => { l.hidden = !l.querySelector('.rb-sec:not([hidden])'); });
   fitToolbar();
 }
 
@@ -63,7 +65,7 @@ export function fitToolbar() {
   const bar = $('toolbar');
   const panels = $('rb-panels');
   if (isPhone() || bar.hidden) { bar.style.removeProperty('--tb'); return; }
-  const secs = [...panels.querySelectorAll('.rb-sec[data-label]')].filter((x) => !x.hidden && x.offsetParent);
+  const secs = [...panels.querySelectorAll('.rb-line[data-line="buttons"] .rb-sec[data-label]')].filter((x) => !x.hidden && x.offsetParent);
   if (!secs.length) return;
   // Borders do not shrink with the rest, so measure again until it really fits (a few rounds).
   let scale = 1;
@@ -109,6 +111,7 @@ export function renderToolbar(note) {
   codingUi.renderToolbar(note);
   const fs = $('note-font');
   $('note-font-row').hidden = code;
+  $('note-font-box').hidden = code;
   fs.disabled = ro;
   fonts.fillFontSelect(fs, { hidden: app.prefs().hiddenFonts || [], current: fonts.fontId(note.meta?.font) });
   rich.render(note);
@@ -218,23 +221,44 @@ export function paintBrackets() {
   brackets.paintBehind($('bracket-layer'), $('body'), on && !rich.active() && !$('body').hidden && pv.hidden);
 }
 
-// ---- Folding: Title, Tags and Formatting, and each group of buttons (computer) --------------
-const closedParts = () => (Array.isArray(app.prefs().closedParts) ? app.prefs().closedParts : []);
-const closedGroups = () => (Array.isArray(app.prefs().closedGroups) ? app.prefs().closedGroups : []);
+// ---- Folding (computer) -------------------------------------------------------------------
+// Two parts, Title & Tags and Formatting, and one of them open at a time. Inside Formatting, each
+// row (Buttons, Format & Font, Options) folds, and so does each labelled box in it.
+const listPref = (key) => (Array.isArray(app.prefs()[key]) ? app.prefs()[key] : []);
+const closedGroups = () => listPref('closedGroups');
+// The open part: 'meta', 'format' or null. Before v0.16.5 each part folded on its own (closedParts).
+function openPart() {
+  const p = app.prefs();
+  if (p.openPart !== undefined) return p.openPart;
+  const old = listPref('closedParts');
+  if (!old.includes('format')) return 'format';
+  if (!old.includes('title') || !old.includes('tags')) return 'meta';
+  return null;
+}
 function applyParts() {
-  const parts = closedParts();
+  const open = openPart();
   const groups = closedGroups();
+  const lines = listPref('closedLines');
   document.querySelectorAll('.ed-part').forEach((p) => {
-    const closed = parts.includes(p.dataset.part);
+    const closed = p.dataset.part !== open;
     p.classList.toggle('closed', closed);
     p.querySelector(':scope > .ed-head')?.setAttribute('aria-expanded', String(!closed));
   });
-  document.querySelectorAll('#rb-panels .rb-sec[data-label]').forEach((sec) => {
-    const closed = groups.includes(sec.dataset.label);
+  document.querySelectorAll('#rb-panels .rb-line').forEach((l) => {
+    const closed = lines.includes(l.dataset.line);
+    l.classList.toggle('closed', closed);
+    l.querySelector(':scope > .rb-line-head')?.setAttribute('aria-expanded', String(!closed));
+  });
+  document.querySelectorAll('#rb-panels .rb-sec[data-label], #rb-panels .rb-box[data-box]').forEach((sec) => {
+    const closed = groups.includes(sec.dataset.label || sec.dataset.box);
     sec.classList.toggle('closed', closed);
     sec.querySelector(':scope > .rb-label')?.setAttribute('aria-expanded', String(!closed));
   });
   fitToolbar();
+}
+function togglePart(part) {
+  app.setPrefs({ openPart: openPart() === part ? null : part });
+  applyParts();
 }
 function toggleIn(key, value) {
   const list = Array.isArray(app.prefs()[key]) ? app.prefs()[key] : [];
@@ -762,17 +786,19 @@ export function init(hooks) {
   research.init(hooks, { renderSources, saveMeta, insertText: (t) => insertAtCaret(t), sourcesOf, styleOf, citerFor });
 
   // Each labelled group gets its name as a button that folds it to just that name.
-  document.querySelectorAll('#rb-panels .rb-sec[data-label]').forEach((sec) => {
+  document.querySelectorAll('#rb-panels .rb-sec[data-label], #rb-panels .rb-box[data-box]').forEach((sec) => {
+    const name = sec.dataset.label || sec.dataset.box;
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'rb-label';
-    b.textContent = sec.dataset.label;
-    b.title = `Show or hide the ${sec.dataset.label} buttons`;
+    b.textContent = name;
+    b.title = sec.dataset.box ? `Show or hide ${name}` : `Show or hide the ${name} buttons`;
     b.setAttribute('aria-expanded', 'true');
-    b.addEventListener('click', () => toggleIn('closedGroups', sec.dataset.label));
+    b.addEventListener('click', () => toggleIn('closedGroups', name));
     sec.prepend(b);
   });
-  document.querySelectorAll('.ed-head').forEach((h) => h.addEventListener('click', () => toggleIn('closedParts', h.dataset.part)));
+  document.querySelectorAll('.ed-head').forEach((h) => h.addEventListener('click', () => togglePart(h.dataset.part)));
+  document.querySelectorAll('.rb-line-head').forEach((h) => h.addEventListener('click', () => toggleIn('closedLines', h.dataset.line)));
   // Copy [ ]: with Brackets on, whether copying and pasting keep the labels (this device).
   $('note-brackets-copy').addEventListener('change', (e) => { app.setPrefs({ bracketCopy: e.target.checked }); log.info('format', 'Copy with brackets', { on: e.target.checked }); });
   $('note-brackets-copy-wrap').addEventListener('click', (e) => e.stopPropagation());
@@ -834,7 +860,7 @@ export function init(hooks) {
   // Buttons in the ribbon keep the text box focused, so a phone keeps its keyboard up.
   $('toolbar').addEventListener('pointerdown', (e) => { if (e.pointerType !== 'mouse' && e.target.closest('.tool, .rb-chip') && (document.activeElement === $('body') || document.activeElement === $('rich'))) e.preventDefault(); });
   $('toolbar').addEventListener('mousedown', (e) => { if (e.target.closest('.tool, .rb-chip') && (document.activeElement === $('body') || document.activeElement === $('rich'))) e.preventDefault(); });
-  $('toolbar').addEventListener('mousedown', (e) => { if (e.target.closest('.rb-label, .ed-head') && document.activeElement === $('rich')) e.preventDefault(); });
+  $('ed-top').addEventListener('mousedown', (e) => { if (e.target.closest('.rb-label, .ed-head, .rb-line-head') && document.activeElement === $('rich')) e.preventDefault(); });
   // With words selected, the Font menu sets the font of those words only (Text and Markdown notes);
   // with nothing selected it sets the font of the whole note.
   $('note-font').addEventListener('change', async (e) => {
