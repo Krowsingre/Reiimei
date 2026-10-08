@@ -1,8 +1,19 @@
-# Reiimei v0.17.4
+# Reiimei v0.17.5
 
 *reiimei* (ree-h-may), n. The cold, luminous stillness peculiar to a clear winter night; especially the effect of moonlight upon frost, illuminating the night without dispelling it.
 
 An offline-first notes app for Windows and iPhone, built as a Progressive Web App (PWA). No Mac, no App Store, no developer fee.
+
+## What changed in v0.17.5
+
+- **A cleaner note on a phone.** One row at the top: back, the note's title, Undo, Redo and ⋯, then a line, then your writing. The tags row and the "Begin writing." text are gone.
+- **⋯ holds everything about the note** (phone): Share, **Tags…** (add and remove tags in their own sheet), Pin to top, **Folder…**, **Copy…**, **Duplicate**, Versions and Delete.
+- **Duplicate.** Select one or more notes and tap **Duplicate**: one note is copied straight away; several ask first ("Duplicate 3 notes?"). Each copy is named "… (copy)" and kept in the same folder with the same tags.
+- **"---" then Enter makes a divider line** in a Text note. "--- " with a space stays as typed, and so does a "---" line you leave without pressing Enter, also after the note is reopened (before, it could turn into a divider then).
+- **Typing check** (Settings › Log). A recorder for problems typing on a phone: start it, try the steps it lists in a practice note, then stop it and send the file it gives. It shows exactly what the phone's keyboard does, so the remaining phone typing problems can be fixed for certain.
+- One new file, `typingcheck.js`: 91 files now. No Supabase changes.
+- **Upload these files** (changed since v0.17.4): `app.js`, `index.html`, `styles.css`, `sw.js`, `typingcheck.js` (new), `ui-rich.js`, `versions.js`, `README.md`.
+- Also fixed: two earlier versions of a note saved at the same moment could overwrite each other, so one was occasionally lost.
 
 ## What changed in v0.17.4
 
@@ -338,6 +349,7 @@ Note: a device still on v0.7 would show the hidden cache record in Recently Dele
 | `Ilunir*.woff` | Ilunir fonts (41 files), © Krowsingre Publishing LLC |
 | `fonts.js` | The list of fonts for the Font menu and the interface font setting |
 | `capitals.js` | The Aa button: capitals at the start of lines and sentences, or all lowercase |
+| `typingcheck.js` | Settings › Log › Typing check: records what a phone's keyboard does, for fixing typing problems |
 | `history.js` | One Undo and Redo for every change to a note: text, formatting, fonts, spacing and Brackets |
 | `versions.js` | Versions: earlier copies of each note, kept on this device, with Restore |
 | `channel.js` | Tells the live app from a beta copy, so each keeps its own notes and settings on a device |
@@ -370,9 +382,9 @@ Then open http://localhost:8000 in Edge or Chrome. Notes work immediately, saved
 
 The iPhone needs an HTTPS address. GitHub Pages hosts the app for free. Only the app's code goes to GitHub; your notes never do.
 
-1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.17.4` folder.
+1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.17.5` folder.
 2. **Create the repository.** In Safari, sign in at github.com, tap **+** › **New repository**. Name it `reiimei`, set it to **Public** (free Pages needs a public repository), and tap **Create repository**.
-3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.17.4` folder, tap **Select**, select all 90 files, and tap **Open**. Scroll down and tap **Commit changes**.
+3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.17.5` folder, tap **Select**, select all 91 files, and tap **Open**. Scroll down and tap **Commit changes**.
    - If you don't see the upload link, tap the **aA** button in Safari's address bar › **Request Desktop Website** and try again.
 4. **Turn on Pages.** In the repository, open **Settings** › **Pages**. Under **Build and deployment**, set Source to **Deploy from a branch**, Branch to **main** and **/ (root)**, then tap **Save**.
 5. **Wait a minute or two**, then reload the Pages screen. It shows your address, which looks like `https://yourname.github.io/reiimei/`.
@@ -511,7 +523,7 @@ The service worker caches the app files. When you change any file, bump `VERSION
 - **Settings › Log** › Download gives a text log of everything the app did, including sync results and errors.
 - **"Test connection"** in Settings › Sync confirms the URL, key, sign-in, and tables are all correct.
 
-## Known limits in v0.17.4
+## Known limits in v0.17.5
 
 - Images can be linked but not attached
 - Sources belong to one note; there is no shared library yet

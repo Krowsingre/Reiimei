@@ -12,7 +12,14 @@ const copyOf = (note, reason, at) => ({ at, reason, body: note.body || '', title
 
 // Keep a copy of the note as it is now. Without force, only when the last copy is a few
 // minutes old. Nothing is kept for an empty note or one that has not changed.
-export async function keep(note, { reason = 'editing', force = false, now = Date.now() } = {}) {
+// One at a time: two copies kept at the same moment must not overwrite each other's list.
+let queue = Promise.resolve();
+export function keep(note, opts = {}) {
+  const run = queue.then(() => keepNow(note, opts));
+  queue = run.catch(() => {});
+  return run;
+}
+async function keepNow(note, { reason = 'editing', force = false, now = Date.now() } = {}) {
   if (!note || note.locked || note.deleted || !(note.body || '').trim()) return false;
   const list = await db.getVersions(note.id);
   if (list === null) return false; // sealed and not opened yet
@@ -26,5 +33,5 @@ export async function keep(note, { reason = 'editing', force = false, now = Date
 }
 
 // Newest first.
-export async function list(id) { return [...((await db.getVersions(id)) || [])].reverse(); }
+export async function list(id) { await queue; return [...((await db.getVersions(id)) || [])].reverse(); }
 export const forget = (id) => db.removeVersions(id);

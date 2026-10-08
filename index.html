@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-version="0.17.4">
+<html lang="en" data-version="0.17.5">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -84,6 +84,7 @@
         <button class="text-btn" id="sel-all">All</button>
         <span class="spacer"></span>
         <button class="btn small" id="sel-share">Share</button>
+        <button class="btn small" id="sel-duplicate">Duplicate</button>
         <button class="btn small" id="sel-restore" hidden>Restore</button>
         <button class="btn small danger" id="sel-delete">Delete</button>
       </div>
@@ -111,8 +112,8 @@
         <span class="spacer"></span>
         <span class="save-state" id="save-state" role="status"></span>
         <button class="icon-btn desktop-only" id="btn-focus" title="Focus: the note fills the window (Ctrl+Shift+F)" aria-label="Focus on this note" aria-pressed="false"><svg class="i-expand" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg><svg class="i-collapse" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg></button>
-        <button class="icon-btn desktop-only head-undo" id="btn-undo" title="Undo (Ctrl+Z)" aria-label="Undo" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></button>
-        <button class="icon-btn desktop-only head-undo" id="btn-redo" title="Redo (Ctrl+Y or Ctrl+Shift+Z)" aria-label="Redo" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 14l5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg></button>
+        <button class="icon-btn head-undo" id="btn-undo" title="Undo (Ctrl+Z)" aria-label="Undo" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></button>
+        <button class="icon-btn head-undo" id="btn-redo" title="Redo (Ctrl+Y or Ctrl+Shift+Z)" aria-label="Redo" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 14l5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg></button>
         <button class="icon-btn" id="btn-note-menu" title="Share, pin or delete" aria-label="Note menu" aria-haspopup="dialog"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/></svg><i class="pin-dot" id="pin-dot" hidden></i></button>
       </header>
       <!-- Three parts on a computer: Title, Tags and Formatting. Their names sit in the header row,
@@ -133,8 +134,6 @@
       <div class="toolbar ed-part" id="toolbar" role="toolbar" aria-label="Formatting" data-part="format">
         <!-- The phone's bar: the everyday tools, and More for the rest (the sections below). -->
         <div class="phone-bar" id="phone-bar" role="group" aria-label="Formatting">
-          <button type="button" class="pb" data-pb="undo" aria-label="Undo" disabled>↶</button>
-          <button type="button" class="pb" data-pb="redo" aria-label="Redo" disabled>↷</button>
           <button type="button" class="pb pb-b" data-pb="b" aria-label="Bold">B</button>
           <button type="button" class="pb pb-i" data-pb="i" aria-label="Italic">I</button>
           <button type="button" class="pb pb-u" data-pb="u" aria-label="Underline">U</button>
@@ -576,6 +575,11 @@
     </section>
 
     <section class="tab-panel" data-panel="log" hidden>
+      <div class="set-block" id="typing-check">
+        <p class="set-label">Typing check</p>
+        <p class="set-help">For problems typing on a phone. Start it, open a practice note, then: dictate a sentence; hold Delete for a few seconds; tap in the middle of a word and type a word; press and hold a word and drag a handle. Come back here, tap Stop and send the file it gives. It records the keys, the letters next to the cursor and how the screen moves, so use a note with nothing private in it.</p>
+        <div class="row"><button class="btn" id="btn-typing-check">Start typing check</button><span class="hint" id="typing-check-state"></span></div>
+      </div>
       <pre class="log-view" id="log-view"></pre>
       <div class="row">
         <button class="btn" id="btn-copy-log">Copy</button>
@@ -627,6 +631,11 @@
       <div class="versions-preview" id="versions-preview" aria-live="polite"></div>
     </div>
     <menu><button class="btn" id="btn-versions-close">Close</button><button class="btn primary" id="btn-versions-restore" disabled>Restore this version</button></menu>
+  </dialog>
+  <dialog id="tags-dialog" class="dialog tags-dialog" aria-labelledby="tags-title">
+    <h3 id="tags-title">Tags</h3>
+    <div id="tags-slot"></div>
+    <menu><button class="btn primary" id="btn-tags-done">Done</button></menu>
   </dialog>
   <dialog id="ask-dialog" class="dialog">
     <form method="dialog">

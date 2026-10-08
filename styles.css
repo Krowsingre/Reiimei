@@ -1426,3 +1426,22 @@ input.switch:disabled { opacity: .5; cursor: default; }
 }
 .tag-opt { padding: 7px 10px; border-radius: 8px; cursor: pointer; font-size: 14px; color: var(--ink-2); }
 .tag-opt:hover, .tag-opt[aria-selected="true"] { background: var(--accent-soft); color: var(--ink); }
+
+/* ---- v0.17.5: the phone's note screen ---- */
+@media (max-width: 760px) {
+  /* One row: back, the title, Undo and Redo, ⋯. The writing starts under the line. */
+  .editor-head .folder-btn { display: none; }
+  .editor-head .title-row { flex: 1 1 auto; min-width: 0; padding: 0 4px; border: 0; }
+  .editor-head #note-title { font-size: 18px; line-height: 1.3; height: 1.3em !important; white-space: nowrap; overflow: hidden; resize: none; padding: 0; }
+  .editor-head .spacer { flex: 0 0 0; min-width: 0; }
+  .editor-head .head-undo { width: 36px; padding: 0; }
+  .editor-head .head-undo svg { width: 20px; height: 20px; }
+  .editor .ed-top > .tag-row { display: none; }
+  .rich.empty::before { content: none; }
+  #body::placeholder { color: transparent; }
+}
+.tags-dialog .tag-row { display: flex; border: 0; padding: 4px 0 8px; }
+.tags-dialog { overflow: visible; }
+.app[data-typing-check="on"] .editor-head::after { content: "● Typing check"; position: absolute; right: 60px; top: 2px; font: 600 10px/1 var(--ui); color: var(--danger, #c0392b); }
+.editor-head { position: relative; }
+.rich hr { border: 0; border-top: 1px solid var(--rule); margin: .6em 0; }

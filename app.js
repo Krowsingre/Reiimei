@@ -16,9 +16,10 @@ import * as versions from './versions.js';
 import { BETA, KEY, NAME } from './channel.js';
 import { noteToHtml } from './format.js';
 import { createHistory, lookOf, sameLook, LOOK_KEYS } from './history.js';
+import * as typingCheck from './typingcheck.js';
 import { noteTitle, noteSnippet, ownTitle, fallbackTitle, sharedFileCheck, plainText } from './share.js';
 
-export const APP_VERSION = '0.17.4';
+export const APP_VERSION = '0.17.5';
 // boot.js compares this with the page's version to catch a launch that mixes two releases.
 window.__reiimeiVersion = APP_VERSION;
 export const BUILD_DATE = '2026-10-04';
@@ -1113,7 +1114,8 @@ function renderSelectBar(notes = filteredNotes()) {
   $('sel-all').textContent = count && count === notes.length ? 'None' : 'All';
   $('sel-restore').hidden = !trash;
   $('sel-delete').textContent = trash ? 'Delete forever' : 'Delete';
-  for (const id of ['sel-share', 'sel-restore', 'sel-delete']) $(id).disabled = !count;
+  for (const id of ['sel-share', 'sel-restore', 'sel-delete', 'sel-duplicate']) $(id).disabled = !count;
+  $('sel-duplicate').hidden = trash;
 }
 
 function setSelecting(on) {
@@ -1150,6 +1152,31 @@ async function deleteSelected() {
   log.info('editor', trash ? 'Notes deleted permanently' : 'Notes moved to Recently Deleted', { count: notes.length });
   await afterBulkChange();
   toast(trash ? `Deleted ${notes.length} forever` : `${notes.length} moved to Recently Deleted`);
+}
+
+// Copies of notes, each marked "(copy)" and kept with the note it came from. Several at once are
+// confirmed first.
+async function duplicateNotes(notes) {
+  notes = notes.filter((n) => n && !n.locked && !n.deleted);
+  if (!notes.length) return [];
+  if (notes.length > 1) {
+    const c = await ask({ title: `Duplicate ${notes.length} notes?`, text: 'Each copy is marked “(copy)” and kept in the same folder.', okText: 'Duplicate' });
+    if (c.action !== 'ok') return [];
+  }
+  await flushSave();
+  const made = [];
+  for (const n of notes) {
+    const meta = { ...(n.meta || {}), title: `${ownTitle(n) || noteTitle(n)} (copy)`, duplicateOf: n.id };
+    const copy = await db.createNote({ folder_id: n.folder_id, tags: [...(n.tags || [])], format: n.format, meta });
+    const saved = await db.saveNote(copy, { body: n.body });
+    replaceNote(saved);
+    made.push(saved);
+  }
+  log.info('editor', 'Notes duplicated', { count: made.length });
+  scheduleSync();
+  render();
+  toast(made.length === 1 ? 'Duplicated' : `Duplicated ${made.length} notes`);
+  return made;
 }
 
 async function restoreSelected() {
@@ -1289,6 +1316,14 @@ async function findConflictedCopies() {
   scheduleSync();
   log.info('editor', 'Conflicted copies moved to Recently Deleted', { count: copies.length });
   setMsg('data-msg', `Moved ${copies.length} conflicted ${copies.length === 1 ? 'copy' : 'copies'} to Recently Deleted.`, 'ok');
+}
+
+function openTagsSheet() {
+  const n = currentNote();
+  if (!n) return;
+  $('tags-slot').append($('tag-row'));
+  $('tags-dialog').showModal();
+  el.tagInput.focus();
 }
 
 async function addTag(raw) {
@@ -1557,6 +1592,19 @@ function openFolderMenu() {
 function openNoteMenu() {
   const n = currentNote();
   if (!n) return;
+  if (isPhone()) {
+    openMenu(el.noteMenu, 'Note', [
+      { label: 'Share…', run: async () => { await flushSave(); const x = currentNote(); if (x) shareUi.open([x], { single: true }); } },
+      { label: 'Tags…', disabled: n.deleted || n.locked, run: openTagsSheet },
+      { label: n.pinned ? 'Unpin' : 'Pin to top', disabled: n.deleted, run: () => { const x = currentNote(); if (x) updateCurrent({ pinned: !x.pinned }); } },
+      { label: 'Folder…', disabled: n.deleted, run: () => $('note-folder').click() },
+      { label: 'Copy…', disabled: n.deleted || n.locked, run: () => $('btn-copy').click() },
+      { label: 'Duplicate', disabled: n.deleted || n.locked, run: async () => { const made = await duplicateNotes([currentNote()]); if (made[0]) await selectNote(made[0].id); } },
+      { label: 'Versions…', disabled: n.deleted || n.locked, run: openVersions },
+      { label: n.deleted ? 'In Recently Deleted' : 'Delete', danger: !n.deleted, disabled: n.deleted, run: deleteCurrent },
+    ]);
+    return;
+  }
   openMenu(el.noteMenu, 'Note', [
     { label: 'Share…', run: async () => { await flushSave(); const x = currentNote(); if (x) shareUi.open([x], { single: true }); } },
     { label: n.pinned ? 'Unpin' : 'Pin to top', disabled: n.deleted, run: () => { const x = currentNote(); if (x) updateCurrent({ pinned: !x.pinned }); } },
@@ -1740,6 +1788,7 @@ function trackViewport() {
     if (!isPhone()) { root.style.removeProperty('--vvh'); root.style.removeProperty('--vvt'); delete root.dataset.kb; return; }
     if (touching) { waiting = true; return; }
     waiting = false;
+    typingCheck.trace('move-app', { h: Math.round(vv.height), top: Math.round(vv.offsetTop) });
     set('--vvh', `${Math.round(vv.height)}px`);
     set('--vvt', `${Math.round(vv.offsetTop)}px`);
     const kb = window.innerHeight - vv.height > 120 ? 'open' : 'closed';
@@ -2206,6 +2255,36 @@ function bindEvents() {
     shareUi.open(selectedNotes(), { title: '', single: notes.length === 1 });
   });
   $('sel-delete').addEventListener('click', deleteSelected);
+  $('sel-duplicate').addEventListener('click', async () => { const made = await duplicateNotes(selectedNotes()); if (made.length) { state.selected.clear(); state.selecting = false; render(); } });
+  // The Tags sheet (phone): the note's tag row, shown on its own.
+  $('btn-tags-done').addEventListener('click', () => $('tags-dialog').close());
+  $('tags-dialog').addEventListener('close', () => { const row = $('tag-row'); const top = $('ed-top'); if (row.parentElement !== top) top.insertBefore(row, $('toolbar')); });
+  // The phone's top row: back, the title, Undo and Redo, ⋯ (the title moves up beside them).
+  const placeTitle = () => {
+    const row = $('title-row');
+    const head = document.querySelector('.editor-head');
+    if (isPhone()) { if (row.parentElement !== head) head.insertBefore(row, head.querySelector('.spacer')); }
+    else if (row.parentElement !== $('ed-top')) $('ed-top').insertBefore(row, $('ed-top').firstChild);
+  };
+  window.matchMedia('(max-width: 760px)').addEventListener('change', placeTitle);
+  placeTitle();
+  // Settings › Log › Typing check.
+  $('btn-typing-check').addEventListener('click', () => {
+    if (!typingCheck.recording()) {
+      typingCheck.start();
+      $('btn-typing-check').textContent = 'Stop and save the check';
+      $('typing-check-state').textContent = 'Recording…';
+      el.app.dataset.typingCheck = 'on';
+      toast('Typing check started. Try the steps in a practice note, then come back here.');
+      return;
+    }
+    const text = typingCheck.stop();
+    $('btn-typing-check').textContent = 'Start typing check';
+    $('typing-check-state').textContent = '';
+    delete el.app.dataset.typingCheck;
+    download(`reiimei-typing-check-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')}.txt`, text, 'text/plain');
+    log.info('diag', 'Typing check saved', { lines: text.split('\n').length });
+  });
   $('sel-restore').addEventListener('click', restoreSelected);
   $('btn-empty-trash').addEventListener('click', emptyTrash);
   $('btn-purge').addEventListener('click', purgeCurrent);
@@ -2264,7 +2343,8 @@ function bindEvents() {
   }, true);
   // A button or menu in the toolbar makes a step of its own.
   $('toolbar').addEventListener('pointerdown', (e) => { if (!e.target.closest('#btn-undo-sheet, #btn-redo-sheet, [data-pb="undo"], [data-pb="redo"], [data-pb="more"]')) markChange(); }, true);
-  for (const id of ['btn-undo', 'btn-redo']) $(id).addEventListener('mousedown', (e) => { if (document.activeElement === $('rich')) e.preventDefault(); });
+  // Undo and Redo leave the caret (and a phone's keyboard) where they are.
+  for (const id of ['btn-undo', 'btn-redo']) for (const t of ['mousedown', 'pointerdown']) $(id).addEventListener(t, (e) => { if (document.activeElement === $('rich') || document.activeElement === el.body) e.preventDefault(); });
   $('btn-undo-sheet').addEventListener('click', () => stepHistory(-1));
   $('btn-redo-sheet').addEventListener('click', () => stepHistory(1));
   $('btn-undo').addEventListener('click', () => stepHistory(-1));

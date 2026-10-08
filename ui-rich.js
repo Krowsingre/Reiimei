@@ -6,6 +6,7 @@
 import { parseMarkdown, inlineToMarkdown, noteToHtml, escapeHtml as esc } from './format.js';
 import { plainText } from './share.js';
 import { stripFragment, stripLabels, labelsIn } from './brackets.js';
+import { trace } from './typingcheck.js';
 
 const $ = (id) => document.getElementById(id);
 let app = null;
@@ -107,7 +108,7 @@ function inlineMd(node, font = null) {
   return out;
 }
 // A line of a paragraph that starts like a heading, list or quote is escaped to stay text.
-const escLineStart = (line) => line.replace(/^(\s*)(#|>|[-*+](?=\s)|\d+[.)](?=\s))/, '$1\\$2');
+const escLineStart = (line) => (/^\s*([-*_])(\s*\1){2,}\s*$/.test(line) ? line.replace(/^(\s*)/, '$1\\') : line.replace(/^(\s*)(#|>|[-*+](?=\s)|\d+[.)](?=\s))/, '$1\\$2'));
 const dropEmptyRuns = (s) => s.replace(/\[\[f:[a-z][a-z0-9-]*\]\]\[\[\/f\]\]/g, '');
 function paraParts(el) {
   // The last line break of a paragraph only holds the line open (the browser adds one after a
@@ -174,6 +175,7 @@ export const htmlToMarkdown = (el) => blocksMd(el);
 
 // ---- Keeping the page and the text box in step --------------------------------------------
 function show(md) {
+  trace('redraw', { chars: md.length });
   box.innerHTML = markdownToHtml(md);
   shownSrc = md;
   markEmpty();
@@ -856,8 +858,8 @@ export function keepCaretVisible() {
   const barTop = bar && !bar.hidden && bar.offsetParent ? bar.getBoundingClientRect().top : Infinity;
   const bottom = Math.min(b.bottom, barTop > b.top ? barTop : Infinity, vv ? vv.offsetTop + vv.height : window.innerHeight) - 28;
   const top = Math.max(b.top, vv ? vv.offsetTop : 0) + 8;
-  if (rect.bottom > bottom) box.scrollTop += rect.bottom - bottom;
-  else if (rect.top < top) box.scrollTop -= top - rect.top;
+  if (rect.bottom > bottom) { trace('scroll-to-caret', { by: Math.round(rect.bottom - bottom) }); box.scrollTop += rect.bottom - bottom; }
+  else if (rect.top < top) { trace('scroll-to-caret', { by: -Math.round(top - rect.top) }); box.scrollTop -= top - rect.top; }
   return true;
 }
 
@@ -941,6 +943,26 @@ export function init(hooks) {
   box.addEventListener('blur', () => app.flushSave());
   document.addEventListener('selectionchange', saveCaret);
   box.addEventListener('beforeinput', autoList);
+  // "---" alone on a line, then Enter: a divider line. ("--- " with a space stays as typed.)
+  box.addEventListener('beforeinput', (e) => {
+    if (e.inputType !== 'insertParagraph' || e.isComposing || box.contentEditable !== 'true') return;
+    const s = sel();
+    if (!s.rangeCount || !s.isCollapsed) return;
+    const blk = closest(s.anchorNode, 'p,div');
+    if (!blk || blk.parentElement !== box || blk.textContent !== '---') return;
+    e.preventDefault();
+    const hr = document.createElement('hr');
+    const p = document.createElement('p');
+    p.appendChild(document.createElement('br'));
+    blk.replaceWith(hr);
+    hr.after(p);
+    const r = document.createRange();
+    r.setStart(p, 0);
+    r.collapse(true);
+    s.removeAllRanges();
+    s.addRange(r);
+    pushToBody();
+  });
   // Anything else that changes the text (citations, moving a section, Undo in a message, the
   // scene board) changes the hidden text box; show that on the page too.
   $('body').addEventListener('input', () => { if (!fromRich && active() && !composing) show($('body').value); });
