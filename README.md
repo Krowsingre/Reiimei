@@ -1,8 +1,19 @@
-# Reiimei v0.17.2
+# Reiimei v0.17.3
 
-*reiimei* (REE-h-may), n. The cold, luminous stillness peculiar to a clear winter night; especially the effect of moonlight upon frost, illuminating the night without dispelling it.
+*reiimei* (ree-h-may), n. The cold, luminous stillness peculiar to a clear winter night; especially the effect of moonlight upon frost, illuminating the night without dispelling it.
 
 An offline-first notes app for Windows and iPhone, built as a Progressive Web App (PWA). No Mac, no App Store, no developer fee.
+
+## What changed in v0.17.3
+
+- **Easier tapping and selecting on a phone.** When the keyboard came up, Reiimei moved itself to stay in view as the screen scrolled, even while your finger was on the screen. The text moved under your finger, so a tap could put the cursor in the wrong place and dragging the selection handles could run away over whole paragraphs. Reiimei now holds still while a finger is on the screen and catches up when you lift it.
+- **Fewer stray capitals on a phone.** The iPhone decides whether to capitalize from the text around the cursor. Reiimei was rewriting parts of the page on every key press (the save indicator, the Undo buttons, the Brackets shading), which can throw that off. Now it changes the page only when something actually changes, and works out the cursor position for Undo without copying the note on every key press (faster in long notes too). The iPhone's own auto-capitals stay on.
+- **A short bar of everyday tools on a phone:** Undo and Redo, Bold, Italic, Underline, Strikethrough, the List button (bullets → numbers → none), Font, Brackets and Aa. Everything else (headings, highlight, checklists, quotes, links, Sources, Copy, Paper, Format, Spacing…) is under **•••** (More).
+- **Title and Tags are separate** (computer): the header names Title, Tags and Formatting, and one opens at a time.
+- **Undo and Redo are in the header** (computer), between Focus and ⋯, instead of the toolbar.
+- The definition reads *ree-h-may*.
+- Still 90 files. No Supabase changes.
+- **Upload these files** (changed since v0.17.2): `app.js`, `brackets.js`, `index.html`, `styles.css`, `sw.js`, `ui-rich.js`, `ui-writing.js`, `README.md`.
 
 ## What changed in v0.17.2
 
@@ -351,9 +362,9 @@ Then open http://localhost:8000 in Edge or Chrome. Notes work immediately, saved
 
 The iPhone needs an HTTPS address. GitHub Pages hosts the app for free. Only the app's code goes to GitHub; your notes never do.
 
-1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.17.2` folder.
+1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.17.3` folder.
 2. **Create the repository.** In Safari, sign in at github.com, tap **+** › **New repository**. Name it `reiimei`, set it to **Public** (free Pages needs a public repository), and tap **Create repository**.
-3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.17.2` folder, tap **Select**, select all 90 files, and tap **Open**. Scroll down and tap **Commit changes**.
+3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.17.3` folder, tap **Select**, select all 90 files, and tap **Open**. Scroll down and tap **Commit changes**.
    - If you don't see the upload link, tap the **aA** button in Safari's address bar › **Request Desktop Website** and try again.
 4. **Turn on Pages.** In the repository, open **Settings** › **Pages**. Under **Build and deployment**, set Source to **Deploy from a branch**, Branch to **main** and **/ (root)**, then tap **Save**.
 5. **Wait a minute or two**, then reload the Pages screen. It shows your address, which looks like `https://yourname.github.io/reiimei/`.
@@ -371,8 +382,10 @@ Chrome on a computer can only imitate an iPhone, so after each update try these 
 4. **Holding Delete** keeps deleting, faster the longer you hold it.
 5. **Undo.** Shake the phone (or swipe left with three fingers) to undo what you typed; Undo and Redo are also in the **Text** sheet.
 6. **Line breaks.** A blank line typed with Return twice is still there after closing and reopening the note, and after a sync.
-7. **The layout.** The mode drop-down is at the top of the home page; the **Note** sheet shows Format & Font, then Options; **Insert** opens its own sheet; the List button steps bullets → numbers → checklist → none.
-8. **Sync.** A change made on the phone shows on the computer, and the other way round.
+7. **The layout.** The mode drop-down is at the top of the home page. The bar above the keyboard has Undo, Redo, B, I, U, S, List (bullets → numbers → none), Font, Brackets, Aa and ••• (More). More shows Text, Paragraph, Insert, Tools and Note; the **Note** sheet shows Format & Font, then Options.
+8. **Tapping and selecting.** Tap in the middle of a word: the cursor lands there. Press and hold a word, then drag a handle: only the words you drag over are selected.
+9. **Capitals.** Move the cursor into the middle of a sentence, or delete a word, then type: the word is not capitalized (it still is at the start of a sentence).
+10. **Sync.** A change made on the phone shows on the computer, and the other way round.
 
 Anything that looks wrong: a screenshot and the step number is all that is needed.
 
@@ -490,7 +503,7 @@ The service worker caches the app files. When you change any file, bump `VERSION
 - **Settings › Log** › Download gives a text log of everything the app did, including sync results and errors.
 - **"Test connection"** in Settings › Sync confirms the URL, key, sign-in, and tables are all correct.
 
-## Known limits in v0.17.2
+## Known limits in v0.17.3
 
 - Images can be linked but not attached
 - Sources belong to one note; there is no shared library yet

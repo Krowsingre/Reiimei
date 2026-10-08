@@ -444,11 +444,12 @@ function retag(items, tag) {
     if (!list.children.length) list.remove();
   }
 }
-function cycleList(blocks) {
+function cycleList(blocks, tasks = true) {
   const kind = listKind();
   const items = blocks.filter((b) => b.tagName === 'LI');
   if (kind === 'none' || !items.length) { toList('UL', blocks); return; }
   if (kind === 'ul') { retag(items, 'OL'); return; }
+  if (kind === 'ol' && !tasks) { toList('OL', items); return; } // the phone's List: bullets, numbers, none
   if (kind === 'ol') { retag(items, 'UL'); items.forEach((li) => { li.classList.add('task'); li.dataset.done = 'false'; }); return; }
   items.forEach((li) => { li.classList.remove('task'); delete li.dataset.done; });
   toList('UL', items);
@@ -567,7 +568,7 @@ export function applyFont(id, noteFont) {
   return true;
 }
 
-export async function apply(id, { typing = false } = {}) {
+export async function apply(id, { typing = false, tasks = true } = {}) {
   if (!active() || box.contentEditable !== 'true') return;
   restoreCaret();
   tidyBlocks();
@@ -602,7 +603,7 @@ export async function apply(id, { typing = false } = {}) {
   }
   switch (id) {
     case 'h': keepSelection(() => { if (!cycleHeading(blocks)) app.toast('Headings work on paragraphs, not list items.'); }); break;
-    case 'list': keepSelection(() => cycleList(blocks)); break;
+    case 'list': keepSelection(() => cycleList(blocks, tasks)); break;
     case 'ul': keepSelection(() => toList('UL', blocks)); break;
     case 'ol': keepSelection(() => toList('OL', blocks)); break;
     case 'task': keepSelection(() => toggleTask(blocks)); break;
@@ -801,19 +802,24 @@ export function keepCaretVisible() {
 // ---- The caret as a place in the text (for Undo) -------------------------------------------
 // Counted the same way both ways: each character, each line break and the start of each block.
 const COUNTED = /^(P|DIV|H[1-6]|LI|PRE|BLOCKQUOTE|UL|OL|TABLE|TR|HR)$/;
-function countIn(node) {
-  let n = 0;
-  for (const c of node.childNodes) {
-    if (c.nodeType === 3) n += c.length;
-    else if (c.nodeType === 1) { if (c.tagName === 'BR') n += 1; else { if (COUNTED.test(c.tagName)) n += 1; n += countIn(c); } }
-  }
-  return n;
-}
 function offsetAt(node, off) {
-  const r = document.createRange();
-  r.setStart(box, 0);
-  r.setEnd(node, off);
-  return countIn(r.cloneContents());
+  // Everything before (node, off), counted as above, without copying the note.
+  let n = 0;
+  const visit = (el) => {
+    const kids = el.childNodes;
+    for (let i = 0; i < kids.length; i++) {
+      if (el === node && i === off) return true;
+      const c = kids[i];
+      if (c.nodeType === 3) { if (c === node) { n += off; return true; } n += c.length; }
+      else if (c.nodeType === 1) {
+        if (c.tagName === 'BR') n += 1;
+        else { if (COUNTED.test(c.tagName)) n += 1; if (visit(c)) return true; }
+      }
+    }
+    return el === node; // the end of an element
+  };
+  visit(box);
+  return n;
 }
 function pointAt(n) {
   let count = 0;

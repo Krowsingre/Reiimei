@@ -28,9 +28,10 @@ const supported = () => typeof CSS !== 'undefined' && !!CSS.highlights && typeof
 
 // Draw labels on a page of rendered text (the Text note editor, or a Preview), without changing
 // it: CSS highlights paint over ranges of the text as it is.
+const painted = new Map(); // name -> the labels last painted, so an unchanged note is left alone
 export function paint(name, root, on) {
   if (!supported()) return false;
-  if (!on || !root) { CSS.highlights.delete(name); return true; }
+  if (!on || !root) { if (CSS.highlights.has(name)) CSS.highlights.delete(name); painted.delete(name); return true; }
   const ranges = [];
   const walk = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
     acceptNode: (n) => (n.parentElement.closest('code, pre, a, .raw-block') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),
@@ -44,6 +45,10 @@ export function paint(name, root, on) {
       ranges.push(r);
     }
   }
+  const key = ranges.map((r) => `${r.startOffset}:${r.endOffset}:${r.startContainer.nodeValue.slice(r.startOffset, r.endOffset)}`).join('|');
+  const last = painted.get(name);
+  if (last && last.key === key && last.nodes.every((t, i) => t === ranges[i].startContainer) && CSS.highlights.has(name)) return true;
+  painted.set(name, { key, nodes: ranges.map((r) => r.startContainer) });
   CSS.highlights.set(name, new Highlight(...ranges));
   return true;
 }

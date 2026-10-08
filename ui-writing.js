@@ -126,6 +126,17 @@ export function renderToolbar(note) {
   $('note-brackets-copy').checked = app.prefs().bracketCopy !== false;
   $('note-spacing-row').hidden = code;
   $('note-brackets').checked = !!note.meta?.brackets;
+  // The phone's bar shows what applies to this note.
+  for (const b of $('phone-bar').querySelectorAll('.pb')) {
+    const w = b.dataset.pb;
+    if (['b', 'i', 'u', 's'].includes(w)) b.hidden = code || !ids.has(w);
+    else if (w === 'list') b.hidden = code || !ids.has('ul');
+    else if (w === 'font' || w === 'brackets' || w === 'case') b.hidden = code;
+    if (b.tagName === 'BUTTON' && w !== 'more' && w !== 'undo' && w !== 'redo') b.disabled = ro || previewOn;
+  }
+  $('phone-bar').querySelector('[data-pb="brackets"]').setAttribute('aria-pressed', String(!!note.meta?.brackets));
+  fonts.fillFontSelect($('pb-font'), { hidden: app.prefs().hiddenFonts || [], current: fonts.fontId(note.meta?.font) });
+  $('pb-font').disabled = ro;
   $('note-brackets').disabled = ro;
   applySpacing(note);
   paintBrackets();
@@ -225,17 +236,18 @@ export function paintBrackets() {
 }
 
 // ---- Folding (computer) -------------------------------------------------------------------
-// Two parts, Title & Tags and Formatting, and one of them open at a time. Inside Formatting, each
+// Three parts, Title, Tags and Formatting, and one of them open at a time. Inside Formatting, each
 // row (Buttons, Format & Font, Options) folds, and so does each labelled box in it.
 const listPref = (key) => (Array.isArray(app.prefs()[key]) ? app.prefs()[key] : []);
 const closedGroups = () => listPref('closedGroups');
 // The open part: 'meta', 'format' or null. Before v0.16.5 each part folded on its own (closedParts).
 function openPart() {
   const p = app.prefs();
-  if (p.openPart !== undefined) return p.openPart;
+  if (p.openPart !== undefined) return p.openPart === 'meta' ? 'title' : p.openPart; // Title & Tags (v0.17.1–v0.17.2) is now Title
   const old = listPref('closedParts');
   if (!old.includes('format')) return 'format';
-  if (!old.includes('title') || !old.includes('tags')) return 'meta';
+  if (!old.includes('title')) return 'title';
+  if (!old.includes('tags')) return 'tags';
   return null;
 }
 function applyParts() {
@@ -345,13 +357,13 @@ export function cycleListText(value, start, end, { tasks = true } = {}) {
   return { value: value.slice(0, ls) + out + value.slice(le), start: ls, end: ls + out.length, kind: next };
 }
 
-export function applyToolById(id) {
+export function applyToolById(id, { tasks = true } = {}) {
   const note = app.note();
   if (!note || note.deleted) return;
-  if (rich.active()) { rich.apply(id); return; }
+  if (rich.active()) { rich.apply(id, { tasks }); return; }
   if (id === 'list') {
     const ta = $('body');
-    const r = cycleListText(ta.value, ta.selectionStart, ta.selectionEnd, { tasks: F.TOOLBAR[fmtOf(note)].some((t) => t.id === 'task') });
+    const r = cycleListText(ta.value, ta.selectionStart, ta.selectionEnd, { tasks: tasks && F.TOOLBAR[fmtOf(note)].some((t) => t.id === 'task') });
     ta.focus();
     applyEdit(ta, r.value, r.start, r.end);
     return;
@@ -836,6 +848,27 @@ export function init(hooks) {
   $('note-brackets-copy').addEventListener('change', (e) => { app.setPrefs({ bracketCopy: e.target.checked }); log.info('format', 'Copy with brackets', { on: e.target.checked }); });
   $('note-brackets-copy-wrap').addEventListener('click', (e) => e.stopPropagation());
   $('btn-case').addEventListener('click', changeCase);
+  // The phone's bar: the everyday tools straight away, the rest under More.
+  const bar = $('phone-bar');
+  bar.addEventListener('pointerdown', (e) => { if (e.target.closest('button.pb') && (document.activeElement === $('body') || document.activeElement === $('rich'))) e.preventDefault(); });
+  bar.addEventListener('mousedown', (e) => { if (e.target.closest('button.pb') && (document.activeElement === $('body') || document.activeElement === $('rich'))) e.preventDefault(); });
+  bar.addEventListener('click', (e) => {
+    const b = e.target.closest('button.pb');
+    if (!b || b.disabled) return;
+    const what = b.dataset.pb;
+    if (what === 'undo') $('btn-undo').click();
+    else if (what === 'redo') $('btn-redo').click();
+    else if (what === 'list') applyToolById('list', { tasks: false });
+    else if (what === 'case') changeCase();
+    else if (what === 'brackets') $('note-brackets').click();
+    else if (what === 'more') {
+      const open = $('toolbar').dataset.more !== 'on';
+      $('toolbar').dataset.more = open ? 'on' : 'off';
+      b.setAttribute('aria-expanded', String(open));
+      if (!open) { ribbonOpen.clear(); syncRibbon(); }
+    } else applyToolById(what);
+  });
+  $('pb-font').addEventListener('change', (e) => { const f = $('note-font'); f.value = e.target.value; f.dispatchEvent(new Event('change', { bubbles: true })); });
   // Insert on a computer is one menu of the Insert buttons that apply to this note.
   $('btn-insert-menu').addEventListener('click', (e) => {
     const sec = e.currentTarget.closest('.rb-sec');

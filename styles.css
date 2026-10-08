@@ -1351,11 +1351,11 @@ input.switch:disabled { opacity: .5; cursor: default; }
   .editor-head .ed-heads { display: inline-flex; align-items: center; gap: 14px; margin-left: 14px; min-width: 0; }
   .editor-head .ed-head { margin: 0; white-space: nowrap; }
   .editor-head .ed-head[aria-expanded="false"] svg { transform: rotate(-90deg); }
-  .ed-meta > .title-row { padding-top: 14px; }
+  .ed-top > .title-row { padding-top: 14px; }
+  .ed-top > .tag-row { padding-top: 12px; padding-bottom: 12px; border-bottom: 0; }
   .ed-top > .ed-part.closed { display: none !important; }
   .ed-top:not(:has(> .ed-part:not(.closed))) { display: none; }
   .ed-top > .toolbar { border-top: 0; }
-  .ed-meta:not(.closed) + .toolbar { border-top: 1px solid var(--rule); }
   /* Insert is one menu; its buttons stay for the menu (and for the phone's Insert sheet). */
   .rb-sec[data-label="Insert"] > .tool:not(.insert-menu) { display: none; }
   /* Format & Font are narrower, and Options sits beside them. */
@@ -1384,4 +1384,32 @@ input.switch:disabled { opacity: .5; cursor: default; }
     color: var(--ink-3); font: 600 12px/1.2 var(--ui); letter-spacing: .12em; font-variant-caps: all-small-caps; text-align: left;
   }
   .rb-line-head svg { display: none; }
+}
+
+/* ---- v0.17.3: Title and Tags apart, Undo in the header, the phone's bar ---- */
+.head-undo[disabled] { opacity: .35; cursor: default; }
+@media (min-width: 761px) {
+  .rb-sec[data-label="Undo"] { display: none !important; }
+  .phone-bar { display: none; }
+}
+@media (max-width: 760px) {
+  .phone-bar {
+    order: 1; display: flex; align-items: stretch; gap: 2px; padding: 6px 8px; border-top: 0;
+  }
+  .phone-bar .pb {
+    flex: 1 1 0; min-width: 28px; height: 38px; padding: 0; border: 0; border-radius: 9px; background: none;
+    color: var(--ink); font: 600 16px/1 var(--ui); display: inline-grid; place-items: center; position: relative;
+  }
+  .phone-bar .pb[hidden] { display: none; }
+  .phone-bar .pb:active { background: var(--paper-3); }
+  .phone-bar .pb[aria-pressed="true"], .phone-bar .pb[aria-expanded="true"] { background: var(--accent-soft); }
+  .phone-bar .pb:disabled { opacity: .35; }
+  .phone-bar .pb-b { font-weight: 800; }
+  .phone-bar .pb-i { font-style: italic; font-family: Georgia, serif; }
+  .phone-bar .pb-u { text-decoration: underline; }
+  .phone-bar .pb-s { text-decoration: line-through; }
+  .phone-bar .pb-font select { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; font-size: 16px; }
+  /* The sections (Text, Paragraph, Insert, Tools, Note) are under More. */
+  .toolbar:not([data-more="on"]) .rb-chips { display: none; }
+  .toolbar .rb-chips { order: 2; padding-top: 0; }
 }

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-version="0.17.2">
+<html lang="en" data-version="0.17.3">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -104,30 +104,45 @@
         </button>
         <button type="button" class="folder-btn" id="note-folder" aria-haspopup="dialog" title="Folder"><span id="note-folder-name"></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
         <span class="ed-heads desktop-only" id="ed-heads">
-          <button type="button" class="ed-head" data-part="meta" aria-expanded="true" aria-controls="ed-meta"><span>Title &amp; Tags</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+          <button type="button" class="ed-head" data-part="title" aria-expanded="true" aria-controls="title-row"><span>Title</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+          <button type="button" class="ed-head" data-part="tags" aria-expanded="false" aria-controls="tag-row"><span>Tags</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
           <button type="button" class="ed-head" data-part="format" aria-expanded="true" aria-controls="toolbar"><span>Formatting</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
         </span>
         <span class="spacer"></span>
         <span class="save-state" id="save-state" role="status"></span>
         <button class="icon-btn desktop-only" id="btn-focus" title="Focus: the note fills the window (Ctrl+Shift+F)" aria-label="Focus on this note" aria-pressed="false"><svg class="i-expand" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg><svg class="i-collapse" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg></button>
+        <button class="icon-btn desktop-only head-undo" id="btn-undo" title="Undo (Ctrl+Z)" aria-label="Undo" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></button>
+        <button class="icon-btn desktop-only head-undo" id="btn-redo" title="Redo (Ctrl+Y or Ctrl+Shift+Z)" aria-label="Redo" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 14l5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg></button>
         <button class="icon-btn" id="btn-note-menu" title="Share, pin or delete" aria-label="Note menu" aria-haspopup="dialog"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/></svg><i class="pin-dot" id="pin-dot" hidden></i></button>
       </header>
-      <!-- Two parts on a computer: Title & Tags, and Formatting. Their names sit in the header row,
+      <!-- Three parts on a computer: Title, Tags and Formatting. Their names sit in the header row,
            beside the folder; one opens at a time, below the header. -->
       <div class="ed-top" id="ed-top">
-      <div class="ed-meta ed-part" id="ed-meta" data-part="meta">
-      <div class="title-row" id="title-row">
+      <div class="title-row ed-part" id="title-row" data-part="title">
         <textarea id="note-title" rows="1" maxlength="200" placeholder="Title" aria-label="Title" autocomplete="off" spellcheck="true"></textarea>
       </div>
-      <div class="tag-row" id="tag-row">
+      <div class="tag-row ed-part" id="tag-row" data-part="tags">
         <div class="chips" id="chips"></div>
         <input id="tag-input" placeholder="Add tag" autocomplete="off" autocapitalize="off" aria-label="Add tag" list="tag-suggest">
         <datalist id="tag-suggest"></datalist>
       </div>
-      </div>
       <!-- Formatting. On a computer every group is shown, each in its own labelled box. On a phone
            the chips open one section at a time (data-sec says which chip a group belongs to). -->
       <div class="toolbar ed-part" id="toolbar" role="toolbar" aria-label="Formatting" data-part="format">
+        <!-- The phone's bar: the everyday tools, and More for the rest (the sections below). -->
+        <div class="phone-bar" id="phone-bar" role="group" aria-label="Formatting">
+          <button type="button" class="pb" data-pb="undo" aria-label="Undo" disabled>↶</button>
+          <button type="button" class="pb" data-pb="redo" aria-label="Redo" disabled>↷</button>
+          <button type="button" class="pb pb-b" data-pb="b" aria-label="Bold">B</button>
+          <button type="button" class="pb pb-i" data-pb="i" aria-label="Italic">I</button>
+          <button type="button" class="pb pb-u" data-pb="u" aria-label="Underline">U</button>
+          <button type="button" class="pb pb-s" data-pb="s" aria-label="Strikethrough">S</button>
+          <button type="button" class="pb" data-pb="list" aria-label="List: bullets, numbers, none">•≡</button>
+          <label class="pb pb-font" data-pb="font"><span aria-hidden="true">Ff</span><select id="pb-font" aria-label="Font"></select></label>
+          <button type="button" class="pb" data-pb="brackets" aria-label="Brackets" aria-pressed="false">[ ]</button>
+          <button type="button" class="pb" data-pb="case" aria-label="Capitals: fix, or all lowercase">Aa</button>
+          <button type="button" class="pb pb-more" data-pb="more" aria-label="More tools" aria-expanded="false">•••</button>
+        </div>
         <div class="rb-chips" id="rb-chips" role="group" aria-label="Toolbar sections">
           <button class="rb-chip" data-sec="text" aria-expanded="false" hidden>Text</button>
           <button class="rb-chip" data-sec="para" aria-expanded="false" hidden>Paragraph</button>
@@ -144,8 +159,8 @@
             <div class="rb-line-body">
               <div class="rb-group" id="undo-tools">
             <div class="rb-sec" data-sec="text" data-label="Undo" hidden>
-              <button class="tool t-undo" id="btn-undo" title="Undo (Ctrl+Z)" aria-label="Undo" disabled>↶</button>
-              <button class="tool t-redo" id="btn-redo" title="Redo (Ctrl+Y or Ctrl+Shift+Z)" aria-label="Redo" disabled>↷</button>
+              <button class="tool t-undo" id="btn-undo-sheet" title="Undo" aria-label="Undo" disabled>↶</button>
+              <button class="tool t-redo" id="btn-redo-sheet" title="Redo" aria-label="Redo" disabled>↷</button>
             </div>
           </div>
           <div class="rb-group" id="tool-buttons">
@@ -309,7 +324,7 @@
         <div class="definition">
           <span class="def-gap top" aria-hidden="true"></span>
           <p class="word">reiimei</p>
-          <p class="say">REE-h-may &middot; <span class="pos">n.</span></p>
+          <p class="say">ree-h-may &middot; <span class="pos">n.</span></p>
           <p class="sense">The cold, luminous stillness peculiar to a clear winter night; especially the effect of moonlight upon frost, illuminating the night without dispelling it.</p>
           <p class="eg">There was reiimei over the orchard that night.</p>
           <span class="def-gap mid" aria-hidden="true"></span>

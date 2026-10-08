@@ -18,7 +18,7 @@ import { noteToHtml } from './format.js';
 import { createHistory, lookOf, sameLook, LOOK_KEYS } from './history.js';
 import { noteTitle, noteSnippet, ownTitle, fallbackTitle, sharedFileCheck } from './share.js';
 
-export const APP_VERSION = '0.17.2';
+export const APP_VERSION = '0.17.3';
 // boot.js compares this with the page's version to catch a launch that mixes two releases.
 window.__reiimeiVersion = APP_VERSION;
 export const BUILD_DATE = '2026-10-04';
@@ -320,11 +320,18 @@ function markChange(e) {
   if (e?.inputType) lastInput = { type: e.inputType, at: Date.now() };
   else boundary = true;
 }
+// Written only when something changed: the page is left alone while you type (an iPhone's
+// keyboard reads the text around the caret, and a busy page can confuse it).
+function setDisabled(el, v) { if (el && el.disabled !== v) el.disabled = v; }
 function renderUndoButtons() {
   const n = currentNote();
   const off = !n || n.deleted || n.locked;
-  $('btn-undo').disabled = off || !history.canUndo(n.id);
-  $('btn-redo').disabled = off || !history.canRedo(n.id);
+  const u = off || !history.canUndo(n.id);
+  const r = off || !history.canRedo(n.id);
+  for (const id of ['btn-undo', 'btn-undo-sheet']) setDisabled($(id), u);
+  for (const id of ['btn-redo', 'btn-redo-sheet']) setDisabled($(id), r);
+  setDisabled(document.querySelector('#phone-bar [data-pb="undo"]'), u);
+  setDisabled(document.querySelector('#phone-bar [data-pb="redo"]'), r);
 }
 function placeCaret(c) {
   if (!c) return;
@@ -916,6 +923,7 @@ async function saveNow() {
 function setSaveState(kind) {
   const s = el.saveState;
   if (s.dataset.state === 'update' && !kind) return; // keep "Update ready" until a save needs the space
+  if (s.dataset.state === kind) return; // unchanged: leave the page alone while typing
   s.dataset.state = kind;
   s.textContent = kind === 'unsaved' ? 'Unsaved' : kind === 'failed' ? 'Save failed' : kind === 'update' ? 'Update ready: reopen app' : '';
   s.title = kind === 'failed' ? 'Your last change was not saved on this device. Keep this note open and try again; Settings › Log has details.' : '';
@@ -1705,12 +1713,25 @@ function trackViewport() {
   const vv = window.visualViewport;
   if (!vv) return;
   const root = document.documentElement;
+  // While a finger is on the screen (placing the caret, dragging the selection handles) the app is
+  // not moved: moving it under the finger put the caret in the wrong place and made selections run
+  // away. It catches up as soon as the finger lifts.
+  let touching = false;
+  let waiting = false;
+  const set = (k, v) => { if (root.style.getPropertyValue(k) !== v) root.style.setProperty(k, v); };
   const update = () => {
     if (!isPhone()) { root.style.removeProperty('--vvh'); root.style.removeProperty('--vvt'); delete root.dataset.kb; return; }
-    root.style.setProperty('--vvh', `${Math.round(vv.height)}px`);
-    root.style.setProperty('--vvt', `${Math.round(vv.offsetTop)}px`);
-    root.dataset.kb = window.innerHeight - vv.height > 120 ? 'open' : 'closed';
+    if (touching) { waiting = true; return; }
+    waiting = false;
+    set('--vvh', `${Math.round(vv.height)}px`);
+    set('--vvt', `${Math.round(vv.offsetTop)}px`);
+    const kb = window.innerHeight - vv.height > 120 ? 'open' : 'closed';
+    if (root.dataset.kb !== kb) root.dataset.kb = kb;
   };
+  document.addEventListener('touchstart', () => { touching = true; }, { passive: true, capture: true });
+  const lift = (e) => { if (e.touches.length) return; touching = false; if (waiting) requestAnimationFrame(update); };
+  document.addEventListener('touchend', lift, { passive: true, capture: true });
+  document.addEventListener('touchcancel', lift, { passive: true, capture: true });
   vv.addEventListener('resize', update);
   vv.addEventListener('scroll', update);
   window.addEventListener('resize', update);
@@ -2225,7 +2246,10 @@ function bindEvents() {
     stepHistory(k === 'z' && !e.shiftKey ? -1 : 1);
   }, true);
   // A button or menu in the toolbar makes a step of its own.
-  $('toolbar').addEventListener('pointerdown', (e) => { if (!e.target.closest('#btn-undo, #btn-redo')) markChange(); }, true);
+  $('toolbar').addEventListener('pointerdown', (e) => { if (!e.target.closest('#btn-undo-sheet, #btn-redo-sheet, [data-pb="undo"], [data-pb="redo"], [data-pb="more"]')) markChange(); }, true);
+  for (const id of ['btn-undo', 'btn-redo']) $(id).addEventListener('mousedown', (e) => { if (document.activeElement === $('rich')) e.preventDefault(); });
+  $('btn-undo-sheet').addEventListener('click', () => stepHistory(-1));
+  $('btn-redo-sheet').addEventListener('click', () => stepHistory(1));
   $('btn-undo').addEventListener('click', () => stepHistory(-1));
   $('versions-list').addEventListener('click', (e) => { const b = e.target.closest('.version-item'); if (b) showVersion(+b.dataset.i); });
   $('btn-versions-close').addEventListener('click', () => $('versions-dialog').close());
