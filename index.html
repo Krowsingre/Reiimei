@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-version="0.17.0">
+<html lang="en" data-version="0.17.1">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -23,7 +23,7 @@
     <!-- Sidebar: folders and tags -->
     <aside class="pane sidebar" aria-label="Folders and tags">
       <header class="pane-head">
-        <h1 class="brand"><button type="button" id="btn-brand" aria-expanded="false" aria-controls="splash" title="Show or hide the Reiimei page">Reiimei</button></h1>
+        <h1 class="brand"><button type="button" id="btn-brand" aria-expanded="false" aria-controls="splash" title="Show or hide the Reiimei page">Reiimei</button><span class="beta-badge" id="beta-badge" hidden title="The beta copy: kept apart from the live app on this device">Beta</span></h1>
         <button class="icon-btn desktop-only" id="btn-rail" title="Fold the sidebar to icons" aria-label="Fold the sidebar to icons" aria-pressed="false">
           <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/><path d="M15 10l-2 2 2 2"/></svg>
         </button>
@@ -428,6 +428,7 @@
       <p class="about-name">Reiimei</p>
       <table class="about-table">
         <tr><th>Version</th><td id="about-version"></td></tr>
+        <tr id="about-channel-row" hidden><th>Copy</th><td><span class="beta-badge">Beta</span> Kept apart from the live app on this device: its own notes, settings and sign-in here. Notes meet through sync if you sign in to the same account.</td></tr>
         <tr><th>Released</th><td id="about-date"></td></tr>
         <tr><th>Running as</th><td id="about-mode"></td></tr>
         <tr><th>This device</th><td id="about-device"></td></tr>
@@ -601,6 +602,15 @@
   </dialog>
 
   <!-- Generic prompt dialog -->
+  <dialog id="versions-dialog" class="dialog wide versions-dialog" aria-labelledby="versions-title">
+    <h3 id="versions-title">Versions</h3>
+    <p class="hint" id="versions-hint">Earlier copies of this note, kept on this device. Restoring one keeps the current text as a version too, and Undo takes it back.</p>
+    <div class="versions-body">
+      <ul class="versions-list" id="versions-list" role="listbox" aria-label="Versions"></ul>
+      <div class="versions-preview" id="versions-preview" aria-live="polite"></div>
+    </div>
+    <menu><button class="btn" id="btn-versions-close">Close</button><button class="btn primary" id="btn-versions-restore" disabled>Restore this version</button></menu>
+  </dialog>
   <dialog id="ask-dialog" class="dialog">
     <form method="dialog">
       <h3 id="ask-title"></h3>

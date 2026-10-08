@@ -1,8 +1,16 @@
-# Reiimei v0.17.0
+# Reiimei v0.17.1
 
 *reiimei* (REE-h-may), n. The cold, luminous stillness peculiar to a clear winter night; especially the effect of moonlight upon frost, illuminating the night without dispelling it.
 
 An offline-first notes app for Windows and iPhone, built as a Progressive Web App (PWA). No Mac, no App Store, no developer fee.
+
+## What changed in v0.17.1
+
+- **Versions.** **⋯ › Versions…** lists earlier copies of the note: one every few minutes while you write, one when you leave the note, one before a sync replaces its text, and one before you restore an older version. Choose one to see it, then **Restore this version**; the current text is kept as a version first, and Undo takes the restore back. The newest 30 versions of each note are kept on this device (sealed when encryption is on); they are not synced.
+- **Nothing typed is lost when the app closes.** Every change to the open note is also written straight away to this device's quick storage. If the app is closed, reloaded or crashes before the note is saved, the text is put back the next time Reiimei starts, with a message and Undo.
+- **A beta copy can sit beside the live app.** Served from a folder with "beta" in its name (for example `yourname.github.io/reiimei-beta/`), Reiimei keeps its own notes, settings, sign-in and offline copy on each device, shows **Beta** next to its name and in **Settings › About**, and calls itself Reiimei Beta. It never touches the live app's notes on that device; the two meet only through sync. See **Trying a new version first (beta copy)** below.
+- Two new files, `channel.js` and `versions.js`: 90 files now. No Supabase changes.
+- **Upload these files** (changed since v0.17.0): `app.js`, `boot.js`, `channel.js` (new), `db.js`, `index.html`, `logger.js`, `styles.css`, `sw.js`, `sync.js`, `versions.js` (new), `README.md`.
 
 ## What changed in v0.17.0
 
@@ -301,6 +309,8 @@ Note: a device still on v0.7 would show the hidden cache record in Recently Dele
 | `fonts.js` | The list of fonts for the Font menu and the interface font setting |
 | `capitals.js` | The Aa button: capitals at the start of lines and sentences, or all lowercase |
 | `history.js` | One Undo and Redo for every change to a note: text, formatting, fonts, spacing and Brackets |
+| `versions.js` | Versions: earlier copies of each note, kept on this device, with Restore |
+| `channel.js` | Tells the live app from a beta copy, so each keeps its own notes and settings on a device |
 | `brackets.js` | Brackets: [section labels] shown as notes in the background |
 | `boot.js` | Start-up check: reloads once if an update left the page and its scripts on different versions |
 | `share.js`, `ui-share.js` | Sharing as text, combined documents, and archives |
@@ -330,14 +340,31 @@ Then open http://localhost:8000 in Edge or Chrome. Notes work immediately, saved
 
 The iPhone needs an HTTPS address. GitHub Pages hosts the app for free. Only the app's code goes to GitHub; your notes never do.
 
-1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.17.0` folder.
+1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.17.1` folder.
 2. **Create the repository.** In Safari, sign in at github.com, tap **+** › **New repository**. Name it `reiimei`, set it to **Public** (free Pages needs a public repository), and tap **Create repository**.
-3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.17.0` folder, tap **Select**, select all 88 files, and tap **Open**. Scroll down and tap **Commit changes**.
+3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.17.1` folder, tap **Select**, select all 90 files, and tap **Open**. Scroll down and tap **Commit changes**.
    - If you don't see the upload link, tap the **aA** button in Safari's address bar › **Request Desktop Website** and try again.
 4. **Turn on Pages.** In the repository, open **Settings** › **Pages**. Under **Build and deployment**, set Source to **Deploy from a branch**, Branch to **main** and **/ (root)**, then tap **Save**.
 5. **Wait a minute or two**, then reload the Pages screen. It shows your address, which looks like `https://yourname.github.io/reiimei/`.
 
 On a laptop, Netlify Drop (app.netlify.com/drop) is another option: drag the folder onto the page.
+
+
+## Trying a new version first (beta copy)
+
+A beta copy is a second Reiimei, at its own address, for trying a new version before it replaces the live app. It uses the same Supabase project; nothing needs setting up in Supabase.
+
+1. **Make a second repository.** On github.com tap **+** › **New repository**, name it `reiimei-beta` (the name must contain "beta"), set it to **Public**, and create it.
+2. **Upload the new version** into it, as in step 3 of *Put it online*: all the files of the new folder.
+3. **Turn on Pages** for it, as in step 4. Its address is `https://yourname.github.io/reiimei-beta/`.
+4. **Open it** in Safari. It says **Beta** next to its name. It starts empty: its notes, settings and sign-in are its own.
+5. **Sync.** In **Settings › Sync**, enter the same Supabase URL and key as the live app.
+   - Sign in with **the same account** to try the new version with your real notes. Whatever the beta changes reaches the live app through sync, so only do this once you trust the version.
+   - Or sign up with **a second email address** to try it with test notes that never reach your real ones (each account only ever sees its own notes).
+6. **Add it to the Home Screen** (Share › **Add to Home Screen**), named **Reiimei Beta**. It is a separate app from the live one.
+7. **Promote it.** When the beta has proved itself, upload the same files to the live `reiimei` repository (the "Upload these files" list in *What changed*). Then upload the next version to the beta first.
+
+The live app and the beta copy never share notes on a device; they only meet through sync. An older live app (v0.17.0 or earlier) may clear the beta's offline copy once when it updates; the beta simply downloads it again.
 
 ## 3. Install it
 
@@ -437,7 +464,7 @@ The service worker caches the app files. When you change any file, bump `VERSION
 - **Settings › Log** › Download gives a text log of everything the app did, including sync results and errors.
 - **"Test connection"** in Settings › Sync confirms the URL, key, sign-in, and tables are all correct.
 
-## Known limits in v0.17.0
+## Known limits in v0.17.1
 
 - Images can be linked but not attached
 - Sources belong to one note; there is no shared library yet

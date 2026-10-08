@@ -4,13 +4,13 @@
 // they reach IndexedDB, and opened again when read.
 import { log } from './logger.js';
 import * as vault from './crypto.js';
+import { DB_NAME, KEY } from './channel.js';
 
 // Fields that are sealed when encryption is on. Everything else (ids, dates,
 // folder links, pinned, deleted) stays readable so sync can work while locked.
 export const SECRET = { notes: ['body', 'tags', 'format', 'meta'], folders: ['name'] };
 const BLANK = { body: '', tags: [], format: 'markdown', meta: {}, name: '' };
 
-const DB_NAME = 'reiimei';
 const DB_VERSION = 1;
 let dbPromise = null;
 
@@ -138,7 +138,14 @@ export async function rewriteAll(between = async () => {}) {
     data[store] = await getAll(store, { internal: true });
     if (data[store].some((r) => r.locked)) throw new Error('Some notes could not be opened with the current passphrase');
   }
+  const versions = [];
+  for (const row of await rawGetAll('meta')) {
+    if (!String(row.key).startsWith('versions:')) continue;
+    const list = await openVersions(row.value);
+    if (list) versions.push([row.key.slice(9), list]);
+  }
   await between();
+  for (const [id, list] of versions) await setVersions(id, list);
   let count = 0;
   for (const store of ['folders', 'notes']) {
     await putMany(store, data[store].map((r) => ({ ...r, dirty: true })));
@@ -156,7 +163,7 @@ export async function eraseDevice() {
     const req = indexedDB.deleteDatabase(DB_NAME);
     req.onsuccess = req.onerror = req.onblocked = () => resolve();
   });
-  Object.keys(localStorage).filter((k) => k.startsWith('reiimei.')).forEach((k) => localStorage.removeItem(k));
+  Object.keys(localStorage).filter((k) => k.startsWith(KEY)).forEach((k) => localStorage.removeItem(k));
 }
 
 export async function getMeta(key, fallback = null) {
@@ -164,6 +171,22 @@ export async function getMeta(key, fallback = null) {
   return row ? row.value : fallback;
 }
 export const setMeta = (key, value) => rawPut('meta', { key, value });
+
+// Earlier versions of a note (versions.js), kept in the meta store and sealed when encryption is
+// on. null means they are sealed and cannot be opened right now.
+const versionsKey = (id) => `versions:${id}`;
+async function openVersions(value) {
+  if (!value) return [];
+  if (!value.sealed) return Array.isArray(value.list) ? value.list : [];
+  if (!vault.isUnlocked()) return null;
+  try { return (await vault.open(value.sealed)).list || []; } catch { return null; }
+}
+export async function getVersions(id) { return openVersions(await getMeta(versionsKey(id), null)); }
+export async function setVersions(id, list) {
+  if (!list.length) return removeVersions(id);
+  return setMeta(versionsKey(id), vault.isEnabled() ? { sealed: await vault.seal({ list }) } : { list });
+}
+export const removeVersions = (id) => remove('meta', versionsKey(id));
 
 const now = () => new Date().toISOString();
 

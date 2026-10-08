@@ -5,11 +5,13 @@
 // load the app again, once.
 (function () {
   const want = document.documentElement.dataset.version;
+  // A beta copy (served from a folder with "beta" in its name) keeps its own names (channel.js).
+  const key = /beta/.test((location.pathname.split('/').filter(Boolean)[0] || '').toLowerCase()) ? 'reiimei-beta.reloadFor' : 'reiimei.reloadFor';
   const have = window.__reiimeiVersion;
-  if (!want || have === want) { try { sessionStorage.removeItem('reiimei.reloadFor'); } catch (e) { /* storage blocked */ } return; }
+  if (!want || have === want) { try { sessionStorage.removeItem(key); } catch (e) { /* storage blocked */ } return; }
   try {
-    if (sessionStorage.getItem('reiimei.reloadFor') === want) return; // at most once per version
-    sessionStorage.setItem('reiimei.reloadFor', want);
+    if (sessionStorage.getItem(key) === want) return; // at most once per version
+    sessionStorage.setItem(key, want);
   } catch (e) { return; }
   let done = false;
   const go = () => { if (!done) { done = true; location.reload(); } };

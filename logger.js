@@ -1,6 +1,8 @@
 // Reiimei logger: writes to the console and keeps a rolling log in localStorage
 // so problems on the iPhone can be exported and inspected later.
-const LOG_KEY = 'reiimei.log';
+import { KEY } from './channel.js';
+
+const LOG_KEY = `${KEY}log`;
 const MAX_ENTRIES = 1000;
 
 let buffer = [];

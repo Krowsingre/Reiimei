@@ -2,12 +2,14 @@
 // Strategy: pull remote changes, then push local dirty records.
 // If the same note was edited on two devices before syncing, the newer edit
 // wins and the other is kept as a "conflicted copy" note, so nothing is lost.
+import { KEY } from './channel.js';
+import * as versions from './versions.js';
 import { log } from './logger.js';
 import * as db from './db.js';
 import * as vault from './crypto.js';
 
-const CFG_KEY = 'reiimei.sync.config';
-const SESSION_KEY = 'reiimei.sync.session';
+const CFG_KEY = `${KEY}sync.config`;
+const SESSION_KEY = `${KEY}sync.session`;
 const PAGE = 500;
 
 let syncing = false;
@@ -241,6 +243,7 @@ async function mergeRemote(store, rows) {
 
       if (!local || !local.dirty) {
         if (!local || local.updated_at !== r.updated_at || local.server_updated_at !== r.server_updated_at) {
+          if (store === 'notes' && local && !local.locked && local.body !== remote.body) await versions.keep(local, { reason: 'before-sync', force: true }).catch(() => {});
           await db.put(store, remote);
           applied++;
         }
@@ -279,6 +282,7 @@ async function mergeRemote(store, rows) {
         const localWins = local.updated_at > r.updated_at;
         const winner = localWins ? { ...local, synced_updated_at: r.updated_at } : remote;
         const loser = localWins ? remote : local;
+        if (!localWins) await versions.keep(local, { reason: 'before-sync', force: true }).catch(() => {});
         await db.put(store, winner);
         copies.push(loser);
       }

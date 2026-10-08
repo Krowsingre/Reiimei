@@ -1,6 +1,8 @@
 // Reiimei service worker: caches the app shell so it opens with no connection.
 // Bump VERSION whenever any app file changes so devices pick up the update.
-const VERSION = 'reiimei-v0.17.0';
+// A beta copy (a folder with "beta" in its name) keeps its own offline copy (channel.js).
+const PREFIX = /beta/.test((self.location.pathname.split('/').filter(Boolean)[0] || '').toLowerCase()) ? 'reiimei-beta-v' : 'reiimei-v';
+const VERSION = `${PREFIX}0.17.1`;
 const SHELL = [
   './',
   './index.html',
@@ -11,6 +13,8 @@ const SHELL = [
   './brackets.js',
   './capitals.js',
   './history.js',
+  './channel.js',
+  './versions.js',
   './db.js',
   './sync.js',
   './logger.js',
@@ -106,7 +110,7 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== VERSION).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => k.startsWith(PREFIX) && k !== VERSION).map((k) => caches.delete(k))))
       .then(() => self.clients.claim()),
   );
 });

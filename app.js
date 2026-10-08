@@ -12,10 +12,13 @@ import * as codeIntel from './codeintel.js';
 import { isCode } from './code.js';
 import * as fonts from './fonts.js';
 import * as rich from './ui-rich.js';
+import * as versions from './versions.js';
+import { BETA, KEY, NAME } from './channel.js';
+import { noteToHtml } from './format.js';
 import { createHistory, lookOf, sameLook, LOOK_KEYS } from './history.js';
 import { noteTitle, noteSnippet, ownTitle, fallbackTitle, sharedFileCheck } from './share.js';
 
-export const APP_VERSION = '0.17.0';
+export const APP_VERSION = '0.17.1';
 // boot.js compares this with the page's version to catch a launch that mixes two releases.
 window.__reiimeiVersion = APP_VERSION;
 export const BUILD_DATE = '2026-10-04';
@@ -55,7 +58,7 @@ const titleOf = (n) => noteTitle(n);
 const snippetOf = (n) => noteSnippet(n);
 
 // ---- Preferences (per device) ------------------------------------------
-const PREFS_KEY = 'reiimei.prefs';
+const PREFS_KEY = `${KEY}prefs`;
 const VIEW_DEFAULT = { sort: 'updated', dir: 'desc', hidden: [] };
 const PREF_DEFAULTS = { mode: 'notes', lastProject: '', codeLang: 'python', format: 'text', style: 'apa', view: VIEW_DEFAULT };
 function prefs() {
@@ -79,7 +82,7 @@ const view = () => ({ ...VIEW_DEFAULT, ...(prefs().view || {}) });
 
 // ---- This device ---------------------------------------------------------
 // Each note remembers where it was written (meta.origin = { id, name }).
-const DEVICE_KEY = 'reiimei.device';
+const DEVICE_KEY = `${KEY}device`;
 function guessDeviceName() {
   const ua = navigator.userAgent;
   if (/iPhone/.test(ua)) return 'iPhone';
@@ -184,6 +187,107 @@ function formatDate(iso) {
 // The editor is one text box shared by every note.
 function setBody(text) {
   el.body.value = text;
+}
+
+// ---- Instant backup ------------------------------------------------------
+// Every change to the open note is also written straight away to this device's quick storage, which
+// is kept even if the app is closed or reloaded before the note is saved (a save waits a moment
+// for you to stop typing). On the next start the text is put back. When encryption is on it is
+// sealed first.
+const DRAFT_KEY = `${KEY}draft`;
+let draftSeq = 0;
+function writeDraft(id, body) {
+  const at = Date.now();
+  const seq = ++draftSeq;
+  const put = (v) => { if (seq !== draftSeq) return; try { localStorage.setItem(DRAFT_KEY, JSON.stringify({ id, at, ...v })); } catch { /* storage full or blocked */ } };
+  if (!vault.isEnabled()) put({ body });
+  else if (vault.isUnlocked()) vault.seal({ body }).then((sealed) => put({ sealed })).catch(() => {});
+}
+function readDraft() { try { return JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null'); } catch { return null; } }
+function clearDraft(id, body) {
+  const d = readDraft();
+  if (!d || d.id !== id) return;
+  if (body === undefined || d.body === undefined || d.body === body) { draftSeq++; try { localStorage.removeItem(DRAFT_KEY); } catch { /* blocked */ } }
+}
+async function recoverDraft() {
+  const d = readDraft();
+  if (!d || !d.id) return;
+  let body = d.body;
+  if (body === undefined && d.sealed) {
+    if (!vault.isUnlocked()) return; // wait until the passphrase is entered
+    try { body = (await vault.open(d.sealed)).body; } catch { return; }
+  }
+  const n = state.notes.find((x) => x.id === d.id);
+  const drop = () => { try { localStorage.removeItem(DRAFT_KEY); } catch { /* blocked */ } };
+  if (typeof body !== 'string' || !n || n.locked || n.deleted || n.body === body || d.at <= Date.parse(n.updated_at)) { drop(); return; }
+  await versions.keep(n, { reason: 'before-recovery', force: true }).catch(() => {});
+  const before = n.body;
+  replaceNote(await db.saveNote(n, { body }));
+  drop();
+  log.info('editor', 'Unsaved text recovered', { id: n.id, chars: body.length });
+  scheduleSync();
+  setTimeout(() => toast(`Text you had not saved yet in “${noteTitle(currentNote()?.id === n.id ? currentNote() : n)}” was put back.`, 'Undo', async () => {
+    const x = state.notes.find((y) => y.id === n.id);
+    if (!x) return;
+    replaceNote(await db.saveNote(x, { body: before }));
+    render();
+  }), 300);
+}
+
+// ---- Versions ------------------------------------------------------------
+async function keepVersion(id, reason) {
+  const n = state.notes.find((x) => x.id === id);
+  try { await versions.keep(n, { reason, force: true }); } catch (e) { log.warn('versions', 'Could not keep a version', { error: e.message }); }
+}
+const VERSION_REASON = { editing: 'While editing', left: 'When you left the note', 'before-sync': 'Before a sync replaced it', 'before-restore': 'Before restoring an older version', 'before-recovery': 'Before unsaved text was put back' };
+let versionsShown = [];
+let versionPicked = -1;
+async function openVersions() {
+  await flushSave();
+  const n = currentNote();
+  if (!n) return;
+  versionsShown = await versions.list(n.id);
+  versionPicked = -1;
+  const ul = $('versions-list');
+  ul.innerHTML = versionsShown.length
+    ? versionsShown.map((v, i) => {
+      const words = (v.body.match(/\S+/g) || []).length;
+      return `<li><button type="button" class="version-item" role="option" aria-selected="false" data-i="${i}"><span class="v-when">${esc(new Date(v.at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }))}</span><span class="v-what">${esc(VERSION_REASON[v.reason] || '')} · ${words} ${words === 1 ? 'word' : 'words'}</span></button></li>`;
+    }).join('')
+    : '<li class="side-empty">No earlier versions yet. Reiimei keeps one every few minutes while you write, and when you leave the note.</li>';
+  $('versions-preview').innerHTML = versionsShown.length ? '<p class="hint">Choose a version to see it here.</p>' : '';
+  $('btn-versions-restore').disabled = true;
+  $('versions-dialog').showModal();
+}
+function showVersion(i) {
+  const v = versionsShown[i];
+  if (!v) return;
+  versionPicked = i;
+  $('versions-list').querySelectorAll('.version-item').forEach((b) => b.setAttribute('aria-selected', String(+b.dataset.i === i)));
+  const pv = $('versions-preview');
+  if (isCode(v.format)) { pv.innerHTML = ''; const pre = document.createElement('pre'); pre.textContent = v.body; pv.append(pre); }
+  else pv.innerHTML = `${v.title ? `<p class="v-title">${esc(v.title)}</p>` : ''}${noteToHtml(v.body, v.format === 'populi' ? 'populi' : 'markdown')}`;
+  $('btn-versions-restore').disabled = false;
+}
+async function restoreVersion() {
+  const v = versionsShown[versionPicked];
+  const n = currentNote();
+  if (!v || !n) return;
+  $('versions-dialog').close();
+  await flushSave();
+  await keepVersion(n.id, 'before-restore');
+  if ((v.format || 'markdown') !== (n.format || 'markdown')) {
+    await updateCurrent({ body: v.body, format: v.format });
+  } else {
+    // Put back as an ordinary change, so Undo takes it back.
+    boundary = true;
+    el.body.value = v.body;
+    el.body.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+  if ((n.meta?.title || '') !== v.title) await updateCurrent({ meta: { ...(currentNote().meta || {}), title: v.title } });
+  render();
+  toast('Version restored', 'Undo', () => stepHistory(-1));
+  log.info('versions', 'Version restored', { id: n.id, from: new Date(v.at).toISOString() });
 }
 
 // ---- Undo and Redo (history.js) ----------------------------------------
@@ -789,6 +893,8 @@ async function saveNow() {
   if (!n || body === n.body) return;
   try {
     replaceNote(await db.saveNote(n, { body }));
+    if (!pending || pending.id !== id) clearDraft(id, body);
+    versions.keep(state.notes.find((x) => x.id === id)).catch((e) => log.warn('versions', 'Could not keep a version', { error: e.message }));
     if (id === state.currentId) el.title.placeholder = fallbackTitle(currentNote()) || 'Title';
     if (!body.trim() && n.body.trim()) {
       // Everything was erased: keep the text in the cache (one slot, shared by all devices).
@@ -881,6 +987,7 @@ async function updateCurrent(changes) {
 async function selectNote(id) {
   await flushSave();
   const prev = state.currentId;
+  if (prev && prev !== id) keepVersion(prev, 'left'); // in the background: opening the next note does not wait
   if (prev && prev !== id) await discardIfBlank(prev);
   state.currentId = id;
   setSaveState('');
@@ -1061,6 +1168,7 @@ async function emptyTrash() {
 async function closeNote() {
   setFocus(false);
   await flushSave();
+  if (state.currentId) keepVersion(state.currentId, 'left');
   if (state.currentId) await discardIfBlank(state.currentId);
   state.currentId = null;
   setSaveState('');
@@ -1126,7 +1234,7 @@ async function renameDevice(name) {
 
 // First launch after upgrading: name this device and say whether existing notes were written here.
 async function offerDeviceSetup() {
-  const key = 'reiimei.deviceAsked';
+  const key = `${KEY}deviceAsked`;
   try { if (localStorage.getItem(key)) return; } catch { return; }
   const n = state.notes.filter((x) => !x.deleted && !x.locked && !isRegistry(x) && !originOf(x)).length;
   if (!n) return;
@@ -1427,6 +1535,7 @@ function openNoteMenu() {
   openMenu(el.noteMenu, 'Note', [
     { label: 'Share…', run: async () => { await flushSave(); const x = currentNote(); if (x) shareUi.open([x], { single: true }); } },
     { label: n.pinned ? 'Unpin' : 'Pin to top', disabled: n.deleted, run: () => { const x = currentNote(); if (x) updateCurrent({ pinned: !x.pinned }); } },
+    { label: 'Versions…', disabled: n.deleted || n.locked, run: openVersions },
     { label: n.deleted ? 'In Recently Deleted' : 'Delete', danger: !n.deleted, disabled: n.deleted, run: deleteCurrent },
   ]);
 }
@@ -1663,8 +1772,8 @@ async function runDiagnostics() {
   add('Secure context', window.isSecureContext ? 'pass' : 'fail', window.isSecureContext ? 'HTTPS or localhost' : 'Not secure: offline mode and install will not work');
 
   try {
-    localStorage.setItem('reiimei.diag', '1');
-    localStorage.removeItem('reiimei.diag');
+    localStorage.setItem(`${KEY}diag`, '1');
+    localStorage.removeItem(`${KEY}diag`);
     add('Local storage', 'pass', 'Readable and writable');
   } catch (e) {
     add('Local storage', 'fail', e.message);
@@ -2118,10 +2227,21 @@ function bindEvents() {
   // A button or menu in the toolbar makes a step of its own.
   $('toolbar').addEventListener('pointerdown', (e) => { if (!e.target.closest('#btn-undo, #btn-redo')) markChange(); }, true);
   $('btn-undo').addEventListener('click', () => stepHistory(-1));
+  $('versions-list').addEventListener('click', (e) => { const b = e.target.closest('.version-item'); if (b) showVersion(+b.dataset.i); });
+  $('btn-versions-close').addEventListener('click', () => $('versions-dialog').close());
+  $('btn-versions-restore').addEventListener('click', restoreVersion);
+  if (BETA) {
+    $('beta-badge').hidden = false;
+    $('about-channel-row').hidden = false;
+    document.documentElement.dataset.channel = 'beta';
+    document.title = NAME;
+    document.querySelector('meta[name="apple-mobile-web-app-title"]')?.setAttribute('content', NAME);
+  }
   $('btn-redo').addEventListener('click', () => stepHistory(1));
   el.body.addEventListener('input', () => {
     if (!state.currentId) return;
     recordChange();
+    writeDraft(state.currentId, el.body.value);
     pending = { id: state.currentId, body: el.body.value };
     setSaveState('unsaved');
     clearTimeout(saveTimer);
@@ -2246,6 +2366,7 @@ async function loadData() {
   await tidyRegistries();
   if (state.filter.type === 'folder' && !folderById(state.filter.id)) state.filter = { type: 'all' };
   if (!state.notes.some((n) => n.id === state.currentId)) state.currentId = isPhone() ? null : filteredNotes()[0]?.id || null;
+  await recoverDraft();
   render();
 }
 
