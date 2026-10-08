@@ -180,7 +180,11 @@ function show(md) {
   shownSrc = md;
   markEmpty();
 }
-function markEmpty() { box.classList.toggle('empty', !box.textContent.trim() && !box.querySelector('li,hr,.raw-block')); }
+// The "Begin writing." placeholder is drawn by styles.css alone. Changing the writing area itself
+// while you type (as a class for the placeholder did) cuts an iPhone's keyboard off from the note:
+// dictation stops showing words until the end and then writes them twice, capitals go wrong, and
+// holding Delete stops repeating (seen in a typing check, v0.17.5).
+function markEmpty() {}
 
 function pushToBody() {
   const md = htmlToMarkdown(box);
@@ -834,6 +838,10 @@ export function replaceRanges(ranges, text) {
   pushToBody();
 }
 
+// Three dashes, as typed: "---", or what a phone's Smart Punctuation makes of them ("—-", "-—",
+// "–-"…). A long dash stands for two. A space anywhere means it stays text.
+const isDashLine = (t) => /^[-–—]+$/.test(t) && [...t].reduce((n, c) => n + (c === '-' ? 1 : 2), 0) >= 3;
+
 // ---- Following the caret (phone) ----------------------------------------------------------
 // The keyboard covers the bottom of the screen, and dictation adds words without key presses, so
 // the browser does not always scroll to follow them. The caret is kept inside the part of the
@@ -949,7 +957,7 @@ export function init(hooks) {
     const s = sel();
     if (!s.rangeCount || !s.isCollapsed) return;
     const blk = closest(s.anchorNode, 'p,div');
-    if (!blk || blk.parentElement !== box || blk.textContent !== '---') return;
+    if (!blk || blk.parentElement !== box || !isDashLine(blk.textContent)) return;
     e.preventDefault();
     const hr = document.createElement('hr');
     const p = document.createElement('p');

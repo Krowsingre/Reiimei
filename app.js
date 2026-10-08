@@ -19,7 +19,7 @@ import { createHistory, lookOf, sameLook, LOOK_KEYS } from './history.js';
 import * as typingCheck from './typingcheck.js';
 import { noteTitle, noteSnippet, ownTitle, fallbackTitle, sharedFileCheck, plainText } from './share.js';
 
-export const APP_VERSION = '0.17.5';
+export const APP_VERSION = '0.17.6';
 // boot.js compares this with the page's version to catch a launch that mixes two releases.
 window.__reiimeiVersion = APP_VERSION;
 export const BUILD_DATE = '2026-10-04';
@@ -1113,7 +1113,8 @@ function renderSelectBar(notes = filteredNotes()) {
   $('sel-count').textContent = count ? `${count} selected` : 'Tap notes to select';
   $('sel-all').textContent = count && count === notes.length ? 'None' : 'All';
   $('sel-restore').hidden = !trash;
-  $('sel-delete').textContent = trash ? 'Delete forever' : 'Delete';
+  $('sel-delete').title = trash ? 'Delete forever' : 'Delete';
+  $('sel-delete').setAttribute('aria-label', $('sel-delete').title);
   for (const id of ['sel-share', 'sel-restore', 'sel-delete', 'sel-duplicate']) $(id).disabled = !count;
   $('sel-duplicate').hidden = trash;
 }

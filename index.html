@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-version="0.17.5">
+<html lang="en" data-version="0.17.6">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -83,10 +83,10 @@
         <span class="sel-count" id="sel-count">0 selected</span>
         <button class="text-btn" id="sel-all">All</button>
         <span class="spacer"></span>
-        <button class="btn small" id="sel-share">Share</button>
-        <button class="btn small" id="sel-duplicate">Duplicate</button>
+        <button class="icon-btn sel-icon" id="sel-share" title="Share" aria-label="Share"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg></button>
+        <button class="icon-btn sel-icon" id="sel-duplicate" title="Duplicate" aria-label="Duplicate"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg></button>
         <button class="btn small" id="sel-restore" hidden>Restore</button>
-        <button class="btn small danger" id="sel-delete">Delete</button>
+        <button class="icon-btn sel-icon danger" id="sel-delete" title="Delete" aria-label="Delete"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13"/><path d="M9 7V4h6v3"/></svg></button>
       </div>
       <button class="mode-all" id="mode-all" type="button" hidden></button>
       <ul class="note-list" id="note-list"></ul>

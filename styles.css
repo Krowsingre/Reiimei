@@ -817,7 +817,7 @@ body { font-synthesis: none; }
   overflow-y: auto; outline: none; padding: 22px max(20px, calc((100% - 720px) / 2)) 40vh;
   font: 17.5px/1.7 var(--note-font); letter-spacing: .01em; color: var(--ink); overflow-wrap: anywhere;
 }
-.rich.empty::before { content: attr(data-placeholder); color: var(--ink-3); position: absolute; pointer-events: none; }
+.rich:has(> p:only-child > br:only-child)::before, .rich:empty::before { content: attr(data-placeholder); color: var(--ink-3); position: absolute; pointer-events: none; }
 .rich > :first-child { margin-top: 0; }
 .rich p { margin: 0 0 .7em; }
 .rich h1, .rich h2, .rich h3, .rich h4, .rich h5, .rich h6 { font-family: var(--head-font); font-weight: 700; line-height: 1.25; margin: 1.1em 0 .45em; }
@@ -1437,7 +1437,7 @@ input.switch:disabled { opacity: .5; cursor: default; }
   .editor-head .head-undo { width: 36px; padding: 0; }
   .editor-head .head-undo svg { width: 20px; height: 20px; }
   .editor .ed-top > .tag-row { display: none; }
-  .rich.empty::before { content: none; }
+  .rich:has(> p:only-child > br:only-child)::before, .rich:empty::before { content: none; }
   #body::placeholder { color: transparent; }
 }
 .tags-dialog .tag-row { display: flex; border: 0; padding: 4px 0 8px; }
@@ -1445,3 +1445,13 @@ input.switch:disabled { opacity: .5; cursor: default; }
 .app[data-typing-check="on"] .editor-head::after { content: "● Typing check"; position: absolute; right: 60px; top: 2px; font: 600 10px/1 var(--ui); color: var(--danger, #c0392b); }
 .editor-head { position: relative; }
 .rich hr { border: 0; border-top: 1px solid var(--rule); margin: .6em 0; }
+
+/* ---- v0.17.6 ---- */
+/* The first lines sit well below the top row on a phone: a finger dragging a selection handle near
+   the top edge made the iPhone scroll the selection up to the start of the note. */
+@media (max-width: 760px) { .rich { padding-top: 44px; } }
+/* Share, Duplicate and Delete fit on one row as icons. */
+.select-bar .sel-icon { width: 38px; height: 38px; padding: 0; }
+.select-bar .sel-icon svg { width: 20px; height: 20px; }
+.select-bar .sel-icon.danger { color: var(--danger, #c0392b); }
+.select-bar .sel-icon:disabled { opacity: .4; }
