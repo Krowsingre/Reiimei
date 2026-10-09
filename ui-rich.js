@@ -265,8 +265,13 @@ export function hasSelection() {
   if (s.rangeCount && inBox(s.anchorNode) && !s.isCollapsed) return true;
   return !!savedRange && !savedRange.collapsed && inBox(savedRange.startContainer);
 }
+// While the phone's format panel is open the keyboard stays away: the tools work on the remembered
+// selection without focusing the note (focusing would bring the keyboard back).
+let quiet = false;
+export function setQuiet(on) { quiet = !!on; }
+const focusBox = () => { if (!quiet) box.focus({ preventScroll: true }); };
 function restoreCaret() {
-  box.focus({ preventScroll: true });
+  focusBox();
   const s = sel();
   if (s.rangeCount && inBox(s.anchorNode)) return;
   const r = savedRange && inBox(savedRange.startContainer) ? savedRange : endOf(box);
@@ -482,6 +487,32 @@ function cycleHeading(blocks) {
   return true;
 }
 
+// The phone's Paragraph panel: straight to a heading level, or back to normal text.
+function setHeading(blocks, tag) {
+  const paras = blocks.filter((b) => /^(P|DIV|H[1-6])$/.test(b.tagName));
+  if (!paras.length) return false;
+  for (const b of paras) if (b.tagName !== tag) rename(b, tag);
+  return true;
+}
+// A divider line after the paragraph the caret is in, with a new line below it.
+function insertDivider() {
+  const s = sel();
+  const at = s.rangeCount ? closest(s.anchorNode, 'p,div,h1,h2,h3,h4,h5,h6,blockquote,ul,ol,pre') : null;
+  let top = at;
+  while (top && top.parentElement !== box) top = top.parentElement;
+  const hr = document.createElement('hr');
+  const p = document.createElement('p');
+  p.appendChild(document.createElement('br'));
+  if (top) top.after(hr); else box.appendChild(hr);
+  hr.after(p);
+  const r = document.createRange();
+  r.setStart(p, 0);
+  r.collapse(true);
+  s.removeAllRanges();
+  s.addRange(r);
+  savedRange = r.cloneRange();
+}
+
 // The text nodes a range covers, split at its ends so each lies wholly inside it.
 function textsIn(r) {
   const out = [];
@@ -602,12 +633,16 @@ export async function apply(id, { typing = false, tasks = true } = {}) {
       sel().removeAllRanges();
       sel().addRange(r);
     }
-    box.focus({ preventScroll: true });
+    focusBox();
     saveCaret();
     pushToBody();
     return;
   }
   switch (id) {
+    case 'h1': case 'h2': case 'h3': case 'p':
+      keepSelection(() => { if (!setHeading(blocks, id.toUpperCase())) app.toast('Headings work on paragraphs, not list items.'); });
+      break;
+    case 'hr': insertDivider(); break;
     case 'h': keepSelection(() => { if (!cycleHeading(blocks)) app.toast('Headings work on paragraphs, not list items.'); }); break;
     case 'list': keepSelection(() => cycleList(blocks, tasks)); break;
     case 'ul': keepSelection(() => toList('UL', blocks)); break;
@@ -633,7 +668,7 @@ export async function apply(id, { typing = false, tasks = true } = {}) {
     }
     default: return;
   }
-  box.focus({ preventScroll: true });
+  focusBox();
   saveCaret();
   pushToBody();
 }
@@ -863,7 +898,9 @@ export function keepCaretVisible() {
   const b = box.getBoundingClientRect();
   const vv = window.visualViewport;
   const bar = $('toolbar');
-  const barTop = bar && !bar.hidden && bar.offsetParent ? bar.getBoundingClientRect().top : Infinity;
+  const dock = $('fmt-dock');
+  const tops = [bar, dock].filter((x) => x && !x.hidden && x.offsetParent && x.getBoundingClientRect().height).map((x) => x.getBoundingClientRect().top);
+  const barTop = tops.length ? Math.min(...tops) : Infinity;
   const bottom = Math.min(b.bottom, barTop > b.top ? barTop : Infinity, vv ? vv.offsetTop + vv.height : window.innerHeight) - 28;
   const top = Math.max(b.top, vv ? vv.offsetTop : 0) + 8;
   if (rect.bottom > bottom) { trace('scroll-to-caret', { by: Math.round(rect.bottom - bottom) }); box.scrollTop += rect.bottom - bottom; }
@@ -925,6 +962,7 @@ export function caretOffsets() {
   if (!r) return null;
   return [offsetAt(r.startContainer, r.startOffset), offsetAt(r.endContainer, r.endOffset)];
 }
+export function resume() { quiet = false; restoreCaret(); keepCaretVisible(); }
 export function setCaretOffsets(pair) {
   if (!active() || !pair) return false;
   const a = pointAt(pair[0]);

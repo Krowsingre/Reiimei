@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-version="0.17.6">
+<html lang="en" data-version="0.17.7">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -332,6 +332,54 @@
           <span class="def-gap mid" aria-hidden="true"></span>
           <p class="hint-line">Select a note, or click here to start a new one.</p>
           <span class="def-gap end" aria-hidden="true"></span>
+        </div>
+      </div>
+      <!-- The phone's formatting: one button; its strip of icons sits above the keyboard, and each
+           icon opens a panel in the keyboard's place. -->
+      <div class="fmt-dock" id="fmt-dock" data-open="false">
+        <button type="button" class="fmt-btn" id="btn-fmt" aria-label="Formatting" aria-expanded="false" aria-controls="fmt-strip"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19h14"/><path d="M8 15l4-10 4 10"/><path d="M9.5 11.5h5"/></svg></button>
+        <div class="fmt-strip" id="fmt-strip" role="toolbar" aria-label="Formatting" hidden>
+          <div class="fmt-window">
+            <button type="button" class="fmt-icon" data-pane="style" aria-label="Text style"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h6a4 4 0 0 1 0 8H7z"/><path d="M7 12h7a4 4 0 0 1 0 8H7z"/></svg></button>
+            <button type="button" class="fmt-icon" data-pane="lists" aria-label="Lists"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="6" r="1.2"/><circle cx="5" cy="12" r="1.2"/><circle cx="5" cy="18" r="1.2"/><path d="M9 6h11M9 12h11M9 18h11"/></svg></button>
+            <button type="button" class="fmt-icon" data-pane="para" aria-label="Paragraph"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 4v16M15 4v16"/><path d="M17 4H9.5a4 4 0 0 0 0 8H10"/></svg></button>
+            <button type="button" class="fmt-icon" data-pane="font" aria-label="Font"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19l5-14 5 14"/><path d="M5.8 14h6.4"/><path d="M15 19v-5a3 3 0 0 1 6 0v5M15 16h6"/></svg></button>
+            <button type="button" class="fmt-icon" data-pane="labels" aria-label="Labels and case"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4H5v16h3"/><path d="M16 4h3v16h-3"/></svg></button>
+          </div>
+        </div>
+        <div class="fmt-panel" id="fmt-panel" hidden>
+          <button type="button" class="fmt-close" id="fmt-close" aria-label="Close and bring back the keyboard"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+          <div class="fmt-pane" data-pane="style" hidden>
+            <button type="button" class="fp fp-b" data-do="b" aria-label="Bold">B</button>
+            <button type="button" class="fp fp-i" data-do="i" aria-label="Italic">I</button>
+            <button type="button" class="fp fp-u" data-do="u" aria-label="Underline">U</button>
+            <button type="button" class="fp fp-s" data-do="s" aria-label="Strikethrough">S</button>
+            <button type="button" class="fp fp-mark" data-do="mark" aria-label="Highlight"><span>H</span></button>
+          </div>
+          <div class="fmt-pane" data-pane="lists" hidden>
+            <button type="button" class="fp" data-do="ul" aria-label="Bulleted list"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="7" r="1.4"/><circle cx="5" cy="17" r="1.4"/><path d="M10 7h10M10 17h10"/></svg></button>
+            <button type="button" class="fp" data-do="ol" aria-label="Numbered list"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h2v5M4 10h3"/><path d="M4 14.5a1.5 1.5 0 0 1 3 0c0 1.5-3 2.5-3 4.5h3"/><path d="M11 7h9M11 17h9"/></svg></button>
+            <button type="button" class="fp" data-do="task" aria-label="Checklist"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="1.5"/><path d="M5.5 7.5l1.5 1.5 3-3"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><path d="M14 7.5h6M14 16.5h6"/></svg></button>
+            <button type="button" class="fp" data-do="outdent" aria-label="Move out"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6H10M20 12h-7M20 18H10"/><path d="M7 9l-3 3 3 3"/></svg></button>
+            <button type="button" class="fp" data-do="indent" aria-label="Move in"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6H10M20 12h-7M20 18H10"/><path d="M4 9l3 3-3 3"/></svg></button>
+          </div>
+          <div class="fmt-pane" data-pane="para" hidden>
+            <button type="button" class="fp fp-h" data-do="h1" aria-label="Heading 1">H<sub>1</sub></button>
+            <button type="button" class="fp fp-h" data-do="h2" aria-label="Heading 2">H<sub>2</sub></button>
+            <button type="button" class="fp fp-h" data-do="h3" aria-label="Heading 3">H<sub>3</sub></button>
+            <button type="button" class="fp" data-do="p" aria-label="Normal text"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h9"/></svg></button>
+            <button type="button" class="fp" data-do="quote" aria-label="Quote"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 18c-1.5-4 0-9 4-10M14 18c-1.5-4 0-9 4-10"/></svg></button>
+            <button type="button" class="fp" data-do="hr" aria-label="Divider line"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h18"/></svg></button>
+          </div>
+          <div class="fmt-pane fmt-font" data-pane="font" hidden>
+            <div class="fp-fonts" id="fp-fonts" role="listbox" aria-label="Font"></div>
+            <label class="fp-spacing"><span aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5v14M4 8l3-3 3 3M4 16l3 3 3-3"/><path d="M13 8h7M13 12h7M13 16h7"/></svg></span><input type="range" id="fp-lh" min="1" max="3" step="0.05" aria-label="Line spacing"><output id="fp-lh-v"></output></label>
+          </div>
+          <div class="fmt-pane" data-pane="labels" hidden>
+            <button type="button" class="fp" data-do="brackets" aria-label="Brackets" aria-pressed="false">[ ]</button>
+            <button type="button" class="fp" data-do="bracketcopy" aria-label="Copy with the labels" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="11" height="12" rx="2"/><path d="M16 8V5H5v12h3"/></svg><small>[ ]</small></button>
+            <button type="button" class="fp" data-do="case" aria-label="Capitals: fix, or all lowercase">Aa</button>
+          </div>
         </div>
       </div>
     </main>

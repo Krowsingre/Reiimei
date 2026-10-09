@@ -126,6 +126,9 @@ export function renderToolbar(note) {
   $('note-brackets-copy').checked = app.prefs().bracketCopy !== false;
   $('note-spacing-row').hidden = code;
   $('note-brackets').checked = !!note.meta?.brackets;
+  $('fmt-dock').hidden = code || ro;
+  if (code || ro) setFormatOpen(false);
+  else if (!$('fmt-panel').hidden) renderFormatPane();
   $('btn-text-find').hidden = code;
   if (tf.open) { if (code || note.deleted) closeTextFind({ focus: false }); else if (lastFindNote !== note.id) { tf.cur = -1; refreshTextFind(false); } }
   lastFindNote = note.id;
@@ -192,6 +195,105 @@ function spacingInput() {
   applySpacing(app.note(), v);
   clearTimeout(spacingTimer);
   spacingTimer = setTimeout(() => { const n = app.note(); if (n) app.update({ meta: { ...(n.meta || {}), lh: v.lh, ls: v.ls, ws: v.ws } }); }, 300);
+}
+
+// ---- The phone's Format button -------------------------------------------------------------
+// One button; its strip of five icons sits above the keyboard. An icon opens its panel in the
+// keyboard's place (the keyboard goes away), and ⌄ brings the keyboard back.
+let kbHeight = 0;
+export function openFormatPane(name) {
+  const dock = $('fmt-dock');
+  const note = app.note();
+  if (!note || note.deleted || isCodeNote(note)) return;
+  const vv = window.visualViewport;
+  const kb = vv ? window.innerHeight - vv.height : 0;
+  if (kb > 120) kbHeight = kb;
+  rich.saveCaret();
+  rich.setQuiet(true);
+  if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
+  dock.dataset.pane = name;
+  for (const p of dock.querySelectorAll('.fmt-pane')) p.hidden = p.dataset.pane !== name;
+  for (const b of dock.querySelectorAll('.fmt-icon')) b.setAttribute('aria-pressed', String(b.dataset.pane === name));
+  const panel = $('fmt-panel');
+  panel.style.setProperty('--kb', `${Math.max(220, Math.min(kbHeight || 300, Math.round(window.innerHeight * 0.5)))}px`);
+  panel.hidden = false;
+  renderFormatPane();
+}
+export function closeFormatPane({ keyboard = true } = {}) {
+  const dock = $('fmt-dock');
+  $('fmt-panel').hidden = true;
+  delete dock.dataset.pane;
+  for (const b of dock.querySelectorAll('.fmt-icon')) b.setAttribute('aria-pressed', 'false');
+  rich.setQuiet(false);
+  if (keyboard) { if (rich.active()) rich.resume(); else $('body').focus(); }
+}
+function setFormatOpen(open) {
+  const dock = $('fmt-dock');
+  dock.dataset.open = String(open);
+  $('fmt-strip').hidden = !open;
+  $('btn-fmt').setAttribute('aria-expanded', String(open));
+  if (!open && !$('fmt-panel').hidden) closeFormatPane({ keyboard: false });
+}
+function renderFormatPane() {
+  const note = app.note();
+  if (!note) return;
+  const box = $('fp-fonts');
+  const current = fonts.fontId(note.meta?.font);
+  box.innerHTML = fonts.shownFonts(app.prefs().hiddenFonts || []).map((f) => `<button type="button" class="fp-font" role="option" data-font="${f.id}" aria-selected="${f.id === current}">${f.name}</button>`).join('');
+  const s = spacingOf(note);
+  $('fp-lh').value = String(s.lh);
+  $('fp-lh-v').textContent = fmt.lh(s.lh);
+  const dock = $('fmt-dock');
+  dock.querySelector('[data-do="brackets"]').setAttribute('aria-pressed', String(!!note.meta?.brackets));
+  const copyBtn = dock.querySelector('[data-do="bracketcopy"]');
+  copyBtn.hidden = !note.meta?.brackets;
+  copyBtn.setAttribute('aria-pressed', String(app.prefs().bracketCopy !== false));
+  const ids = new Set(F.TOOLBAR[fmtOf(note)].map((t) => t.id));
+  for (const b of dock.querySelectorAll('.fp[data-do]')) {
+    const d = b.dataset.do;
+    if (['b', 'i', 'u', 's', 'mark', 'ul', 'ol', 'task', 'quote', 'indent', 'outdent'].includes(d)) b.hidden = !ids.has(d);
+    else if (/^h[123]$|^p$|^hr$/.test(d)) b.hidden = !rich.active();
+  }
+}
+function initFormatDock() {
+  const dock = $('fmt-dock');
+  // Nothing in the dock takes the focus from the note (the keyboard stays up for the strip).
+  for (const t of ['pointerdown', 'mousedown']) dock.addEventListener(t, (e) => { if (e.target.closest('button') && (document.activeElement === $('rich') || document.activeElement === $('body'))) e.preventDefault(); });
+  $('btn-fmt').addEventListener('click', () => setFormatOpen(dock.dataset.open !== 'true'));
+  $('fmt-strip').addEventListener('click', (e) => {
+    const b = e.target.closest('.fmt-icon');
+    if (!b) return;
+    if (dock.dataset.pane === b.dataset.pane) closeFormatPane(); else openFormatPane(b.dataset.pane);
+  });
+  $('fmt-close').addEventListener('click', () => closeFormatPane());
+  $('fmt-panel').addEventListener('click', async (e) => {
+    const b = e.target.closest('.fp[data-do]');
+    const f = e.target.closest('.fp-font');
+    if (f) { const s = $('note-font'); s.value = f.dataset.font; s.dispatchEvent(new Event('change', { bubbles: true })); setTimeout(renderFormatPane, 50); return; }
+    if (!b || b.disabled) return;
+    const d = b.dataset.do;
+    if (d === 'brackets') $('note-brackets').click();
+    else if (d === 'bracketcopy') { const c = $('note-brackets-copy'); c.checked = !c.checked; c.dispatchEvent(new Event('change', { bubbles: true })); }
+    else if (d === 'case') await changeCase();
+    else if (rich.active()) await rich.apply(d);
+    else applyToolById(d);
+    // Putting the selection back can hand the note the focus (and a phone its keyboard): give it
+    // back while the panel is open.
+    if (!$('fmt-panel').hidden && (document.activeElement === $('rich') || document.activeElement === $('body'))) document.activeElement.blur();
+    setTimeout(renderFormatPane, 50);
+  });
+  $('fp-lh').addEventListener('input', (e) => {
+    const n = app.note();
+    if (!n) return;
+    const s = spacingOf(n);
+    $('sp-lh').value = e.target.value;
+    $('sp-ls').value = String(s.ls);
+    $('sp-ws').value = String(s.ws);
+    $('fp-lh-v').textContent = fmt.lh(Number(e.target.value));
+    spacingInput();
+  });
+  // Leaving the note folds the strip away.
+  $('rich').addEventListener('blur', () => { if ($('fmt-panel').hidden && !document.activeElement?.closest?.('#fmt-dock')) setTimeout(() => { if (document.activeElement !== $('rich') && $('fmt-panel').hidden) setFormatOpen(false); }, 200); });
 }
 
 // ---- Find and replace (Text, Markdown and Populi notes) --------------------------------------
@@ -982,6 +1084,7 @@ export function init(hooks) {
     const s = rich.active() ? getSelection().toString() : $('body').value.slice($('body').selectionStart, $('body').selectionEnd);
     openTextFind(s && !s.includes('\n') ? s : '');
   });
+  initFormatDock();
   // The phone's bar: the everyday tools straight away, the rest under More.
   const bar = $('phone-bar');
   bar.addEventListener('pointerdown', (e) => { if (e.target.closest('button.pb') && (document.activeElement === $('body') || document.activeElement === $('rich'))) e.preventDefault(); });

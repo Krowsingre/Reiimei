@@ -19,7 +19,7 @@ import { createHistory, lookOf, sameLook, LOOK_KEYS } from './history.js';
 import * as typingCheck from './typingcheck.js';
 import { noteTitle, noteSnippet, ownTitle, fallbackTitle, sharedFileCheck, plainText } from './share.js';
 
-export const APP_VERSION = '0.17.6';
+export const APP_VERSION = '0.17.7';
 // boot.js compares this with the page's version to catch a launch that mixes two releases.
 window.__reiimeiVersion = APP_VERSION;
 export const BUILD_DATE = '2026-10-04';
@@ -1319,6 +1319,29 @@ async function findConflictedCopies() {
   setMsg('data-msg', `Moved ${copies.length} conflicted ${copies.length === 1 ? 'copy' : 'copies'} to Recently Deleted.`, 'ok');
 }
 
+// The note's format (Text, Markdown, Populi, a code language), from the phone's ⋯.
+function openFormatMenu() {
+  const sel = $('note-format');
+  const items = [];
+  for (const g of sel.querySelectorAll('optgroup')) {
+    items.push({ heading: g.label });
+    for (const o of g.querySelectorAll('option')) items.push({ label: o.textContent, checked: o.value === sel.value, run: () => { sel.value = o.value; sel.dispatchEvent(new Event('change', { bubbles: true })); } });
+  }
+  openMenu(el.noteMenu, 'Note format', items);
+}
+// Preview (Markdown), Outline (Research) and the scene board (Storyboard), for the phone's ⋯.
+function phoneViews(n) {
+  const out = [];
+  for (const [id, label] of [['btn-preview', null], ['btn-outline', 'Outline'], ['btn-board', null]]) {
+    const b = $(id);
+    if (!b || b.hidden || n.deleted) continue;
+    const on = b.getAttribute('aria-pressed') === 'true';
+    const name = id === 'btn-preview' ? (on ? 'Back to editing' : 'Preview') : id === 'btn-board' ? (on ? 'Show the text' : 'Show the scene board') : (on ? 'Hide the outline' : label);
+    out.push({ label: name, run: () => b.click() });
+  }
+  return out;
+}
+
 function openTagsSheet() {
   const n = currentNote();
   if (!n) return;
@@ -1600,6 +1623,9 @@ function openNoteMenu() {
       { label: n.pinned ? 'Unpin' : 'Pin to top', disabled: n.deleted, run: () => { const x = currentNote(); if (x) updateCurrent({ pinned: !x.pinned }); } },
       { label: 'Folder…', disabled: n.deleted, run: () => $('note-folder').click() },
       { label: 'Copy…', disabled: n.deleted || n.locked, run: () => $('btn-copy').click() },
+      { label: 'Find…', disabled: n.deleted || n.locked, run: () => (isCode(n.format) ? $('btn-find').click() : writing.openTextFind()) },
+      { label: 'Note format…', disabled: n.deleted || n.locked, run: () => openFormatMenu() },
+      ...phoneViews(n),
       { label: 'Duplicate', disabled: n.deleted || n.locked, run: async () => { const made = await duplicateNotes([currentNote()]); if (made[0]) await selectNote(made[0].id); } },
       { label: 'Versions…', disabled: n.deleted || n.locked, run: openVersions },
       { label: n.deleted ? 'In Recently Deleted' : 'Delete', danger: !n.deleted, disabled: n.deleted, run: deleteCurrent },

@@ -1,8 +1,20 @@
-# Reiimei v0.17.6
+# Reiimei v0.17.7
 
 *reiimei* (ree-h-may), n. The cold, luminous stillness peculiar to a clear winter night; especially the effect of moonlight upon frost, illuminating the night without dispelling it.
 
 An offline-first notes app for Windows and iPhone, built as a Progressive Web App (PWA). No Mac, no App Store, no developer fee.
+
+## What changed in v0.17.7
+
+- **The phone's Format button.** One round button at the bottom right of a note. Tap it and a strip of five icons opens above the keyboard: **Text style**, **Lists**, **Paragraph**, **Font**, and **Labels & case**. The strip swipes sideways only. Tapping an icon puts away the keyboard and shows that icon's panel in its place; **⌄** closes it and brings the keyboard back.
+  - Text style: Bold, Italic, Underline, Strikethrough, Highlight.
+  - Lists: Bullets, Numbers, Checklist, Move out, Move in.
+  - Paragraph: Heading 1, 2 and 3, Normal text, Quote, Divider line.
+  - Font: the fonts, and line spacing.
+  - Labels & case: Brackets, Copy [ ] (copy with or without the labels) and Aa.
+- **⋯ on the phone** also has **Find…** and **Note format…**, and Preview, Outline or the scene board where a note has them. The old bottom bar and its ••• sections are gone from the phone. Links and Sources are on the computer.
+- Still 91 files. No Supabase changes.
+- **Upload these files** (changed since v0.17.6): `app.js`, `index.html`, `styles.css`, `sw.js`, `ui-rich.js`, `ui-writing.js`, `README.md`.
 
 ## What changed in v0.17.6
 
@@ -391,9 +403,9 @@ Then open http://localhost:8000 in Edge or Chrome. Notes work immediately, saved
 
 The iPhone needs an HTTPS address. GitHub Pages hosts the app for free. Only the app's code goes to GitHub; your notes never do.
 
-1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.17.6` folder.
+1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.17.7` folder.
 2. **Create the repository.** In Safari, sign in at github.com, tap **+** › **New repository**. Name it `reiimei`, set it to **Public** (free Pages needs a public repository), and tap **Create repository**.
-3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.17.6` folder, tap **Select**, select all 91 files, and tap **Open**. Scroll down and tap **Commit changes**.
+3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.17.7` folder, tap **Select**, select all 91 files, and tap **Open**. Scroll down and tap **Commit changes**.
    - If you don't see the upload link, tap the **aA** button in Safari's address bar › **Request Desktop Website** and try again.
 4. **Turn on Pages.** In the repository, open **Settings** › **Pages**. Under **Build and deployment**, set Source to **Deploy from a branch**, Branch to **main** and **/ (root)**, then tap **Save**.
 5. **Wait a minute or two**, then reload the Pages screen. It shows your address, which looks like `https://yourname.github.io/reiimei/`.
@@ -411,7 +423,7 @@ Chrome on a computer can only imitate an iPhone, so after each update try these 
 4. **Holding Delete** keeps deleting, faster the longer you hold it.
 5. **Undo.** Shake the phone (or swipe left with three fingers) to undo what you typed; Undo and Redo are also in the **Text** sheet.
 6. **Line breaks.** A blank line typed with Return twice is still there after closing and reopening the note, and after a sync.
-7. **The layout.** The mode drop-down is at the top of the home page. The bar above the keyboard has Undo, Redo, B, I, U, S, List (bullets → numbers → none), Font, Brackets, Aa and ••• (More). More shows Text, Paragraph, Insert, Tools and Note; the **Note** sheet shows Format & Font, then Options.
+7. **The layout.** The mode drop-down is at the top of the home page. In a note: back, title, Undo, Redo and ⋯ on one row; the round Format button at the bottom right opens the icon strip above the keyboard, and each icon's panel takes the keyboard's place (⌄ brings it back).
 8. **Tapping and selecting.** Tap in the middle of a word: the cursor lands there. Press and hold a word, then drag a handle: only the words you drag over are selected.
 9. **Capitals.** Move the cursor into the middle of a sentence, or delete a word, then type: the word is not capitalized (it still is at the start of a sentence).
 10. **Sync.** A change made on the phone shows on the computer, and the other way round.
@@ -532,7 +544,7 @@ The service worker caches the app files. When you change any file, bump `VERSION
 - **Settings › Log** › Download gives a text log of everything the app did, including sync results and errors.
 - **"Test connection"** in Settings › Sync confirms the URL, key, sign-in, and tables are all correct.
 
-## Known limits in v0.17.6
+## Known limits in v0.17.7
 
 - Images can be linked but not attached
 - Sources belong to one note; there is no shared library yet
