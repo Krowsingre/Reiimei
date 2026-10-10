@@ -35,6 +35,17 @@ const EXTRA = {
   '1JN': ['1 jn', '1 john', '1jn'], '2JN': ['2 jn', '2 john', '2jn'], '3JN': ['3 jn', '3 john', '3jn'], JUD: ['jude', 'jd'], REV: ['rv', 'rev', 'revelation', 'revelations', 'apocalypse'],
 };
 
+// Highlight colours: the rainbow (red, orange, yellow, green, blue, indigo, violet), each in a light
+// and a deep tone ("red-1", "red-2"…). The five colours of v0.18.1 become the nearest light tone.
+const HUES = ['red', 'orange', 'yellow', 'green', 'blue', 'indigo', 'violet'];
+export const HIGHLIGHTS = [1, 2].flatMap((t) => HUES.map((h) => ({ id: `${h}-${t}`, name: `${t === 1 ? 'Light' : 'Deep'} ${h}` })));
+const OLD = { yellow: 'yellow-1', green: 'green-1', blue: 'blue-1', pink: 'red-1', purple: 'violet-1' };
+export const hlColor = (c) => (HIGHLIGHTS.some((x) => x.id === c) ? c : OLD[c] || 'yellow-1');
+export const highlightPalette = (on, attrs = '') => HIGHLIGHTS.map((x) => `<button type="button" class="hl-dot hl-${x.id}${x.id === on ? ' on' : ''}" ${attrs}data-color="${x.id}" aria-label="${x.name}" title="${x.name}" aria-pressed="${x.id === on}"></button>`).join('');
+
+// Every book id, in Bible order (known before any translation is loaded).
+export const ORDER = Object.keys(EXTRA);
+
 const norm = (s) => s.toLowerCase().replace(/\./g, '').replace(/^(first|1st|i)\s+/, '1 ').replace(/^(second|2nd|ii)\s+/, '2 ').replace(/^(third|3rd|iii)\s+/, '3 ').replace(/\s+/g, ' ').trim();
 
 function index(v) {

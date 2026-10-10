@@ -1,6 +1,8 @@
 // Reiimei Bible reader: read any of the translations by book and chapter, switch translation in
 // place, find a passage by its reference or its words (in every translation on the device, or
 // online), see the footnotes, and copy verses or put them into the note you are writing.
+// Verses can be highlighted in a few colours, and notes taken on a passage (on a computer the
+// reader and the note sit side by side; on a phone one shows at a time).
 import * as B from './bible.js';
 import { log } from './logger.js';
 
@@ -13,6 +15,7 @@ let at = { book: 'GEN', c: 1 };
 const picked = new Set(); // "book:c:v": the same verses in every translation
 let shown = 'chapter';  // or 'results'
 let lastQuery = '';
+let marks = new Map(); // highlights: "book:c:v" -> {color}
 
 const key = (b, c, v) => `${b}:${c}:${v}`;
 export const isOpen = () => !$('bible-view').hidden;
@@ -28,10 +31,11 @@ async function ensure(v) {
   }
 }
 
-export async function open({ insert = false, version = null, query = '' } = {}) {
+// at: a passage to show ({book, c1, v1, c2, v2, whole}); side: beside the open note (computer only).
+export async function open({ insert = false, version = null, query = '', at: go = null, side = null } = {}) {
   const view = $('bible-view');
   view.hidden = false;
-  document.documentElement.dataset.bible = 'on';
+  setSide(side === null ? isSide() : side);
   setStatus('');
   const last = app.prefs().bibleAt;
   ver = version || last?.version || B.DEFAULT;
@@ -40,7 +44,11 @@ export async function open({ insert = false, version = null, query = '' } = {}) 
   fillBooks();
   if (last && B.book(last.book, ver)) at = { book: last.book, c: Math.min(last.c, B.book(last.book, ver).c.length) };
   $('bible-insert').hidden = !canInsert();
-  if (query) { $('bible-search').value = query; await runSearch(); } else showChapter(at.book, at.c);
+  if (go && B.book(go.book, ver)) {
+    picked.clear();
+    if (!go.whole) for (const x of B.passage(go, ver)) picked.add(key(x.book, x.c, x.v));
+    showChapter(go.book, Math.min(go.c1, B.book(go.book, ver).c.length), { scroll: go.whole ? null : go.v1 });
+  } else if (query) { $('bible-search').value = query; await runSearch(); } else showChapter(at.book, at.c);
   if (insert || query) $('bible-search').focus();
   app.onBible?.();
 }
@@ -48,9 +56,22 @@ export async function open({ insert = false, version = null, query = '' } = {}) 
 export function close() {
   $('bible-view').hidden = true;
   delete document.documentElement.dataset.bible;
+  app.sideBySide?.();
   picked.clear();
   renderBar();
   app.onBible?.();
+}
+
+// Side by side: the reader on the left half, the open note on the right (a computer only).
+export const isSide = () => document.documentElement.dataset.bible === 'side';
+function setSide(on) {
+  const side = !!on && !app.phone() && !!app.note();
+  document.documentElement.dataset.bible = side ? 'side' : 'on';
+  const b = $('bible-side');
+  b.hidden = app.phone() || !app.note();
+  b.setAttribute('aria-pressed', String(side));
+  b.title = side ? 'Show the Bible on its own' : 'Read beside the open note';
+  app.sideBySide?.();
 }
 
 function canInsert() {
@@ -87,7 +108,8 @@ function verseHtml(b, c, v, item) {
   const lines = esc(text).replace(/\n\t/g, '<br><span class="bv-indent"></span>').replace(/\n/g, '<br>');
   const sel = picked.has(key(b.id, c, v)) ? ' picked' : '';
   const empty = text ? '' : ' empty';
-  return `<span class="bv${sel}${empty}" data-v="${v}" id="bv-${c}-${v}"><sup class="bv-n">${v}</sup>${lines}${notes ? `<button type="button" class="bv-note" data-k="${k}" aria-label="Footnote">†</button>` : ''}</span> `;
+  const hl = marks.get(key(b.id, c, v));
+  return `<span class="bv${sel}${empty}${hl ? ` hl-${hl.color}` : ''}" data-v="${v}" id="bv-${c}-${v}"><sup class="bv-n">${v}</sup>${lines}${notes ? `<button type="button" class="bv-note" data-k="${k}" aria-label="Footnote">†</button>` : ''}</span> `;
 }
 
 export function showChapter(id, c, { scroll = null } = {}) {
@@ -100,7 +122,8 @@ export function showChapter(id, c, { scroll = null } = {}) {
   fillChapters(id);
   $('bible-chapter').value = String(c);
   const list = b.c[c - 1];
-  let html = `<h2 class="bible-chapter-title">${esc(b.name)} ${c} <span class="bible-ver">${esc(B.version(ver).short)}</span></h2>`;
+  marks = app.highlights();
+  let html = `<div class="bible-chapter-head"><h2 class="bible-chapter-title">${esc(b.name)} ${c} <span class="bible-ver">${esc(B.version(ver).short)}</span></h2><button type="button" class="text-btn" id="bible-chapter-notes">Take notes</button></div>`;
   let open = false;
   const closeBlock = () => { if (open) { html += '</p>'; open = false; } };
   list.forEach((item, i) => {
@@ -221,6 +244,51 @@ function renderBar() {
   if (!n) return;
   $('bible-sel').textContent = runs().map((x) => B.label(x, ver)).join('; ');
   $('bible-insert').hidden = !canInsert();
+  const colors = new Set([...picked].map((k) => marks.get(k)?.color).filter(Boolean));
+  $('bible-unhl').hidden = !colors.size;
+  for (const d of document.querySelectorAll('#bible-colors .hl-dot')) {
+    const on = colors.size === 1 && colors.has(d.dataset.color);
+    d.classList.toggle('on', on);
+    d.setAttribute('aria-pressed', String(on));
+  }
+}
+
+// The picked verses as they are in the translation being read (for highlights).
+function pickedVerses() {
+  const out = [];
+  for (const r of runs()) for (const x of B.passage(r, ver)) out.push({ book: x.book, c: x.c, v: x.v, version: ver, text: x.text.replace(/\n\t?/g, ' '), label: B.label({ book: x.book, c1: x.c, v1: x.v, c2: x.c, v2: x.v }, ver) });
+  return out;
+}
+async function highlight(color) {
+  const verses = pickedVerses();
+  if (!verses.length) return;
+  await app.setHighlight(verses, color);
+  marks = app.highlights();
+  for (const el of document.querySelectorAll('#bible-body .bv')) {
+    const k = key(at.book, at.c, +el.dataset.v);
+    el.className = el.className.replace(/\s*hl-[a-z]+(-\d)?/g, '') + (marks.get(k) ? ` hl-${marks.get(k).color}` : '');
+  }
+  picked.clear();
+  document.querySelectorAll('#bible-body .picked').forEach((x) => x.classList.remove('picked'));
+  renderBar();
+  app.toast(color ? 'Highlighted' : 'Highlight removed');
+}
+
+// Notes on the picked verses, or on the chapter when none are picked.
+async function takeNotes() {
+  const r = shown === 'chapter' ? runs() : [];
+  const b = B.book(at.book, ver);
+  const passage = r.length
+    ? { ...r[0], version: ver, label: r.map((x) => B.label(x, ver)).join('; ') }
+    : { book: at.book, c1: at.c, v1: 1, c2: at.c, v2: b.c[at.c - 1].length, whole: true, version: ver, label: `${b.name} ${at.c}` };
+  const phone = app.phone();
+  picked.clear();
+  document.querySelectorAll('#bible-body .picked').forEach((x) => x.classList.remove('picked'));
+  renderBar();
+  if (phone) close();
+  await app.takeNotes(passage, `Notes on ${passage.label}`);
+  if (!phone) setSide(true);
+  log.info('bible', 'Notes taken', { passage: passage.label, side: !phone });
 }
 
 // Markdown for a note: a quote with verse numbers (superscript) and the reference under it.
@@ -241,7 +309,13 @@ export function quotePlain(ranges, { numbers = true, v = ver } = {}) {
 export function init(hooks) {
   app = hooks;
   $('bible-close').addEventListener('click', close);
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && isOpen() && !document.querySelector('dialog[open]')) { e.preventDefault(); close(); } });
+  // Escape closes the reader; beside a note, only while you are in the reader (Escape in the note is the note's own).
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && isOpen() && !document.querySelector('dialog[open]') && (!isSide() || $('bible-view').contains(document.activeElement) || document.activeElement === document.body)) { e.preventDefault(); close(); } });
+  $('bible-side').addEventListener('click', () => setSide(!isSide()));
+  $('bible-colors').innerHTML = B.highlightPalette(null);
+  $('bible-colors').addEventListener('click', (e) => { const d = e.target.closest('[data-color]'); if (d) highlight(d.dataset.color); });
+  $('bible-unhl').addEventListener('click', () => highlight(null));
+  $('bible-take').addEventListener('click', takeNotes);
   $('bible-version').addEventListener('change', (e) => switchVersion(e.target.value));
   $('bible-book').addEventListener('change', (e) => showChapter(e.target.value, 1));
   $('bible-chapter').addEventListener('change', (e) => showChapter(at.book, +e.target.value));
@@ -250,6 +324,7 @@ export function init(hooks) {
   $('bible-search').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); clearTimeout(t); runSearch(); } });
   $('bible-body').addEventListener('click', (e) => {
     if (e.target.closest('#bible-online')) { searchOnline($('bible-search').value); return; }
+    if (e.target.closest('#bible-chapter-notes')) { takeNotes(); return; }
     const go = e.target.closest('[data-go]');
     if (go) { const [b, c] = go.dataset.go.split(':'); showChapter(b, +c); return; }
     const note = e.target.closest('.bv-note');
@@ -288,7 +363,8 @@ export function init(hooks) {
     if (!r.length) return;
     const md = quoteMarkdown(r, { numbers: $('bible-numbers').checked });
     const labels = r.map((x) => B.label(x, ver)).join('; ');
-    close();
+    // Beside the note, the reader stays open.
+    if (isSide()) { picked.clear(); document.querySelectorAll('#bible-body .picked').forEach((x) => x.classList.remove('picked')); renderBar(); } else close();
     app.insertBlocks(md);
     app.toast(`${labels} put in the note`);
     log.info('bible', 'Passage inserted', { refs: labels, version: ver });

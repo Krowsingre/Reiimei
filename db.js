@@ -201,10 +201,10 @@ export function locked(fn) {
 }
 
 // ---- Notes -------------------------------------------------------------
-export async function createNote({ folder_id = null, tags = [], format = 'markdown', meta = {} } = {}) {
+export async function createNote({ folder_id = null, tags = [], format = 'markdown', meta = {}, body = '' } = {}) {
   const note = {
     id: uuid(),
-    body: '',
+    body,
     format,
     meta,
     folder_id,

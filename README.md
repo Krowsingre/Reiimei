@@ -1,8 +1,26 @@
-# Reiimei v0.18.0
+# Reiimei v0.18.2
 
 *reiimei* (ree-h-may), n. The cold, luminous stillness peculiar to a clear winter night; especially the effect of moonlight upon frost, illuminating the night without dispelling it.
 
 An offline-first notes app for Windows and iPhone, built as a Progressive Web App (PWA). No Mac, no App Store, no developer fee.
+
+## What changed in v0.18.2
+
+- **Bible notes show in every mode**: Notes, Research, Coding and Storyboard each list them (marked "Bible") and count them, as do All modes, search and **Bible › Bible notes**.
+- **Fourteen highlight colours**: the rainbow (red, orange, yellow, green, blue, indigo, violet), each in a light and a deep tone. In the Bible's bar and on each card under **Bible › Highlights** they sit in two rows: light tones on top, deep tones below. Highlights made in v0.18.1 keep their place in the nearest light tone (pink becomes light red, purple light violet).
+- Still 98 files. No Supabase changes.
+- **Upload these files** (changed since v0.18.1): `app.js`, `bible.js`, `index.html`, `styles.css`, `sw.js`, `ui-bible.js`, `README.md`.
+
+## What changed in v0.18.1
+
+- **Highlights.** In the Bible, pick verses and tap one of five colours (yellow, green, blue, pink, purple; fourteen since v0.18.2) in the bar at the bottom. A highlight shows in every translation. Pick highlighted verses to change their colour or tap **Remove highlight**. The scripture itself is never changed.
+- **Bible › Highlights** lists every highlight in Bible order, with neighbouring verses of one colour together, each with its reference, translation and text. Tap the reference to open the Bible there; tap a colour dot to change it; **×** removes it. Highlights are not notes, so they are not counted in any mode.
+- **Bible notes.** **Take notes** (in the bar for picked verses, or beside the chapter heading for the whole chapter) starts a note called "Notes on John 3:16". It is kept under **Bible › Bible notes**, and it also shows in **All modes** and in search (and, since v0.18.2, in every mode). A line at the top of the note shows its passage; tap it to open the Bible there. With Bible notes open, the new-note button starts a Bible note without a passage.
+- **Reading beside a note (computer).** Take notes puts the Bible on the left half of the window and the note on the right, so you can read and write at once. **Put in note** keeps the Bible open there. The split button at the top right of the Bible switches between side by side and the Bible on its own; **Escape** while in the Bible closes it (Escape in the note does not).
+- **On a phone**, one shows at a time: Take notes closes the Bible and opens the note, and the passage line opens the Bible again.
+- Highlights and Bible notes sync like notes, and are sealed when encryption is on. No Supabase changes.
+- Still 98 files.
+- **Upload these files** (changed since v0.18.0): `app.js`, `bible.js`, `db.js`, `index.html`, `modes.js`, `styles.css`, `sw.js`, `ui-bible.js`, `README.md`.
 
 ## What changed in v0.18.0
 
@@ -434,9 +452,9 @@ Then open http://localhost:8000 in Edge or Chrome. Notes work immediately, saved
 
 The iPhone needs an HTTPS address. GitHub Pages hosts the app for free. Only the app's code goes to GitHub; your notes never do.
 
-1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.18.0` folder.
+1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.18.2` folder.
 2. **Create the repository.** In Safari, sign in at github.com, tap **+** › **New repository**. Name it `reiimei`, set it to **Public** (free Pages needs a public repository), and tap **Create repository**.
-3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.18.0` folder, tap **Select**, select all 98 files, and tap **Open**. Scroll down and tap **Commit changes**.
+3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.18.2` folder, tap **Select**, select all 98 files, and tap **Open**. Scroll down and tap **Commit changes**.
    - If you don't see the upload link, tap the **aA** button in Safari's address bar › **Request Desktop Website** and try again.
 4. **Turn on Pages.** In the repository, open **Settings** › **Pages**. Under **Build and deployment**, set Source to **Deploy from a branch**, Branch to **main** and **/ (root)**, then tap **Save**.
 5. **Wait a minute or two**, then reload the Pages screen. It shows your address, which looks like `https://yourname.github.io/reiimei/`.
@@ -575,7 +593,7 @@ The service worker caches the app files. When you change any file, bump `VERSION
 - **Settings › Log** › Download gives a text log of everything the app did, including sync results and errors.
 - **"Test connection"** in Settings › Sync confirms the URL, key, sign-in, and tables are all correct.
 
-## Known limits in v0.18.0
+## Known limits in v0.18.2
 
 - Images can be linked but not attached
 - Sources belong to one note; there is no shared library yet

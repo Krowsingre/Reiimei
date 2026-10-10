@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-version="0.18.0">
+<html lang="en" data-version="0.18.2">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -300,6 +300,10 @@
           </div>
         </div>
       </div>
+      </div>
+      <div class="passage-bar" id="passage-bar" hidden>
+        <span class="passage-label">Bible note on</span>
+        <button type="button" class="text-btn" id="btn-passage" title="Open this passage in the Bible"></button>
       </div>
       <div class="trash-bar" id="trash-bar" hidden>
         This note is in Recently Deleted.
@@ -718,14 +722,18 @@
       <select id="bible-book" aria-label="Book"></select>
       <select id="bible-chapter" aria-label="Chapter"></select>
       <input type="search" id="bible-search" placeholder="John 3:16, or words" aria-label="Find a passage or words" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <button type="button" class="icon-btn" id="bible-side" aria-label="Read beside the open note" aria-pressed="false" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 4v16"/></svg></button>
     </header>
     <p class="bible-status" id="bible-status" role="status" hidden></p>
     <div class="bible-body" id="bible-body"></div>
     <div class="bible-bar" id="bible-bar" hidden>
       <span class="bible-sel" id="bible-sel"></span>
       <label class="bible-num"><input type="checkbox" id="bible-numbers" checked> Verse numbers</label>
+      <span class="bible-colors" id="bible-colors" role="group" aria-label="Highlight"></span>
+      <button type="button" class="text-btn" id="bible-unhl" hidden>Remove highlight</button>
       <span class="spacer"></span>
       <button type="button" class="text-btn" id="bible-clear">Clear</button>
+      <button type="button" class="btn" id="bible-take">Take notes</button>
       <button type="button" class="btn" id="bible-copy">Copy</button>
       <button type="button" class="btn primary" id="bible-insert">Put in note</button>
     </div>

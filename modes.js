@@ -11,11 +11,14 @@ export const MODES = [
   { id: 'storyboard', name: 'Storyboard', key: '4' },
 ];
 export const MODE_IDS = MODES.map((m) => m.id);
-export const modeName = (id) => (MODES.find((m) => m.id === id) || MODES[0]).name;
+export const modeName = (id) => (id === BIBLE ? 'Bible' : (MODES.find((m) => m.id === id) || MODES[0]).name);
+// Notes taken on the Bible are not a mode of their own: they sit under Bible in the sidebar
+// (and show in All modes and in search). Each links to its passage (meta.passage).
+export const BIBLE = 'bible';
 
 export function kindOf(note) {
   const k = note?.meta?.kind;
-  if (MODE_IDS.includes(k)) return k;
+  if (MODE_IDS.includes(k) || k === BIBLE) return k;
   if (note && isCode(note.format)) return 'coding';
   if (note?.meta?.sources?.length) return 'research';
   return 'notes';

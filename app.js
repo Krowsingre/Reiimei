@@ -21,7 +21,7 @@ import * as bibleUi from './ui-bible.js';
 import * as bible from './bible.js';
 import { noteTitle, noteSnippet, ownTitle, fallbackTitle, sharedFileCheck, plainText } from './share.js';
 
-export const APP_VERSION = '0.18.0';
+export const APP_VERSION = '0.18.2';
 // boot.js compares this with the page's version to catch a launch that mixes two releases.
 window.__reiimeiVersion = APP_VERSION;
 export const BUILD_DATE = '2026-10-04';
@@ -135,12 +135,15 @@ function toast(text, actionLabel = null, action = null) {
 }
 // Storyboard registers are kept in a hidden note per project; it never shows in a list.
 const isRegistry = (n) => !!(n.meta && n.meta.registry);
-const activeNotes = () => state.notes.filter((n) => !n.deleted && !isRegistry(n));
+// A Bible highlight is a hidden record too (one per verse, meta.highlight); it is listed only under Bible › Highlights.
+const isHighlight = (n) => !!(n.meta && n.meta.highlight);
+const isHidden = (n) => isRegistry(n) || isHighlight(n);
+const activeNotes = () => state.notes.filter((n) => !n.deleted && !isHidden(n));
 // A permanently deleted note is a blank deleted stub (kept only so other devices wipe it too).
 const isPurged = (n) => n.deleted && !n.locked && !(n.body || '').trim() && !ownTitle(n) && !(n.tags || []).length;
 // A note with no text and no title is blank; blank notes are discarded when you leave them.
 const isBlank = (n) => !(n.body || '').trim() && !ownTitle(n);
-const trashNotes = () => state.notes.filter((n) => n.deleted && !isPurged(n) && !isRegistry(n));
+const trashNotes = () => state.notes.filter((n) => n.deleted && !isPurged(n) && !isHidden(n));
 const anyFolders = () => state.folders.filter((f) => !f.deleted);
 const liveFolders = () => anyFolders().filter((f) => !modes.isProject(f)).sort((a, b) => modes.projectName(a).localeCompare(modes.projectName(b)));
 // Subfolders (Notes mode, one level). A folder's parent counts only while it is a live top-level folder.
@@ -387,9 +390,11 @@ function tagCounts() {
 // A mode filters folders and the main lists. Tags, search and Recently Deleted always span every mode.
 function inMode(n) {
   const f = state.filter;
-  if (state.showAll || f.type === 'tag' || f.type === 'trash' || state.query.trim()) return true;
-  return modes.kindOf(n) === state.mode;
+  if (state.showAll || f.type === 'tag' || f.type === 'trash' || f.type === 'biblenotes' || state.query.trim()) return true;
+  return inModeKind(n, state.mode);
 }
+// Bible notes belong to no mode, so they show in every mode (and under Bible).
+const inModeKind = (n, mode) => { const k = modes.kindOf(n); return k === mode || k === modes.BIBLE; };
 
 function filteredNotes() {
   const f = state.filter;
@@ -397,6 +402,8 @@ function filteredNotes() {
   list = list.filter(inMode);
   const v = view();
   if (f.type === 'folder') list = list.filter((n) => n.folder_id === f.id);
+  if (f.type === 'biblenotes') list = list.filter((n) => modes.kindOf(n) === modes.BIBLE);
+  if (f.type === 'highlights') return [];
   if (f.type === 'device') list = list.filter((n) => originOf(n)?.id === device().id);
   // Several tags narrow the list: a note must carry every chosen tag (in any mode or folder).
   if (f.type === 'tag') list = list.filter((n) => f.tags.every((t) => tagsOf(n).includes(t)));
@@ -583,6 +590,8 @@ const ICONS = {
   trash: '<svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>',
   more: '<svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg>',
   pin: '<svg viewBox="0 0 24 24"><path d="M12 17v5"/><path d="M9 10.8V4h6v6.8l3 3.2H6z"/></svg>',
+  bnote: '<svg viewBox="0 0 24 24"><path d="M5 4h11l3 3v13H5z"/><path d="M12 8v8M9 11h6"/></svg>',
+  highlight: '<svg viewBox="0 0 24 24"><path d="M14 4l6 6-8 8H6v-6z"/><path d="M4 21h9"/></svg>',
 };
 
 const MAX_TAGS = 5;
@@ -642,7 +651,7 @@ const MODE_NOTES = { notes: 'Notes', research: 'Research notes', coding: 'Coding
 const allLabel = () => (state.showAll ? 'All notes' : MODE_NOTES[state.mode] || 'Notes');
 
 function renderSidebar() {
-  const act = activeNotes().filter((n) => state.showAll || modes.kindOf(n) === state.mode);
+  const act = activeNotes().filter((n) => state.showAll || inModeKind(n, state.mode));
   const research = modes.hasProjects(state.mode);
   const folders = research ? liveProjects() : liveFolders();
   renderModeSwitch();
@@ -695,6 +704,12 @@ function renderSidebar() {
   bl.hidden = !bibleOpen;
   const reading = bibleUi.isOpen() ? bibleUi.current() : null;
   bl.innerHTML = bible.VERSIONS.map((v) => `<li class="side-item bible-item${reading === v.id ? ' active' : ''}" data-bible="${v.id}" role="button" tabindex="0" title="${esc(v.name)}"><span class="name">${esc(v.name)}</span><span class="count">${esc(v.short)}</span></li>`).join('');
+  // Notes taken on the Bible, and highlights, kept apart from the rest.
+  const bn = sideItem({ type: 'biblenotes' }, 'bnote', 'Bible notes', activeNotes().filter((n) => modes.kindOf(n) === modes.BIBLE).length);
+  bn.id = 'side-bible-notes';
+  const hl = sideItem({ type: 'highlights' }, 'highlight', 'Highlights', highlightGroups().length);
+  hl.id = 'side-highlights';
+  bl.prepend(bn, hl);
   for (const id of ['btn-tags-toggle', 'btn-tags-chevron']) $(id).setAttribute('aria-expanded', String(prefs().tagsOpen !== false));
   el.tagList.hidden = prefs().tagsOpen === false;
   if (!tags.length) el.tagList.innerHTML = '<li class="side-empty">Add tags to a note</li>';
@@ -718,12 +733,12 @@ function renderModeSwitch() {
   const act = activeNotes();
   box.innerHTML = modes.MODES.map((m) => {
     const on = m.id === state.mode;
-    const c = act.filter((n) => modes.kindOf(n) === m.id).length;
+    const c = act.filter((n) => inModeKind(n, m.id)).length;
     return `<button class="mode-btn${on ? ' on' : ''}" role="tab" aria-selected="${on}" data-mode="${m.id}" data-short="${esc(m.name[0])}" title="${m.name} (Ctrl+${m.key}) · ${c} ${c === 1 ? 'note' : 'notes'}">${esc(m.name)}</button>`;
   }).join('');
   // The computer's drop-down: the four modes, then All modes (in place of "Show all modes").
   const sel = $('mode-select');
-  sel.innerHTML = modes.MODES.map((m) => `<option value="${m.id}">${esc(m.name)} (${act.filter((n) => modes.kindOf(n) === m.id).length})</option>`).join('')
+  sel.innerHTML = modes.MODES.map((m) => `<option value="${m.id}">${esc(m.name)} (${act.filter((n) => inModeKind(n, m.id)).length})</option>`).join('')
     + `<option value="all">All modes (${act.length})</option>`;
   sel.value = state.showAll ? 'all' : state.mode;
 }
@@ -731,7 +746,7 @@ function renderModeSwitch() {
 function renderModeAll() {
   const b = $('mode-all');
   const f = state.filter;
-  const relevant = f.type !== 'tag' && f.type !== 'trash' && !state.query.trim();
+  const relevant = f.type !== 'tag' && f.type !== 'trash' && f.type !== 'biblenotes' && f.type !== 'highlights' && !state.query.trim();
   b.hidden = !relevant;
   if (!relevant) return;
   b.textContent = state.showAll ? `Showing all modes · back to ${modes.modeName(state.mode)}` : 'Show all modes';
@@ -754,7 +769,7 @@ async function setMode(id) {
   state.selected.clear();
   state.mode = id;
   state.showAll = false;
-  if (state.filter.type === 'tag' || state.filter.type === 'trash' || state.filter.type === 'folder') state.filter = { type: 'all' };
+  if (['tag', 'trash', 'folder', 'biblenotes', 'highlights'].includes(state.filter.type)) state.filter = { type: 'all' };
   setPrefs({ mode: id });
   await afterListChange(state.currentId);
   log.info('modes', 'Mode changed', { mode: id });
@@ -793,6 +808,8 @@ function listTitle() {
   if (f.type === 'trash') return 'Recently Deleted';
   if (f.type === 'device') return 'This device';
   if (f.type === 'none') return 'Notes';
+  if (f.type === 'biblenotes') return 'Bible notes';
+  if (f.type === 'highlights') return 'Highlights';
   return allLabel();
 }
 
@@ -803,9 +820,10 @@ function renderList() {
   renderSelectBar(notes);
   renderTagFilter();
   renderModeAll();
+  if (state.filter.type === 'highlights') { renderHighlights(); return; }
   if (!notes.length) {
     const hiddenNote = state.filter.type === 'all' && view().hidden.length && !state.query;
-    el.noteList.innerHTML = `<li class="list-empty">${state.query ? 'No matching notes' : state.filter.type === 'trash' ? 'Nothing deleted' : hiddenNote ? 'Some devices are hidden. Use the sort icon to show them.' : 'No notes here yet'}</li>`;
+    el.noteList.innerHTML = `<li class="list-empty">${state.query ? 'No matching notes' : state.filter.type === 'trash' ? 'Nothing deleted' : state.filter.type === 'biblenotes' ? 'No Bible notes yet. While reading, pick verses and choose Take notes.' : hiddenNote ? 'Some devices are hidden. Use the sort icon to show them.' : 'No notes here yet'}</li>`;
     $('view-dot').hidden = !(view().sort !== 'updated' || view().dir !== 'desc' || view().hidden.length);
     return;
   }
@@ -818,7 +836,7 @@ function renderList() {
     return head + `
     <li class="note-item${n.id === state.currentId && !state.selecting ? ' active' : ''}${state.selected.has(n.id) ? ' selected' : ''}" data-id="${n.id}" role="option" aria-selected="${state.selected.has(n.id)}">
       <div class="title">${n.pinned ? ICONS.pin : ''}<span>${esc(titleOf(n))}</span></div>
-      <div class="meta"><span class="date">${esc(formatDate(view().sort === 'created' ? (n.created_at || n.updated_at) : n.updated_at))}</span>${multi ? `<span class="dev">${esc(deviceOf(n).name)}</span>` : ''}${state.showAll ? `<span class="kind">${esc(modes.modeName(modes.kindOf(n)))}</span>` : ''}<span class="snippet">${state.query.trim() ? matchSnippet(n, state.query.trim()) : esc(snippetOf(n))}</span></div>
+      <div class="meta"><span class="date">${esc(formatDate(view().sort === 'created' ? (n.created_at || n.updated_at) : n.updated_at))}</span>${multi ? `<span class="dev">${esc(deviceOf(n).name)}</span>` : ''}${state.showAll ? `<span class="kind">${esc(modes.modeName(modes.kindOf(n)))}</span>` : ''}${modes.kindOf(n) === modes.BIBLE && state.filter.type !== 'biblenotes' && !state.showAll ? '<span class="kind">Bible</span>' : ''}<span class="snippet">${state.query.trim() ? matchSnippet(n, state.query.trim()) : esc(snippetOf(n))}</span></div>
       ${tagsOf(n).length ? `<div class="tags">${tagsOf(n).map((t) => `<span class="mini-tag">#${esc(t)}</span>`).join('')}</div>` : ''}
       ${state.filter.type === 'trash'
         ? '<div class="swipe-actions left" aria-hidden="true"><button type="button" data-swipe="restore" tabindex="-1">Restore</button></div><div class="swipe-actions right" aria-hidden="true"><button type="button" class="danger" data-swipe="purge" tabindex="-1">Delete</button></div>'
@@ -862,6 +880,9 @@ function renderEditor() {
   el.folderBtn.title = n.deleted ? where : `${where}: change where this note is kept`;
   el.folderBtn.setAttribute('aria-label', `${where}: ${folderLabel(n)}`);
   $('editor').dataset.kind = modes.kindOf(n);
+  const pass = modes.kindOf(n) === modes.BIBLE ? n.meta?.passage : null;
+  $('passage-bar').hidden = !pass;
+  if (pass) $('btn-passage').textContent = `${pass.label || 'Passage'}${pass.version ? ` (${bible.version(pass.version).short})` : ''}`;
   $('editor').dataset.font = fontOf(n);
   $('pin-dot').hidden = !n.pinned;
 
@@ -1053,12 +1074,17 @@ async function newNote() {
   const f = state.filter;
   if (f.type === 'trash') state.filter = { type: 'all' };
   const p = prefs();
-  const note = await db.createNote({
-    folder_id: modes.hasProjects(state.mode) ? (await projectForNew(state.mode)).id : f.type === 'folder' && !modes.isProject(folderById(f.id)) ? f.id : null,
-    tags: f.type === 'tag' ? [...f.tags] : [],
-    format: state.mode === 'coding' && !isCode(p.format) ? (isCode(p.codeLang) ? p.codeLang : 'python') : p.format,
-    meta: { ...writing.newNoteMeta(p), kind: state.mode, origin: { id: device().id, name: device().name } },
-  });
+  // Under Bible, a new note is a Bible note (not of any mode).
+  const forBible = f.type === 'biblenotes' || f.type === 'highlights';
+  if (f.type === 'highlights') state.filter = { type: 'biblenotes' };
+  const note = await db.createNote(forBible
+    ? { format: isCode(p.format) ? 'markdown' : p.format, meta: { ...writing.newNoteMeta(p), kind: modes.BIBLE, origin: { id: device().id, name: device().name } } }
+    : {
+      folder_id: modes.hasProjects(state.mode) ? (await projectForNew(state.mode)).id : f.type === 'folder' && !modes.isProject(folderById(f.id)) ? f.id : null,
+      tags: f.type === 'tag' ? [...f.tags] : [],
+      format: state.mode === 'coding' && !isCode(p.format) ? (isCode(p.codeLang) ? p.codeLang : 'python') : p.format,
+      meta: { ...writing.newNoteMeta(p), kind: state.mode, origin: { id: device().id, name: device().name } },
+    });
   writing.resetView();
   if (view().hidden.includes(device().id)) setPrefs({ view: { ...view(), hidden: view().hidden.filter((x) => x !== device().id) } });
   replaceNote(note);
@@ -1255,7 +1281,7 @@ function renderViewDialog() {
   $('view-dir').value = v.dir;
   $('view-devices-wrap').hidden = !all;
   const devs = knownDevices();
-  if (state.notes.some((n) => !n.deleted && !isRegistry(n) && !originOf(n)) && !devs.some((d) => d.id === UNKNOWN.id)) {
+  if (state.notes.some((n) => !n.deleted && !isHidden(n) && !originOf(n)) && !devs.some((d) => d.id === UNKNOWN.id)) {
     devs.push({ ...UNKNOWN, count: activeNotes().filter((n) => !originOf(n)).length, mine: false });
   }
   $('view-devices').innerHTML = devs.map((d) =>
@@ -1298,7 +1324,7 @@ async function renameDevice(name) {
 async function offerDeviceSetup() {
   const key = `${KEY}deviceAsked`;
   try { if (localStorage.getItem(key)) return; } catch { return; }
-  const n = state.notes.filter((x) => !x.deleted && !x.locked && !isRegistry(x) && !originOf(x)).length;
+  const n = state.notes.filter((x) => !x.deleted && !x.locked && !isHidden(x) && !originOf(x)).length;
   if (!n) return;
   const me = device();
   const r = await ask({
@@ -1401,6 +1427,118 @@ const isCodingFolder = (folderId) => modes.isProject(folderById(folderId), 'codi
 function registryOf(folderId) {
   const list = registryNotes(folderId).map((n) => n.meta);
   return isCodingFolder(folderId) ? codeIntel.mergeProjectData(list) : story.mergeRegistries(list);
+}
+
+// ---- Bible: highlights and Bible notes --------------------------------------------
+// A highlight is one hidden record per verse (meta.highlight = {book, c, v, version, color}) that
+// syncs like a note; its text is a copy of the verse, kept so the Highlights list can show it. The
+// scripture itself is never edited. Verses highlighted in a row with the same colour are listed
+// together, and a highlight shows in every translation.
+const hlKey = (h) => `${h.book}:${h.c}:${h.v}`;
+const liveHighlights = () => state.notes.filter((n) => !n.deleted && !n.locked && isHighlight(n));
+function highlightMap() {
+  const m = new Map();
+  for (const n of liveHighlights()) {
+    const k = hlKey(n.meta.highlight);
+    const had = m.get(k);
+    if (!had || had.note.updated_at < n.updated_at) m.set(k, { color: bible.hlColor(n.meta.highlight.color), note: n });
+  }
+  return m;
+}
+function highlightGroups() {
+  const order = (b) => { const i = bible.ORDER.indexOf(b); return i < 0 ? 999 : i; };
+  const list = [...highlightMap().values()].map((x) => x.note)
+    .sort((a, b) => { const x = a.meta.highlight; const y = b.meta.highlight; return order(x.book) - order(y.book) || x.c - y.c || x.v - y.v; });
+  const out = [];
+  for (const n of list) {
+    const h = n.meta.highlight;
+    const last = out[out.length - 1];
+    const lh = last && last.notes[last.notes.length - 1].meta.highlight;
+    if (lh && lh.book === h.book && lh.c === h.c && lh.v + 1 === h.v && bible.hlColor(lh.color) === bible.hlColor(h.color)) last.notes.push(n);
+    else out.push({ notes: [n] });
+  }
+  return out;
+}
+// verses: [{book, c, v, version, text, label}]. color: a colour name, or null to remove.
+async function setHighlight(verses, color) {
+  const have = highlightMap();
+  for (const x of verses) {
+    const k = hlKey(x);
+    const old = have.get(k)?.note;
+    // Every copy of this verse's highlight (two devices may have made one each).
+    const copies = liveHighlights().filter((n) => hlKey(n.meta.highlight) === k);
+    if (!color) { for (const n of copies) await dropNote(n); continue; }
+    if (old) {
+      if (old.meta.highlight.color !== color) replaceNote(await db.saveNote(old, { meta: { ...old.meta, highlight: { ...old.meta.highlight, color } } }));
+      for (const n of copies.filter((c) => c.id !== old.id)) await dropNote(n);
+      continue;
+    }
+    replaceNote(await db.createNote({ body: x.text || x.label, meta: { highlight: { book: x.book, c: x.c, v: x.v, version: x.version, color, label: x.label }, origin: { id: device().id, name: device().name } } }));
+  }
+  log.info('bible', color ? 'Verses highlighted' : 'Highlights removed', { verses: verses.length, color });
+  renderSidebar();
+  if (state.filter.type === 'highlights') renderList();
+  scheduleSync();
+}
+function renderHighlights() {
+  const groups = highlightGroups();
+  if (!groups.length) {
+    el.noteList.innerHTML = '<li class="list-empty">No highlights yet. While reading the Bible, pick verses and choose a colour.</li>';
+    return;
+  }
+  el.noteList.innerHTML = groups.map((g) => {
+    const first = g.notes[0].meta.highlight;
+    const last = g.notes[g.notes.length - 1].meta.highlight;
+    const name = (first.label || '').replace(/\s+\d+:\d+.*$/, '') || first.book;
+    const ref = first.v === last.v ? `${name} ${first.c}:${first.v}` : `${name} ${first.c}:${first.v}–${last.v}`;
+    const ids = g.notes.map((n) => n.id).join(',');
+    const text = g.notes.map((n) => n.body).join(' ');
+    const color = bible.hlColor(first.color);
+    return `<li class="hl-item hl-${color}" data-ids="${ids}" data-ref="${esc(first.book)}:${first.c}:${first.v}:${last.v}" data-version="${esc(first.version || '')}">
+      <div class="hl-head"><button type="button" class="hl-ref" data-hl="open">${esc(ref)}</button><span class="hl-ver">${esc(bible.version(first.version).short)}</span><span class="spacer"></span>
+      <button type="button" class="icon-btn hl-remove" data-hl="remove" aria-label="Remove this highlight" title="Remove this highlight"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>
+      <p class="hl-text">${esc(text)}</p>
+      <div class="hl-palette" role="group" aria-label="Colour">${bible.highlightPalette(color, 'data-hl="color" ')}</div>
+    </li>`;
+  }).join('');
+}
+async function highlightAction(e) {
+  const item = e.target.closest('.hl-item');
+  if (!item) return false;
+  const act = e.target.closest('[data-hl]')?.dataset.hl || 'open';
+  const notes = item.dataset.ids.split(',').map((id) => state.notes.find((n) => n.id === id)).filter(Boolean);
+  const verses = notes.map((n) => n.meta.highlight);
+  if (act === 'remove') await setHighlight(verses, null);
+  else if (act === 'color') await setHighlight(verses, e.target.closest('[data-color]').dataset.color);
+  else {
+    const [book, c, v1, v2] = item.dataset.ref.split(':');
+    await bibleUi.open({ version: item.dataset.version || null, at: { book, c1: +c, v1: +v1, c2: +c, v2: +v2 } });
+  }
+  return true;
+}
+// A Bible note for a passage, opened beside the reader on a computer (alone on a phone).
+async function takeBibleNotes(passage, title) {
+  await flushSave();
+  if (state.currentId) await discardIfBlank(state.currentId);
+  const p = prefs();
+  const note = await db.createNote({ format: isCode(p.format) ? 'markdown' : p.format, meta: { ...writing.newNoteMeta(p), kind: modes.BIBLE, title, passage, origin: { id: device().id, name: device().name } } });
+  replaceNote(note);
+  writing.resetView();
+  state.query = '';
+  el.search.value = '';
+  state.filter = { type: 'biblenotes' };
+  state.currentId = note.id;
+  log.info('bible', 'Bible note started', { passage: passage.label });
+  render();
+  setMobileView('editor');
+  scheduleSync();
+  return note;
+}
+async function openPassage() {
+  const pass = currentNote()?.meta?.passage;
+  if (!pass) return;
+  await flushSave();
+  await bibleUi.open({ version: pass.version || null, at: pass, side: !isPhone() });
 }
 
 async function dropNote(n) {
@@ -2265,6 +2403,7 @@ function bindEvents() {
 
   let longPressed = false;
   el.noteList.addEventListener('click', (e) => {
+    if (e.target.closest('.hl-item')) { highlightAction(e); return; }
     const item = e.target.closest('.note-item');
     if (!item) return;
     if (swipeClick(e, item)) return;
@@ -2287,6 +2426,7 @@ function bindEvents() {
   for (const id of ['btn-bible-toggle', 'btn-bible-chevron']) $(id).addEventListener('click', () => { setPrefs({ bibleOpen: prefs().bibleOpen === false }); renderSidebar(); });
   const openVersion = (li) => { if (!li) return; if (bibleUi.isOpen()) bibleUi.switchVersion(li.dataset.bible); else bibleUi.open({ version: li.dataset.bible }); };
   $('bible-list').addEventListener('click', (e) => openVersion(e.target.closest('[data-bible]')));
+  $('btn-passage').addEventListener('click', openPassage);
   $('bible-list').addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openVersion(e.target.closest('[data-bible]')); } });
   // Settings › Formatting › Search online with
   $('pref-search-site').innerHTML = bible.SEARCH_SITES.map((x) => `<option value="${x.id}">${esc(x.name)}</option>`).join('');
@@ -2625,9 +2765,14 @@ const hooks = {
   notesIn: (folderId, mode = 'storyboard') => activeNotes().filter((n) => n.folder_id === folderId && !n.locked && modes.kindOf(n) === mode),
   openNote: async (id) => {
     const n = state.notes.find((x) => x.id === id);
-    if (n && !filteredNotes().some((x) => x.id === id)) { state.filter = { type: 'folder', id: n.folder_id }; state.query = ''; el.search.value = ''; }
+    if (n && !filteredNotes().some((x) => x.id === id)) { state.filter = modes.kindOf(n) === modes.BIBLE ? { type: 'biblenotes' } : { type: 'folder', id: n.folder_id }; state.query = ''; el.search.value = ''; }
     await selectNote(id);
   },
+  phone: () => isPhone(),
+  highlights: () => highlightMap(),
+  setHighlight: (verses, color) => setHighlight(verses, color),
+  takeNotes: (passage, title) => takeBibleNotes(passage, title),
+  sideBySide: () => renderList(),
   projects: (mode = 'research') => liveProjects(mode).map((f) => ({ id: f.id, name: modes.projectName(f) })),
   projectNotes: (folderId, mode = 'research') => activeNotes().filter((n) => n.folder_id === folderId && !n.locked && modes.kindOf(n) === mode),
   updateNote: async (n, changes) => { replaceNote(await db.saveNote(n, changes)); render(); scheduleSync(); },
