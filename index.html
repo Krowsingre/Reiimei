@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-version="0.18.2">
+<html lang="en" data-version="0.18.3">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -47,10 +47,9 @@
         </div>
         <div class="side-section" id="bible-section">
           <div class="side-head">
-            <button class="side-head-label" id="btn-bible-toggle" aria-expanded="true" aria-controls="bible-list"><span>Bible</span></button>
-            <button class="side-head-icon side-head-chevron" id="btn-bible-chevron" aria-expanded="true" aria-controls="bible-list" aria-label="Show or hide the Bible"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+            <button class="side-head-label" id="btn-bible-toggle" title="The Bible page: reading, bookmarks, notes and highlights"><span>Bible</span></button>
+            <button class="side-head-icon side-head-chevron bible-go" id="btn-bible-chevron" aria-label="Open the Bible page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
           </div>
-          <ul class="side-list" id="bible-list"></ul>
         </div>
         <div class="side-section" id="tag-section">
           <div class="side-head">
@@ -718,6 +717,7 @@
   <div class="bible-view" id="bible-view" role="dialog" aria-label="Bible" hidden>
     <header class="bible-head">
       <button type="button" class="icon-btn" id="bible-close" aria-label="Close the Bible"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+      <button type="button" class="icon-btn" id="bible-books" aria-label="Books" title="Books"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/></svg></button>
       <select id="bible-version" aria-label="Translation"></select>
       <select id="bible-book" aria-label="Book"></select>
       <select id="bible-chapter" aria-label="Chapter"></select>
@@ -733,6 +733,7 @@
       <button type="button" class="text-btn" id="bible-unhl" hidden>Remove highlight</button>
       <span class="spacer"></span>
       <button type="button" class="text-btn" id="bible-clear">Clear</button>
+      <button type="button" class="btn" id="bible-mark">Bookmark</button>
       <button type="button" class="btn" id="bible-take">Take notes</button>
       <button type="button" class="btn" id="bible-copy">Copy</button>
       <button type="button" class="btn primary" id="bible-insert">Put in note</button>

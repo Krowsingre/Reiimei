@@ -1169,8 +1169,8 @@ export function init(hooks) {
   $('btn-insert-menu').addEventListener('click', (e) => {
     const sec = e.currentTarget.closest('.rb-sec');
     const items = [...sec.querySelectorAll('.tool:not(.insert-menu)')].filter((b) => !b.hidden).map((b) => ({
-      label: { quote: 'Quote', code: 'Code', link: 'Link…' }[b.dataset.tool] || (b.id === 'btn-quote' ? 'Quote a source…' : b.id === 'btn-sources' || b.id === 'btn-scripture' || b.id === 'btn-lookup' || b.id === 'btn-websearch' ? `${b.textContent.trim()}…` : b.textContent.trim()),
-      hint: b.dataset.tool === 'quote' ? 'A quoted passage' : b.dataset.tool === 'code' ? 'Code in the text' : b.id === 'btn-sources' ? 'Add sources and cite them' : b.id === 'btn-scripture' ? 'A Bible passage' : b.id === 'btn-lookup' ? 'The selected words, in every translation' : b.id === 'btn-websearch' ? 'The selected words, on the web' : '',
+      // Just the names: no descriptions under them and no "…" after them.
+      label: { quote: 'Quote', code: 'Code', link: 'Link' }[b.dataset.tool] || (b.id === 'btn-quote' ? 'Quote a source' : b.textContent.trim().replace(/…$/, '')),
       disabled: b.disabled,
       run: () => b.click(),
     }));

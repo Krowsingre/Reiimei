@@ -1,8 +1,22 @@
-# Reiimei v0.18.2
+# Reiimei v0.18.3
 
 *reiimei* (ree-h-may), n. The cold, luminous stillness peculiar to a clear winter night; especially the effect of moonlight upon frost, illuminating the night without dispelling it.
 
 An offline-first notes app for Windows and iPhone, built as a Progressive Web App (PWA). No Mac, no App Store, no developer fee.
+
+## What changed in v0.18.3
+
+- **The Bible page.** The Bible heading in the sidebar now has a right-pointing chevron, and it is there in every mode. Clicking **Bible** or the chevron opens the Bible page:
+  - **Bible**: **Open the Bible** (or **Continue reading**), **Books**, a button for each translation, and **Bookmarks**. The place you last read comes first in Bookmarks, marked "Last read".
+  - **Notes**: your Bible notes. With the Bible page open, the new-note button starts a Bible note.
+  - **Highlights**: your highlights, each with its colours and ×.
+- **Opening the Bible** takes you to where you last read (at the verse that was at the top) or, if you haven't read anything yet, to the list of books. The new **Books** button at the top of the reader shows the books (Old and New Testament), then a book's chapters. The book menu opens the chapter list too, and a one-chapter book opens straight away.
+- **Bookmarks.** In the reader, **Bookmark** bookmarks the picked verses (it's in the bar) or the whole chapter (it's beside the chapter heading). Bookmarks sync like notes; × on the Bible page removes one.
+- **Bible notes show only on the Bible page and in All modes** (and in search), not in Notes, Research, Coding or Storyboard. This undoes v0.18.2's change.
+- **Refresh stays in place.** Reloading the page brings back the same list, note and screen, and the Bible if it was open (side by side included). A new tab or window, or opening the app afresh, starts on the home screen as before.
+- **The Insert menu** shows just the names: no descriptions under them and no "…".
+- Still 98 files. No Supabase changes.
+- **Upload these files** (changed since v0.18.2): `app.js`, `index.html`, `styles.css`, `sw.js`, `ui-bible.js`, `ui-writing.js`, `README.md`.
 
 ## What changed in v0.18.2
 
@@ -452,9 +466,9 @@ Then open http://localhost:8000 in Edge or Chrome. Notes work immediately, saved
 
 The iPhone needs an HTTPS address. GitHub Pages hosts the app for free. Only the app's code goes to GitHub; your notes never do.
 
-1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.18.2` folder.
+1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.18.3` folder.
 2. **Create the repository.** In Safari, sign in at github.com, tap **+** › **New repository**. Name it `reiimei`, set it to **Public** (free Pages needs a public repository), and tap **Create repository**.
-3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.18.2` folder, tap **Select**, select all 98 files, and tap **Open**. Scroll down and tap **Commit changes**.
+3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.18.3` folder, tap **Select**, select all 98 files, and tap **Open**. Scroll down and tap **Commit changes**.
    - If you don't see the upload link, tap the **aA** button in Safari's address bar › **Request Desktop Website** and try again.
 4. **Turn on Pages.** In the repository, open **Settings** › **Pages**. Under **Build and deployment**, set Source to **Deploy from a branch**, Branch to **main** and **/ (root)**, then tap **Save**.
 5. **Wait a minute or two**, then reload the Pages screen. It shows your address, which looks like `https://yourname.github.io/reiimei/`.
@@ -593,7 +607,7 @@ The service worker caches the app files. When you change any file, bump `VERSION
 - **Settings › Log** › Download gives a text log of everything the app did, including sync results and errors.
 - **"Test connection"** in Settings › Sync confirms the URL, key, sign-in, and tables are all correct.
 
-## Known limits in v0.18.2
+## Known limits in v0.18.3
 
 - Images can be linked but not attached
 - Sources belong to one note; there is no shared library yet

@@ -31,8 +31,9 @@ async function ensure(v) {
   }
 }
 
-// at: a passage to show ({book, c1, v1, c2, v2, whole}); side: beside the open note (computer only).
-export async function open({ insert = false, version = null, query = '', at: go = null, side = null } = {}) {
+// at: a passage to show ({book, c1, v1, c2, v2, whole}); side: beside the open note (computer only);
+// books: the list of books. Otherwise the Bible opens where you last read, or on the list of books.
+export async function open({ insert = false, version = null, query = '', at: go = null, side = null, books = false } = {}) {
   const view = $('bible-view');
   view.hidden = false;
   setSide(side === null ? isSide() : side);
@@ -42,18 +43,20 @@ export async function open({ insert = false, version = null, query = '', at: go 
   if (!(await ensure(ver))) return;
   fillVersions();
   fillBooks();
-  if (last && B.book(last.book, ver)) at = { book: last.book, c: Math.min(last.c, B.book(last.book, ver).c.length) };
+  const hasLast = !!(last && B.book(last.book, ver));
+  if (hasLast) at = { book: last.book, c: Math.min(last.c, B.book(last.book, ver).c.length) };
   $('bible-insert').hidden = !canInsert();
   if (go && B.book(go.book, ver)) {
     picked.clear();
     if (!go.whole) for (const x of B.passage(go, ver)) picked.add(key(x.book, x.c, x.v));
     showChapter(go.book, Math.min(go.c1, B.book(go.book, ver).c.length), { scroll: go.whole ? null : go.v1 });
-  } else if (query) { $('bible-search').value = query; await runSearch(); } else showChapter(at.book, at.c);
+  } else if (query) { $('bible-search').value = query; await runSearch(); } else if (books || !hasLast) showBooks(); else showChapter(at.book, at.c, { scroll: last.v > 1 ? last.v : null });
   if (insert || query) $('bible-search').focus();
   app.onBible?.();
 }
 
 export function close() {
+  keepPlace();
   $('bible-view').hidden = true;
   delete document.documentElement.dataset.bible;
   app.sideBySide?.();
@@ -117,13 +120,13 @@ export function showChapter(id, c, { scroll = null } = {}) {
   if (!b) return;
   at = { book: id, c };
   shown = 'chapter';
-  app.setPrefs({ bibleAt: { ...at, version: ver } });
+  app.setPrefs({ bibleAt: { ...at, version: ver, label: `${b.name} ${c}`, v: scroll || 1 } });
   $('bible-book').value = id;
   fillChapters(id);
   $('bible-chapter').value = String(c);
   const list = b.c[c - 1];
   marks = app.highlights();
-  let html = `<div class="bible-chapter-head"><h2 class="bible-chapter-title">${esc(b.name)} ${c} <span class="bible-ver">${esc(B.version(ver).short)}</span></h2><button type="button" class="text-btn" id="bible-chapter-notes">Take notes</button></div>`;
+  let html = `<div class="bible-chapter-head"><h2 class="bible-chapter-title">${esc(b.name)} ${c} <span class="bible-ver">${esc(B.version(ver).short)}</span></h2><span class="bible-chapter-acts"><button type="button" class="text-btn" id="bible-chapter-mark">Bookmark</button><button type="button" class="text-btn" id="bible-chapter-notes">Take notes</button></span></div>`;
   let open = false;
   const closeBlock = () => { if (open) { html += '</p>'; open = false; } };
   list.forEach((item, i) => {
@@ -149,6 +152,34 @@ export function showChapter(id, c, { scroll = null } = {}) {
   renderBar();
 }
 
+// The last place read is kept (with the verse at the top) as the Bible page's "Last read".
+function keepPlace() {
+  if (shown !== 'chapter' || !isOpen()) return;
+  const b = B.book(at.book, ver);
+  app.setPrefs({ bibleAt: { ...at, version: ver, label: `${b.name} ${at.c}`, v: topVerse() || 1 } });
+}
+
+// The books, Old and New Testament; then a book's chapters.
+export function showBooks() {
+  shown = 'books';
+  const books = B.books(ver);
+  const grid = (list) => `<div class="bk-grid">${list.map((b) => `<button type="button" class="bk-btn" data-book="${b.id}">${esc(b.name)}</button>`).join('')}</div>`;
+  $('bible-body').innerHTML = `<h2 class="bible-chapter-title">Books <span class="bible-ver">${esc(B.version(ver).short)}</span></h2>`
+    + `<h3 class="bk-head">Old Testament</h3>${grid(books.slice(0, 39))}<h3 class="bk-head">New Testament</h3>${grid(books.slice(39))}`;
+  $('bible-body').scrollTop = 0;
+  renderBar();
+}
+function showChapters(id) {
+  const b = B.book(id, ver);
+  if (b.c.length === 1) { showChapter(id, 1); return; }
+  shown = 'chapters';
+  $('bible-body').innerHTML = `<h2 class="bible-chapter-title">${esc(b.name)} <span class="bible-ver">${esc(B.version(ver).short)}</span></h2>`
+    + `<div class="ch-grid">${b.c.map((_, i) => `<button type="button" class="ch-btn" data-chap="${id}:${i + 1}">${i + 1}</button>`).join('')}</div>`
+    + '<p><button type="button" class="text-btn" data-books>‹ All books</button></p>';
+  $('bible-body').scrollTop = 0;
+  renderBar();
+}
+
 // The first verse showing at the top, to keep the place when switching translation.
 function topVerse() {
   const body = $('bible-body');
@@ -164,6 +195,7 @@ export async function switchVersion(v) {
   fillVersions();
   fillBooks();
   if (shown === 'results' && lastQuery) showResults(lastQuery);
+  else if (shown === 'books' || shown === 'chapters') showBooks();
   else showChapter(at.book, Math.min(at.c, B.book(at.book, ver).c.length), { scroll: keep && keep > 1 ? keep : null });
   log.info('bible', 'Translation switched', { version: v });
 }
@@ -274,13 +306,24 @@ async function highlight(color) {
   app.toast(color ? 'Highlighted' : 'Highlight removed');
 }
 
-// Notes on the picked verses, or on the chapter when none are picked.
-async function takeNotes() {
+// A bookmark on the picked verses, or on the chapter when none are picked.
+function passageHere() {
   const r = shown === 'chapter' ? runs() : [];
   const b = B.book(at.book, ver);
-  const passage = r.length
+  return r.length
     ? { ...r[0], version: ver, label: r.map((x) => B.label(x, ver)).join('; ') }
     : { book: at.book, c1: at.c, v1: 1, c2: at.c, v2: b.c[at.c - 1].length, whole: true, version: ver, label: `${b.name} ${at.c}` };
+}
+async function bookmark() {
+  await app.addBookmark(passageHere());
+  picked.clear();
+  document.querySelectorAll('#bible-body .picked').forEach((x) => x.classList.remove('picked'));
+  renderBar();
+}
+
+// Notes on the picked verses, or on the chapter when none are picked.
+async function takeNotes() {
+  const passage = passageHere();
   const phone = app.phone();
   picked.clear();
   document.querySelectorAll('#bible-body .picked').forEach((x) => x.classList.remove('picked'));
@@ -316,8 +359,10 @@ export function init(hooks) {
   $('bible-colors').addEventListener('click', (e) => { const d = e.target.closest('[data-color]'); if (d) highlight(d.dataset.color); });
   $('bible-unhl').addEventListener('click', () => highlight(null));
   $('bible-take').addEventListener('click', takeNotes);
+  $('bible-mark').addEventListener('click', bookmark);
+  $('bible-books').addEventListener('click', showBooks);
   $('bible-version').addEventListener('change', (e) => switchVersion(e.target.value));
-  $('bible-book').addEventListener('change', (e) => showChapter(e.target.value, 1));
+  $('bible-book').addEventListener('change', (e) => showChapters(e.target.value));
   $('bible-chapter').addEventListener('change', (e) => showChapter(at.book, +e.target.value));
   let t = null;
   $('bible-search').addEventListener('input', () => { clearTimeout(t); t = setTimeout(runSearch, 300); });
@@ -325,6 +370,12 @@ export function init(hooks) {
   $('bible-body').addEventListener('click', (e) => {
     if (e.target.closest('#bible-online')) { searchOnline($('bible-search').value); return; }
     if (e.target.closest('#bible-chapter-notes')) { takeNotes(); return; }
+    if (e.target.closest('#bible-chapter-mark')) { bookmark(); return; }
+    if (e.target.closest('[data-books]')) { showBooks(); return; }
+    const bk = e.target.closest('[data-book]');
+    if (bk) { showChapters(bk.dataset.book); return; }
+    const ch = e.target.closest('[data-chap]');
+    if (ch) { const [b, c] = ch.dataset.chap.split(':'); showChapter(b, +c); return; }
     const go = e.target.closest('[data-go]');
     if (go) { const [b, c] = go.dataset.go.split(':'); showChapter(b, +c); return; }
     const note = e.target.closest('.bv-note');
