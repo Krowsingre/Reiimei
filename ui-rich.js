@@ -35,6 +35,7 @@ function inlineHtml(nodes) {
       case 'img': return esc(`![${n.alt}](${n.src})`);
       case 'emoji': return esc(`:${n.name}:`);
       case 'font': return `<span class="f-run" data-font="${esc(n.font)}">${inlineHtml(n.c)}</span>`;
+      case 'size': return `<span class="z-run" data-size="${esc(n.size)}">${inlineHtml(n.c)}</span>`;
       default: return TAG[n.t] ? `<${TAG[n.t]}>${inlineHtml(n.c)}</${TAG[n.t]}>` : '';
     }
   }).join('');
@@ -80,7 +81,7 @@ const KEEP = /(\[@[\w:-]+[^\]\n]*\]|https?:\/\/[^\s<>"]*[^\s<>"'.,:;!?)\]]|:[a-z
 function escText(s) {
   return s.split(KEEP).map((part, k) => (k % 2 ? part : part.replace(/([\\`*_[\]~^])/g, '\\$1').replace(/==/g, '\\==').replace(/\+\+/g, '\\++'))).join('');
 }
-function inlineMd(node, font = null) {
+function inlineMd(node, font = null, size = null) {
   let out = '';
   for (const n of node.childNodes) {
     if (n.nodeType === 3) { out += escText(n.nodeValue.replace(/\u00a0/g, ' ').replace(/\n/g, ' ')); continue; }
@@ -90,13 +91,21 @@ function inlineMd(node, font = null) {
     if (t === 'CODE') { out += n.textContent ? `\`${n.textContent.replace(/`/g, "'")}\`` : ''; continue; }
     if (t === 'SPAN' && n.dataset.font && /^[a-z][a-z0-9-]*$/.test(n.dataset.font)) {
       const f = n.dataset.font;
-      const inner = inlineMd(n, f);
+      const inner = inlineMd(n, f, size);
       if (!inner.trim() || f === font) { out += inner; continue; }
       const [, lead, core, trail] = /^(\s*)([\s\S]*?)(\s*)$/.exec(inner);
       out += `${lead}${font ? '[[/f]]' : ''}[[f:${f}]]${core}[[/f]]${font ? `[[f:${font}]]` : ''}${trail}`;
       continue;
     }
-    const inner = inlineMd(n, font);
+    if (t === 'SPAN' && /^(xs|s|m|l|xl|xxl)$/.test(n.dataset.size || '')) {
+      const z = n.dataset.size;
+      const inner = inlineMd(n, font, z);
+      if (!inner.trim() || z === size) { out += inner; continue; }
+      const [, lead, core, trail] = /^(\s*)([\s\S]*?)(\s*)$/.exec(inner);
+      out += `${lead}${size ? '[[/z]]' : ''}[[z:${z}]]${core}[[/z]]${size ? `[[z:${size}]]` : ''}${trail}`;
+      continue;
+    }
+    const inner = inlineMd(n, font, size);
     if (t === 'A') { const href = n.getAttribute('href') || ''; out += /^(https?:|mailto:)/i.test(href) && inner.trim() ? `[${inner}](${href})` : inner; continue; }
     let m = MARK[t];
     if (!m && t === 'SPAN') { const st = n.getAttribute('data-style') || ''; m = /font-weight:\s*(bold|[6-9]00)/i.test(st) ? '**' : /font-style:\s*italic/i.test(st) ? '*' : ''; }
@@ -109,7 +118,7 @@ function inlineMd(node, font = null) {
 }
 // A line of a paragraph that starts like a heading, list or quote is escaped to stay text.
 const escLineStart = (line) => (/^\s*([-*_])(\s*\1){2,}\s*$/.test(line) ? line.replace(/^(\s*)/, '$1\\') : line.replace(/^(\s*)(#|>|[-*+](?=\s)|\d+[.)](?=\s))/, '$1\\$2'));
-const dropEmptyRuns = (s) => s.replace(/\[\[f:[a-z][a-z0-9-]*\]\]\[\[\/f\]\]/g, '');
+const dropEmptyRuns = (s) => s.replace(/\[\[f:[a-z][a-z0-9-]*\]\]\[\[\/f\]\]/g, '').replace(/\[\[z:[a-z]+\]\]\[\[\/z\]\]/g, '');
 function paraParts(el) {
   // The last line break of a paragraph only holds the line open (the browser adds one after a
   // Shift+Enter at the end of a line), so one is dropped; any more are lines left empty on purpose.
@@ -605,6 +614,36 @@ export function applyFont(id, noteFont) {
   return true;
 }
 
+// A size on the selected words, as the Font menu does with a font ('m' is the note's own size).
+const sizeRun = (z) => { const el = document.createElement('span'); el.className = 'z-run'; el.dataset.size = z; return el; };
+export function applySize(z, noteSize = 'm') {
+  if (!active() || box.contentEditable !== 'true') return false;
+  restoreCaret();
+  if (!sel().rangeCount || sel().isCollapsed) return false;
+  tidyBlocks();
+  const texts = textsIn(sel().getRangeAt(0));
+  if (!texts.length) return false;
+  for (const t of texts) {
+    const run = t.parentElement;
+    if (run.matches('span.z-run')) {
+      const after = run.cloneNode(false);
+      let n = t.nextSibling;
+      while (n) { const next = n.nextSibling; after.appendChild(n); n = next; }
+      run.after(t);
+      if (after.childNodes.length) t.after(after);
+      if (!run.childNodes.length) run.remove();
+      if (z !== noteSize || t.parentElement.closest('span.z-run')) wrapText(t, () => sizeRun(z));
+    } else if (z !== noteSize || t.parentElement.closest('span.z-run')) {
+      wrapText(t, () => sizeRun(z));
+    }
+  }
+  mergeRuns('span.z-run', (a, b) => a.dataset.size === b.dataset.size);
+  selectTexts(texts);
+  saveCaret();
+  pushToBody();
+  return true;
+}
+
 export async function apply(id, { typing = false, tasks = true } = {}) {
   if (!active() || box.contentEditable !== 'true') return;
   restoreCaret();
@@ -961,6 +1000,33 @@ export function caretOffsets() {
   const r = s.rangeCount && inBox(s.anchorNode) ? s.getRangeAt(0) : savedRange && inBox(savedRange.startContainer) ? savedRange : null;
   if (!r) return null;
   return [offsetAt(r.startContainer, r.startOffset), offsetAt(r.endContainer, r.endOffset)];
+}
+// Whole blocks (a Bible passage) after the paragraph the caret is in; an empty line is replaced.
+export function insertBlocks(md) {
+  if (!active() || box.contentEditable !== 'true') return false;
+  restoreCaret();
+  const s = sel();
+  let top = s.rangeCount ? closest(s.anchorNode, 'p,div,h1,h2,h3,h4,h5,h6,blockquote,ul,ol,pre,hr') : null;
+  while (top && top.parentElement !== box) top = top.parentElement;
+  const tpl = document.createElement('template');
+  tpl.innerHTML = markdownToHtml(md);
+  const nodes = [...tpl.content.childNodes];
+  if (!nodes.length) return false;
+  const after = document.createElement('p');
+  after.appendChild(document.createElement('br'));
+  const blank = top && !top.textContent.trim() && !top.querySelector('hr,img');
+  if (blank) top.replaceWith(...nodes, after);
+  else if (top) top.after(...nodes, after);
+  else box.append(...nodes, after);
+  const r = document.createRange();
+  r.setStart(after, 0);
+  r.collapse(true);
+  s.removeAllRanges();
+  s.addRange(r);
+  savedRange = r.cloneRange();
+  pushToBody();
+  keepCaretVisible();
+  return true;
 }
 export function resume() { quiet = false; restoreCaret(); keepCaretVisible(); }
 export function setCaretOffsets(pair) {

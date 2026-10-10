@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-version="0.17.7">
+<html lang="en" data-version="0.17.9">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -198,12 +198,13 @@
               </div>
               <div class="rb-group">
                 <div class="rb-sec" data-sec="insert" data-label="Insert" hidden>
-                  <button type="button" class="tool insert-menu" id="btn-insert-menu" aria-haspopup="dialog" title="Insert a quote, code, a link or a citation">Add ▾</button>
+                  <button type="button" class="tool insert-menu" id="btn-insert-menu" aria-haspopup="dialog" aria-label="Insert" title="Insert a quote, code, a link or a citation"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span aria-hidden="true">▾</span></button>
                   <button class="tool" data-tool="quote" title="Quote" aria-label="Quote">❝</button>
                   <button class="tool" data-tool="code" title="Code" aria-label="Code">{ }</button>
                   <button class="tool" data-tool="link" title="Link" aria-label="Link">Link</button>
                   <button class="tool" id="btn-sources" title="Sources and citations">Sources</button>
                   <button class="tool research-only" id="btn-quote" title="Quote a source" hidden>Quote</button>
+                  <button class="tool" id="btn-scripture" title="Find a Bible passage and put it in the note">Scripture</button>
                 </div>
                 <div class="rb-sec" data-sec="view" data-label="View" hidden>
                   <button class="tool" id="btn-preview" aria-pressed="false" title="Preview">Preview</button>
@@ -255,6 +256,16 @@
                       <option value="serif">System serif</option>
                       <option value="sans">System sans-serif</option>
                     </optgroup>
+                  </select>
+                </label>
+                <label class="rb-row" id="note-size-row"><span>Size</span>
+                  <select id="note-size" aria-label="Text size: the selected words, or the whole note">
+                    <option value="xs">13</option>
+                    <option value="s">15</option>
+                    <option value="m">17 · normal</option>
+                    <option value="l">22</option>
+                    <option value="xl">26</option>
+                    <option value="xxl">35</option>
                   </select>
                 </label>
               </div>
@@ -309,6 +320,7 @@
         <button class="tool" id="spell-keep" title="Stop underlining this spelling in this project">Keep my spelling</button>
       </div>
       <div class="editor-area" id="editor-area">
+        <div class="word-count" id="word-count" aria-live="off" hidden></div>
         <div class="gutter" id="gutter" hidden aria-hidden="true"></div>
         <pre class="code-layer" id="code-layer" hidden aria-hidden="true"><code id="code-hl"></code></pre>
         <pre class="code-layer mark-layer" id="mark-layer" hidden aria-hidden="true"></pre>
@@ -563,6 +575,11 @@
           <p class="set-help">How citations and reference lists look. Each note can switch in Sources.</p>
         </div>
         <div class="set-row">
+          <label for="pref-counter">Word count</label>
+          <span><input type="checkbox" class="switch" id="pref-counter" role="switch"></span>
+          <p class="set-help">Show the number of words and characters in the bottom-left corner of a note. With text selected, it counts the selection.</p>
+        </div>
+        <div class="set-row">
           <label for="pref-brackets">Brackets</label>
           <span><input type="checkbox" class="switch" id="pref-brackets" role="switch"></span>
           <p class="set-help">Start new notes with Brackets on: [Verse 1], [Chorus] and other [labels] show as notes in the background. Each note can switch it in its toolbar.</p>
@@ -680,6 +697,24 @@
     </div>
     <menu><button class="btn" id="btn-versions-close">Close</button><button class="btn primary" id="btn-versions-restore" disabled>Restore this version</button></menu>
   </dialog>
+  <div class="bible-view" id="bible-view" role="dialog" aria-label="Bible" hidden>
+    <header class="bible-head">
+      <button type="button" class="icon-btn" id="bible-close" aria-label="Close the Bible"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+      <select id="bible-book" aria-label="Book"></select>
+      <select id="bible-chapter" aria-label="Chapter"></select>
+      <input type="search" id="bible-search" placeholder="John 3:16, or words" aria-label="Find a passage or words" autocomplete="off" autocapitalize="off" spellcheck="false">
+    </header>
+    <p class="bible-status" id="bible-status" role="status" hidden></p>
+    <div class="bible-body" id="bible-body"></div>
+    <div class="bible-bar" id="bible-bar" hidden>
+      <span class="bible-sel" id="bible-sel"></span>
+      <label class="bible-num"><input type="checkbox" id="bible-numbers" checked> Verse numbers</label>
+      <span class="spacer"></span>
+      <button type="button" class="text-btn" id="bible-clear">Clear</button>
+      <button type="button" class="btn" id="bible-copy">Copy</button>
+      <button type="button" class="btn primary" id="bible-insert">Put in note</button>
+    </div>
+  </div>
   <dialog id="tags-dialog" class="dialog tags-dialog" aria-labelledby="tags-title">
     <h3 id="tags-title">Tags</h3>
     <div id="tags-slot"></div>

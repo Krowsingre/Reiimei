@@ -1,8 +1,25 @@
-# Reiimei v0.17.7
+# Reiimei v0.17.9
 
 *reiimei* (ree-h-may), n. The cold, luminous stillness peculiar to a clear winter night; especially the effect of moonlight upon frost, illuminating the night without dispelling it.
 
 An offline-first notes app for Windows and iPhone, built as a Progressive Web App (PWA). No Mac, no App Store, no developer fee.
+
+## What changed in v0.17.9
+
+- **The Bible: the World English Bible (WEB), all 66 books, with its footnotes.** Choose **Bible** at the end of the mode menu to read it: pick a book and chapter, or type a reference ("John 3:16", "1 Cor 13:4–7", "Psalm 23") or words ("faith hope love"; put words in quotes to find them exactly as typed). Verse numbers are small, poetry keeps its lines, and † shows a footnote. Tap verses to pick them, then **Copy** or **Put in note**. The Bible is not a mode of notes, so it is not part of All modes.
+- **Scripture in any note.** **Insert › Scripture…** (computer) or **⋯ › Scripture…** (phone) opens the Bible to find a passage; **Put in note** adds it at the cursor as a quote with small verse numbers and the reference under it ("— John 3:16–17 (WEB)"). **Verse numbers** can be switched off first. Undo takes it back.
+- **Fetched once, offline afterwards.** The Bible's text (`bible-web.json`, 4.4 MB, much less over the network) is fetched the first time you open it on each device and kept there, separately from the app, so it works offline and app updates do not fetch it again.
+- The WEB is in the public domain (eBible.org); its text is used unchanged.
+- Three new files, `bible.js`, `ui-bible.js` and `bible-web.json`: 94 files now. No Supabase changes.
+- **Upload these files** (changed since v0.17.8): `app.js`, `bible-web.json` (new), `bible.js` (new), `index.html`, `styles.css`, `sw.js`, `ui-bible.js` (new), `ui-rich.js`, `ui-writing.js`, `README.md`.
+
+## What changed in v0.17.8
+
+- **Text size** (computer). A **Size** menu sits beside Font: with words selected it sizes those words; with nothing selected, the whole note. Six sizes, from 13 to 35, with 17 as normal. Undo takes a size back, and exports leave sizes out (as they do fonts set on selected words).
+- **The Insert menu's button** is an icon (＋ ▾), without "Add".
+- **A word and character count** in the bottom-left corner of a note, in small, quiet type: words and characters (spaces included). With text selected it counts the selection ("2 of 4 words"). **Settings › Formatting › Word count** turns it off and on.
+- Still 91 files. No Supabase changes.
+- **Upload these files** (changed since v0.17.7): `app.js`, `format.js`, `history.js`, `index.html`, `styles.css`, `sw.js`, `ui-rich.js`, `ui-writing.js`, `README.md`.
 
 ## What changed in v0.17.7
 
@@ -371,6 +388,9 @@ Note: a device still on v0.7 would show the hidden cache record in Recently Dele
 | `fonts.js` | The list of fonts for the Font menu and the interface font setting |
 | `capitals.js` | The Aa button: capitals at the start of lines and sentences, or all lowercase |
 | `typingcheck.js` | Settings › Log › Typing check: records what a phone's keyboard does, for fixing typing problems |
+| `bible.js` | The Bible (WEB): fetching it once, references and word search |
+| `ui-bible.js` | The Bible reader, and putting passages in notes |
+| `bible-web.json` | The text of the World English Bible (public domain), fetched when the Bible is first opened |
 | `history.js` | One Undo and Redo for every change to a note: text, formatting, fonts, spacing and Brackets |
 | `versions.js` | Versions: earlier copies of each note, kept on this device, with Restore |
 | `channel.js` | Tells the live app from a beta copy, so each keeps its own notes and settings on a device |
@@ -403,9 +423,9 @@ Then open http://localhost:8000 in Edge or Chrome. Notes work immediately, saved
 
 The iPhone needs an HTTPS address. GitHub Pages hosts the app for free. Only the app's code goes to GitHub; your notes never do.
 
-1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.17.7` folder.
+1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.17.9` folder.
 2. **Create the repository.** In Safari, sign in at github.com, tap **+** › **New repository**. Name it `reiimei`, set it to **Public** (free Pages needs a public repository), and tap **Create repository**.
-3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.17.7` folder, tap **Select**, select all 91 files, and tap **Open**. Scroll down and tap **Commit changes**.
+3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.17.9` folder, tap **Select**, select all 94 files, and tap **Open**. Scroll down and tap **Commit changes**.
    - If you don't see the upload link, tap the **aA** button in Safari's address bar › **Request Desktop Website** and try again.
 4. **Turn on Pages.** In the repository, open **Settings** › **Pages**. Under **Build and deployment**, set Source to **Deploy from a branch**, Branch to **main** and **/ (root)**, then tap **Save**.
 5. **Wait a minute or two**, then reload the Pages screen. It shows your address, which looks like `https://yourname.github.io/reiimei/`.
@@ -544,7 +564,7 @@ The service worker caches the app files. When you change any file, bump `VERSION
 - **Settings › Log** › Download gives a text log of everything the app did, including sync results and errors.
 - **"Test connection"** in Settings › Sync confirms the URL, key, sign-in, and tables are all correct.
 
-## Known limits in v0.17.7
+## Known limits in v0.17.9
 
 - Images can be linked but not attached
 - Sources belong to one note; there is no shared library yet

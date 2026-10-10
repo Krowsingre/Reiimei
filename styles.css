@@ -1503,3 +1503,72 @@ input.switch:disabled { opacity: .5; cursor: default; }
   .fp-spacing { display: grid; grid-template-columns: 28px 1fr 44px; align-items: center; gap: 10px; color: var(--ink-2); }
   .fp-spacing input { width: 100%; accent-color: var(--accent); }
 }
+
+/* ---- v0.17.8: text size, the word and character count ---- */
+#editor[data-size="xs"] :is(.rich, .preview, #body, .bracket-layer) { font-size: 13px; }
+#editor[data-size="s"] :is(.rich, .preview, #body, .bracket-layer) { font-size: 15px; }
+#editor[data-size="l"] :is(.rich, .preview, #body, .bracket-layer) { font-size: 22px; }
+#editor[data-size="xl"] :is(.rich, .preview, #body, .bracket-layer) { font-size: 26px; }
+#editor[data-size="xxl"] :is(.rich, .preview, #body, .bracket-layer) { font-size: 35px; }
+.z-run[data-size="xs"] { font-size: .75em; }
+.z-run[data-size="s"] { font-size: .86em; }
+.z-run[data-size="m"] { font-size: 1em; }
+.z-run[data-size="l"] { font-size: 1.25em; }
+.z-run[data-size="xl"] { font-size: 1.5em; }
+.z-run[data-size="xxl"] { font-size: 2em; }
+@media (min-width: 761px) {
+  /* Font and Size share one box, so Options still fits beside Format & Font. */
+  .rb-box[data-box="Font"] { gap: 6px; }
+  .rb-box[data-box="Font"] select#note-font { width: 124px; }
+  .rb-box[data-box="Font"] #note-size-row { flex: 0 0 auto; }
+  .rb-box[data-box="Font"] select#note-size { width: 58px; }
+  .rb-box[data-box="Format"] select { width: 106px; }
+  .rb-line[data-line="note"]:not(.closed) { margin-right: 12px; }
+}
+.word-count {
+  position: absolute; left: 14px; bottom: 8px; z-index: 3; pointer-events: none;
+  padding: 2px 8px; border-radius: 999px; background: color-mix(in srgb, var(--sheet) 85%, transparent);
+  color: var(--ink-3); font: 500 11.5px/1.5 var(--ui); letter-spacing: .02em; font-variant-numeric: tabular-nums;
+}
+.word-count[hidden] { display: none; }
+.insert-menu svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+.insert-menu span { margin-left: 2px; font-size: 10px; }
+
+/* ---- v0.17.9: the Bible (WEB) ---- */
+.bible-view { position: fixed; inset: 0; z-index: 40; display: flex; flex-direction: column; background: var(--sheet); color: var(--ink); top: var(--vvt, 0px); height: var(--vvh, 100dvh); }
+.bible-view[hidden] { display: none; }
+.bible-head { display: flex; align-items: center; gap: 8px; padding: 10px 14px; padding-top: calc(10px + env(safe-area-inset-top)); border-bottom: 1px solid var(--rule); }
+.bible-head select { font: inherit; font-size: 14px; padding: 6px 8px; border: 1px solid var(--rule); border-radius: 8px; background: var(--paper); color: var(--ink); max-width: 40vw; }
+.bible-head input { flex: 1; min-width: 0; font: inherit; font-size: 15px; padding: 7px 10px; border: 1px solid var(--rule); border-radius: 10px; background: var(--paper); color: var(--ink); }
+.bible-status { margin: 0; padding: 14px 18px; color: var(--ink-2); }
+.bible-body { flex: 1; overflow-y: auto; padding: 18px max(20px, calc((100% - 720px) / 2)) 30vh; font: 18px/1.65 var(--note-font, Georgia, serif); }
+.bible-chapter-title { font: 700 22px/1.3 var(--head-font, var(--ui)); margin: 0 0 14px; }
+.bible-title { font-style: italic; color: var(--ink-2); margin: 14px 0 6px; }
+.bible-p { margin: 0 0 .6em; }
+.bible-p.gap { margin-top: 1em; }
+.bible-q { margin: 0; padding-left: 1.4em; text-indent: -1em; }
+.bible-q.q2, .bv-indent { padding-left: 2.4em; }
+.bv-indent { display: inline-block; width: 1.4em; padding: 0; }
+.bv { border-radius: 4px; cursor: pointer; }
+.bv.picked { background: var(--accent-soft); box-shadow: 0 0 0 2px var(--accent-soft); }
+.bv-n { font: 600 .62em/1 var(--ui); color: var(--ink-3); margin-right: 3px; vertical-align: super; }
+.bv-note { border: 0; background: none; color: var(--accent); font-size: .8em; padding: 0 2px; cursor: pointer; vertical-align: super; }
+.bv-note-text { display: block; margin: 4px 0 8px; padding: 8px 10px; border-left: 3px solid var(--rule); background: var(--paper); color: var(--ink-2); font: 14px/1.5 var(--ui); }
+.bible-nav { display: flex; justify-content: space-between; gap: 10px; margin: 28px 0 10px; }
+.bible-credit { color: var(--ink-3); font: 12px var(--ui); margin-top: 18px; }
+.bible-count { color: var(--ink-2); font: 13px var(--ui); margin: 0 0 10px; }
+.bible-hit { display: block; width: 100%; text-align: left; border: 0; border-bottom: 1px solid var(--rule); background: none; color: inherit; padding: 10px 2px; font: inherit; font-size: 16px; cursor: pointer; }
+.bible-hit.picked { background: var(--accent-soft); }
+.bh-ref { display: block; font: 600 12.5px var(--ui); color: var(--accent); margin-bottom: 2px; }
+.bible-hit mark { background: var(--gold-soft); color: inherit; border-radius: 3px; }
+.bible-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 14px calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid var(--rule); background: var(--paper); }
+.bible-bar[hidden] { display: none; }
+.bible-sel { font: 600 13.5px var(--ui); }
+.bible-num { font-size: 13px; color: var(--ink-2); display: inline-flex; gap: 5px; align-items: center; }
+@media (max-width: 760px) {
+  .bible-head { gap: 6px; padding-left: 8px; padding-right: 10px; }
+  .bible-head #bible-book { max-width: 30vw; }
+  .bible-head #bible-chapter { max-width: 16vw; }
+  .bible-head input { min-width: 110px; font-size: 16px; }
+  .bible-body { padding-left: 18px; padding-right: 18px; }
+}

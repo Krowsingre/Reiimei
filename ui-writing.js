@@ -115,6 +115,11 @@ export function renderToolbar(note) {
   const fs = $('note-font');
   $('note-font-row').hidden = code;
   $('note-font-box').hidden = code;
+  $('note-size-row').hidden = code;
+  $('note-size').value = note.meta?.size || 'm';
+  $('note-size').disabled = ro;
+  if ($('editor').dataset.size !== (note.meta?.size || 'm')) $('editor').dataset.size = note.meta?.size || 'm';
+  renderCount();
   fs.disabled = ro;
   fonts.fillFontSelect(fs, { hidden: app.prefs().hiddenFonts || [], current: fonts.fontId(note.meta?.font) });
   rich.render(note);
@@ -130,6 +135,7 @@ export function renderToolbar(note) {
   if (code || ro) setFormatOpen(false);
   else if (!$('fmt-panel').hidden) renderFormatPane();
   $('btn-text-find').hidden = code;
+  $('btn-scripture').hidden = code;
   if (tf.open) { if (code || note.deleted) closeTextFind({ focus: false }); else if (lastFindNote !== note.id) { tf.cur = -1; refreshTextFind(false); } }
   lastFindNote = note.id;
   // The phone's bar shows what applies to this note.
@@ -195,6 +201,47 @@ function spacingInput() {
   applySpacing(app.note(), v);
   clearTimeout(spacingTimer);
   spacingTimer = setTimeout(() => { const n = app.note(); if (n) app.update({ meta: { ...(n.meta || {}), lh: v.lh, ls: v.ls, ws: v.ws } }); }, 300);
+}
+
+// A Bible passage (or any Markdown blocks) put in the note at the caret, as its own paragraphs.
+export function insertBlocks(md) {
+  const note = app.note();
+  if (!note || note.deleted || isCodeNote(note)) return false;
+  if (rich.active()) return rich.insertBlocks(md);
+  const ta = $('body');
+  const at = ta.selectionEnd;
+  const lineEnd = ta.value.indexOf('\n', at) < 0 ? ta.value.length : ta.value.indexOf('\n', at);
+  const before = ta.value.slice(0, lineEnd);
+  const sep = before.trim() ? '\n\n' : '';
+  const text = `${sep}${md}\n\n`;
+  ta.focus();
+  applyEdit(ta, before + text + ta.value.slice(lineEnd), lineEnd + text.length, lineEnd + text.length);
+  return true;
+}
+
+// ---- The word and character count ------------------------------------------------------------
+// Words and characters (spaces included, line breaks not), of the selection when there is one.
+const fmtN = (n) => n.toLocaleString();
+function countOf(text) {
+  const t = text.replace(/\r?\n/g, '');
+  return { words: (text.match(/[\p{L}\p{N}][\p{L}\p{N}'’_-]*/gu) || []).length, chars: t.length };
+}
+export function renderCount() {
+  const el = $('word-count');
+  const note = app.note();
+  const on = !!note && app.prefs().counter !== false;
+  if (el.hidden === on) el.hidden = !on;
+  if (!on) return;
+  let all;
+  try { all = isCodeNote(note) ? $('body').value : (rich.active() ? $('rich').innerText : S.plainText({ ...note, body: $('body').value, meta: note.meta || {} }, {})); } catch { all = $('body').value; }
+  const total = countOf(all);
+  let part = null;
+  if (rich.active()) { const s = getSelection(); if (s.rangeCount && !s.isCollapsed && $('rich').contains(s.anchorNode)) part = countOf(s.toString()); }
+  else { const ta = $('body'); if (document.activeElement === ta && ta.selectionEnd > ta.selectionStart) part = countOf(ta.value.slice(ta.selectionStart, ta.selectionEnd)); }
+  const w = (n) => `${fmtN(n)} ${n === 1 ? 'word' : 'words'}`;
+  const c = (n) => `${fmtN(n)} ${n === 1 ? 'character' : 'characters'}`;
+  const text = part ? `${fmtN(part.words)} of ${w(total.words)} · ${fmtN(part.chars)} of ${c(total.chars)}` : `${w(total.words)} · ${c(total.chars)}`;
+  if (el.textContent !== text) el.textContent = text;
 }
 
 // ---- The phone's Format button -------------------------------------------------------------
@@ -1085,6 +1132,7 @@ export function init(hooks) {
     openTextFind(s && !s.includes('\n') ? s : '');
   });
   initFormatDock();
+  $('btn-scripture').addEventListener('click', () => app.openBible({ insert: true }));
   // The phone's bar: the everyday tools straight away, the rest under More.
   const bar = $('phone-bar');
   bar.addEventListener('pointerdown', (e) => { if (e.target.closest('button.pb') && (document.activeElement === $('body') || document.activeElement === $('rich'))) e.preventDefault(); });
@@ -1110,8 +1158,8 @@ export function init(hooks) {
   $('btn-insert-menu').addEventListener('click', (e) => {
     const sec = e.currentTarget.closest('.rb-sec');
     const items = [...sec.querySelectorAll('.tool:not(.insert-menu)')].filter((b) => !b.hidden).map((b) => ({
-      label: { quote: 'Quote', code: 'Code', link: 'Link…' }[b.dataset.tool] || (b.id === 'btn-quote' ? 'Quote a source…' : b.id === 'btn-sources' ? `${b.textContent.trim()}…` : b.textContent.trim()),
-      hint: b.dataset.tool === 'quote' ? 'A quoted passage' : b.dataset.tool === 'code' ? 'Code in the text' : b.id === 'btn-sources' ? 'Add sources and cite them' : '',
+      label: { quote: 'Quote', code: 'Code', link: 'Link…' }[b.dataset.tool] || (b.id === 'btn-quote' ? 'Quote a source…' : b.id === 'btn-sources' || b.id === 'btn-scripture' ? `${b.textContent.trim()}…` : b.textContent.trim()),
+      hint: b.dataset.tool === 'quote' ? 'A quoted passage' : b.dataset.tool === 'code' ? 'Code in the text' : b.id === 'btn-sources' ? 'Add sources and cite them' : b.id === 'btn-scripture' ? 'A Bible passage (WEB)' : '',
       disabled: b.disabled,
       run: () => b.click(),
     }));
@@ -1178,6 +1226,36 @@ export function init(hooks) {
   $('ed-heads').addEventListener('mousedown', (e) => { if (e.target.closest('.ed-head') && document.activeElement === $('rich')) e.preventDefault(); });
   // With words selected, the Font menu sets the font of those words only (Text and Markdown notes);
   // with nothing selected it sets the font of the whole note.
+  // Size: the selected words, or the whole note (as Font does).
+  $('note-size').addEventListener('change', async (e) => {
+    const note = app.note();
+    if (!note) return;
+    const z = e.target.value;
+    const own = note.meta?.size || 'm';
+    if (rich.active() && rich.hasSelection()) {
+      e.target.value = own;
+      if (rich.applySize(z, own)) app.toast('Size set for the selected text');
+      return;
+    }
+    const ta = $('body');
+    if (!rich.active() && note.format === 'markdown' && !isCodeNote(note) && ta.selectionEnd > ta.selectionStart) {
+      e.target.value = own;
+      const { selectionStart: a, selectionEnd: b } = ta;
+      const words = ta.value.slice(a, b);
+      applyEdit(ta, `${ta.value.slice(0, a)}[[z:${z}]]${words}[[/z]]${ta.value.slice(b)}`, a + z.length + 6, a + z.length + 6 + words.length);
+      app.toast('Size set for the selected text');
+      return;
+    }
+    const meta = { ...(note.meta || {}) };
+    if (z === 'm') delete meta.size; else meta.size = z;
+    await app.update({ meta });
+    log.info('format', 'Note size changed', { size: z });
+  });
+  // The word and character count.
+  let countTimer = null;
+  const recount = () => { clearTimeout(countTimer); countTimer = setTimeout(renderCount, 120); };
+  $('body').addEventListener('input', recount);
+  document.addEventListener('selectionchange', () => { if (!$('word-count').hidden) recount(); });
   $('note-font').addEventListener('change', async (e) => {
     const note = app.note();
     if (!note) return;

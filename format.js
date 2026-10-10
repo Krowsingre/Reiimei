@@ -74,6 +74,12 @@ function parseInline(src, mode) {
       const close = src.indexOf('[[/f]]', i + m[0].length);
       if (close >= 0) { flush(); out.push({ t: 'font', font: m[1], c: parseInline(src.slice(i + m[0].length, close), mode) }); i = close + 6; continue; }
     }
+    // A size on part of the text (Size menu with text selected): [[z:l]]text[[/z]].
+    m = ch === '[' && /^\[\[z:(xs|s|m|l|xl|xxl)\]\]/.exec(rest);
+    if (m) {
+      const close = src.indexOf('[[/z]]', i + m[0].length);
+      if (close >= 0) { flush(); out.push({ t: 'size', size: m[1], c: parseInline(src.slice(i + m[0].length, close), mode) }); i = close + 6; continue; }
+    }
     // Citation tokens work in both formats: [@key], [@key, 42; @other]
     m = /^\[(@[\w:-]+[^\]\n]*)\]/.exec(rest);
     if (m) { flush(); out.push({ t: 'cite', raw: m[1] }); i += m[0].length; continue; }
@@ -247,6 +253,7 @@ export function inlineToHtml(nodes, ctx = {}) {
         return runs ? `<span class="cite">${runsToHtml(runs)}</span>` : escapeHtml(n.raw);
       }
       case 'font': return `<span class="f-run" data-font="${escapeHtml(n.font)}">${inlineToHtml(n.c, ctx)}</span>`;
+      case 'size': return `<span class="z-run" data-size="${escapeHtml(n.size)}">${inlineToHtml(n.c, ctx)}</span>`;
       default: return `<${TAGS[n.t]}>${inlineToHtml(n.c, ctx)}</${TAGS[n.t]}>`;
     }
   }).join('');
@@ -329,6 +336,7 @@ export function inlineToMarkdown(nodes, ctx = {}) {
       }
       // Kept inside Reiimei; Markdown made for other apps leaves the font out.
       case 'font': return ctx.resolve ? inlineToMarkdown(n.c, ctx) : `[[f:${n.font}]]${inlineToMarkdown(n.c, ctx)}[[/f]]`;
+      case 'size': return ctx.resolve ? inlineToMarkdown(n.c, ctx) : `[[z:${n.size}]]${inlineToMarkdown(n.c, ctx)}[[/z]]`;
       default: return MD_MARK[n.t] + inlineToMarkdown(n.c, ctx) + MD_MARK[n.t];
     }
   }).join('');
@@ -349,6 +357,7 @@ export function inlineToPopuli(nodes, ctx = {}, lost = new Set()) {
       case 'img': return n.src;
       case 's': lost.add('strikethrough'); return inlineToPopuli(n.c, ctx, lost);
       case 'font': lost.add('fonts set on selected text'); return inlineToPopuli(n.c, ctx, lost);
+      case 'size': lost.add('sizes set on selected text'); return inlineToPopuli(n.c, ctx, lost);
       case 'cite': {
         const runs = ctx.resolve && ctx.cite ? ctx.cite(n.raw) : null;
         return runs ? runs.map((r) => (r.italic ? `_${r.text}_` : r.text)).join('') : `[${n.raw}]`;
@@ -475,6 +484,7 @@ export function inlineToRuns(nodes, ctx = {}, style = {}) {
         break;
       }
       case 'font': out.push(...inlineToRuns(n.c, ctx, { ...style, font: n.font })); break;
+      case 'size': out.push(...inlineToRuns(n.c, ctx, style)); break;
       default: out.push(...inlineToRuns(n.c, ctx, { ...style, [n.t]: true }));
     }
   }

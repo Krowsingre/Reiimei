@@ -7,7 +7,7 @@
 // when. Typing without a pause is one step, as in a word processor; everything else is a step of
 // its own.
 
-export const LOOK_KEYS = ['font', 'lh', 'ls', 'ws', 'brackets'];
+export const LOOK_KEYS = ['font', 'size', 'lh', 'ls', 'ws', 'brackets'];
 export const lookOf = (note) => Object.fromEntries(LOOK_KEYS.map((k) => [k, note?.meta?.[k] ?? null]));
 export const sameLook = (a, b) => LOOK_KEYS.every((k) => (a?.[k] ?? null) === (b?.[k] ?? null));
 

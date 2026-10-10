@@ -17,9 +17,10 @@ import { BETA, KEY, NAME } from './channel.js';
 import { noteToHtml } from './format.js';
 import { createHistory, lookOf, sameLook, LOOK_KEYS } from './history.js';
 import * as typingCheck from './typingcheck.js';
+import * as bibleUi from './ui-bible.js';
 import { noteTitle, noteSnippet, ownTitle, fallbackTitle, sharedFileCheck, plainText } from './share.js';
 
-export const APP_VERSION = '0.17.7';
+export const APP_VERSION = '0.17.9';
 // boot.js compares this with the page's version to catch a launch that mixes two releases.
 window.__reiimeiVersion = APP_VERSION;
 export const BUILD_DATE = '2026-10-04';
@@ -715,7 +716,8 @@ function renderModeSwitch() {
   // The computer's drop-down: the four modes, then All modes (in place of "Show all modes").
   const sel = $('mode-select');
   sel.innerHTML = modes.MODES.map((m) => `<option value="${m.id}">${esc(m.name)} (${act.filter((n) => modes.kindOf(n) === m.id).length})</option>`).join('')
-    + `<option value="all">All modes (${act.length})</option>`;
+    + `<option value="all">All modes (${act.length})</option>`
+    + '<option value="bible">Bible</option>';
   sel.value = state.showAll ? 'all' : state.mode;
 }
 
@@ -1624,6 +1626,7 @@ function openNoteMenu() {
       { label: 'Folder…', disabled: n.deleted, run: () => $('note-folder').click() },
       { label: 'Copy…', disabled: n.deleted || n.locked, run: () => $('btn-copy').click() },
       { label: 'Find…', disabled: n.deleted || n.locked, run: () => (isCode(n.format) ? $('btn-find').click() : writing.openTextFind()) },
+      { label: 'Scripture…', disabled: n.deleted || n.locked || isCode(n.format), run: () => bibleUi.open({ insert: true }) },
       { label: 'Note format…', disabled: n.deleted || n.locked, run: () => openFormatMenu() },
       ...phoneViews(n),
       { label: 'Duplicate', disabled: n.deleted || n.locked, run: async () => { const made = await duplicateNotes([currentNote()]); if (made[0]) await selectNote(made[0].id); } },
@@ -2046,6 +2049,7 @@ function openSettings(tab = 'sync', explicitTab = tab !== 'sync') {
   $('pref-style').value = prefs().style;
   renderFontSettings();
   renderSpacingSettings();
+  $('pref-counter').checked = prefs().counter !== false;
   $('pref-brackets').checked = !!prefs().brackets;
   renderDiagnostics();
   $('log-view').textContent = log.exportText() || '(empty)';
@@ -2219,6 +2223,7 @@ function bindEvents() {
   for (const k of ['lh', 'ls', 'ws']) $(`pref-${k}`).addEventListener('input', (e) => { setPrefs({ [k]: Number(e.target.value) }); renderSpacingSettings(); writing.applySpacing(currentNote()); });
   $('pref-spacing-reset').addEventListener('click', () => { setPrefs({ lh: null, ls: null, ws: null }); renderSpacingSettings(); writing.applySpacing(currentNote()); });
   $('pref-brackets').addEventListener('change', (e) => setPrefs({ brackets: e.target.checked }));
+  $('pref-counter').addEventListener('change', (e) => { setPrefs({ counter: e.target.checked }); writing.renderCount(); });
   $('pref-note-font').addEventListener('change', (e) => { setPrefs({ noteFont: e.target.value }); log.info('prefs', 'Font for new notes changed', { font: e.target.value }); });
   $('font-packs').addEventListener('change', (e) => { const id = e.target.dataset?.font; if (id) setFontShown([id], e.target.checked); });
   $('font-packs').addEventListener('click', (e) => {
@@ -2401,6 +2406,8 @@ function bindEvents() {
   $('mode-all').addEventListener('click', toggleShowAll);
   $('mode-select').addEventListener('change', (e) => {
     const v = e.target.value;
+    // The Bible is not a mode of notes: it opens over the app, and the menu goes back to the mode.
+    if (v === 'bible') { e.target.value = state.showAll ? 'all' : state.mode; bibleUi.open(); return; }
     if (v === 'all') { if (!state.showAll) toggleShowAll(); } else setMode(v);
   });
   document.addEventListener('keydown', (e) => {
@@ -2579,6 +2586,8 @@ function setEditorText(text) {
 const hooks = {
   note: () => currentNote(),
   update: (changes) => updateCurrent(changes),
+  openBible: (o) => bibleUi.open(o),
+  insertBlocks: (md) => writing.insertBlocks(md),
   menu: (anchor, title, items) => openMenu(anchor, title, items),
   flushSave: () => flushSave(),
   setEditorText,
@@ -2624,6 +2633,7 @@ async function boot() {
     bindEvents();
     trackViewport();
     writing.init(hooks);
+  bibleUi.init(hooks);
     writing.setStyleDefault(() => prefs().style);
     security.init(hooks);
     shareUi.init(hooks);
