@@ -21,7 +21,7 @@ import * as bibleUi from './ui-bible.js';
 import * as bible from './bible.js';
 import { noteTitle, noteSnippet, ownTitle, fallbackTitle, sharedFileCheck, plainText } from './share.js';
 
-export const APP_VERSION = '0.18.3';
+export const APP_VERSION = '0.18.4';
 // boot.js compares this with the page's version to catch a launch that mixes two releases.
 window.__reiimeiVersion = APP_VERSION;
 export const BUILD_DATE = '2026-10-04';
@@ -1516,7 +1516,7 @@ function renderBibleHome(notes) {
   const x = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>';
   el.noteList.innerHTML = `
     <li class="bh-sec" id="bh-bible">
-      <div class="bh-read"><button type="button" class="btn primary" id="bh-open">${last ? 'Continue reading' : 'Open the Bible'}</button><button type="button" class="btn" id="bh-books">Books</button></div>
+      <div class="bh-read"><button type="button" class="btn primary" id="bh-open">${last ? 'Continue reading' : 'Open the Bible'}</button><button type="button" class="btn" id="bh-books">Books</button><button type="button" class="btn" id="bh-conc">Concordance</button></div>
       <div class="bh-versions" role="group" aria-label="Translations">${bible.VERSIONS.map((v) => `<button type="button" class="bh-ver" data-bible="${v.id}" title="${esc(v.name)}">${esc(v.short)}</button>`).join('')}</div>
       <h3 class="bh-title">Bookmarks</h3>
       <ul class="bm-list" id="bm-list">
@@ -1535,6 +1535,7 @@ async function bibleHomeAction(e) {
   const t = e.target;
   if (t.closest('#bh-open')) return bibleUi.open({});
   if (t.closest('#bh-books')) return bibleUi.open({ books: true });
+  if (t.closest('#bh-conc')) return bibleUi.open({ conc: '' });
   const v = t.closest('[data-bible]');
   if (v) return bibleUi.open({ version: v.dataset.bible });
   const bm = t.closest('.bm-item');

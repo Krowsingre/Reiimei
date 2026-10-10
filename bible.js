@@ -212,6 +212,141 @@ export function search(query, { versions = loadedVersions(), limit = 200 } = {})
   return { hits, total: keys.length, words: phrase ? [phrase] : words, close };
 }
 
+// ---- Concordance: every word of a translation, how often it is used, and where -------------
+// Built on the device from the translation's own text (nothing more is fetched).
+const WORD = /[\p{L}\p{N}]+(?:['’][\p{L}]+)*/gu;
+const wordKey = (w) => w.toLowerCase().replace(/’/g, "'");
+const conc = new Map(); // version -> Map(word -> [keys "book:c:v", one per use])
+function concordanceOf(v) {
+  if (!conc.has(v)) {
+    const m = new Map();
+    for (const b of data.get(v).books) b.c.forEach((ch, ci) => ch.forEach((x, vi) => {
+      if (!x[0]) return;
+      const k = `${b.id}:${ci + 1}:${vi + 1}`;
+      for (const w of x[0].match(WORD) || []) {
+        const key = wordKey(w);
+        let list = m.get(key);
+        if (!list) { list = []; m.set(key, list); }
+        list.push(k);
+      }
+    }));
+    conc.set(v, m);
+  }
+  return conc.get(v);
+}
+// The words starting with some letters, with how many times each is used: [[word, count]].
+export function words(prefix = '', v = DEFAULT) {
+  if (!data.has(v)) return [];
+  const p = wordKey(prefix.trim());
+  return [...concordanceOf(v).entries()].filter(([w]) => w.startsWith(p)).map(([w, l]) => [w, l.length]).sort((a, b) => a[0].localeCompare(b[0]));
+}
+// One word: how many times it is used, in how many verses, by book, and the verses (in Bible order).
+export function concordance(word, v = DEFAULT) {
+  const list = data.has(v) ? concordanceOf(v).get(wordKey(word.trim())) || [] : [];
+  const verses = [...new Set(list)];
+  const byBook = new Map();
+  for (const k of list) { const b = k.split(':')[0]; byBook.set(b, (byBook.get(b) || 0) + 1); }
+  return {
+    word: wordKey(word.trim()),
+    uses: list.length,
+    books: [...byBook.entries()].map(([book, count]) => ({ book, count })),
+    hits: verses.map((k) => { const [b, c, x] = k.split(':'); return { book: b, c: +c, v: +x }; }),
+  };
+}
+
+// ---- Strong's numbers -----------------------------------------------------------------
+// The KJV's words carry the number of the Hebrew or Greek word they translate (bible-kjv-strongs.json),
+// and Strong's dictionary (strongs.json) says what each word means. Both are fetched the first time
+// they are used and kept on the device, like the translations.
+const extra = new Map();
+async function fetchKept(file) {
+  if (extra.has(file)) return extra.get(file);
+  const p = (async () => {
+    let res = null;
+    try { const c = await caches.open(CACHE); res = await c.match(file); } catch { /* no cache storage */ }
+    if (!res) {
+      const fresh = await fetch(file, { cache: 'no-store' });
+      if (!fresh.ok) throw new Error(`${file} could not be fetched (${fresh.status}).`);
+      try { const c = await caches.open(CACHE); await c.put(file, fresh.clone()); } catch { /* kept for this visit only */ }
+      res = fresh;
+    }
+    return res.json();
+  })();
+  extra.set(file, p);
+  try { return await p; } catch (e) { extra.delete(file); throw e; }
+}
+let tagData = null;
+let dict = null;
+export const strongsReady = () => !!(tagData && dict);
+export async function loadStrongs() {
+  if (strongsReady()) return;
+  const [t, d] = await Promise.all([fetchKept('bible-kjv-strongs.json'), fetchKept('strongs.json')]);
+  tagData = t;
+  dict = d;
+}
+const isNT = (bookId) => ORDER.indexOf(bookId) >= 39;
+// The KJV words of a verse that carry numbers: [{ at, len, nums: ['G25'] }] (positions in the KJV text).
+export function strongsOf(bookId, c, v) {
+  const s = tagData?.b?.[bookId]?.[c - 1]?.[v - 1];
+  if (!s) return [];
+  const out = [];
+  let cur = 0;
+  const letter = isNT(bookId) ? 'G' : 'H';
+  for (const part of s.split(' ')) {
+    const [d, l, n] = part.split('.');
+    const at = cur + +d;
+    out.push({ at, len: +l, nums: n.split('+').map((x) => (/^[HG]/.test(x) ? x : letter + x)) });
+    cur = at + +l;
+  }
+  return out;
+}
+// A number's dictionary entry.
+export function strongsEntry(num) {
+  const m = /^([HG])0*(\d+)$/.exec(num || '');
+  const e = m && dict?.[m[1]]?.[m[2]];
+  if (!e) return null;
+  return { num: m[1] + m[2], lang: m[1] === 'H' ? 'Hebrew' : 'Greek', word: e[0], translit: e[1], pron: e[2], meaning: e[3], use: e[4] };
+}
+// Every KJV verse that uses a number, and the English words it is translated by (with how often).
+let byNum = null;
+export function strongsUses(num) {
+  if (!byNum) {
+    byNum = new Map();
+    const kjv = data.get('kjv');
+    for (const [bookId, chs] of Object.entries(tagData?.b || {})) chs.forEach((vs, ci) => vs.forEach((s, vi) => {
+      if (!s) return;
+      const text = kjv ? book(bookId, 'kjv')?.c[ci]?.[vi]?.[0] || '' : '';
+      for (const t of strongsOf(bookId, ci + 1, vi + 1)) for (const n of t.nums) {
+        let e = byNum.get(n);
+        if (!e) { e = { keys: [], words: new Map() }; byNum.set(n, e); }
+        const k = `${bookId}:${ci + 1}:${vi + 1}`;
+        if (e.keys[e.keys.length - 1] !== k) e.keys.push(k);
+        if (text) { const w = text.slice(t.at, t.at + t.len).toLowerCase(); e.words.set(w, (e.words.get(w) || 0) + 1); }
+      }
+    }));
+  }
+  const e = byNum.get(num);
+  if (!e) return { verses: [], words: [] };
+  return {
+    verses: e.keys.map((k) => { const [b, c, v] = k.split(':'); return { book: b, c: +c, v: +v }; }),
+    words: [...e.words.entries()].sort((a, b) => b[1] - a[1]),
+  };
+}
+// The numbers behind an English word in the KJV, most used first: [[num, count]].
+export function strongsForWord(word) {
+  const w = wordKey(word.trim());
+  const count = new Map();
+  for (const [bookId, chs] of Object.entries(tagData?.b || {})) chs.forEach((vs, ci) => vs.forEach((s, vi) => {
+    if (!s) return;
+    const text = book(bookId, 'kjv')?.c[ci]?.[vi]?.[0] || '';
+    for (const t of strongsOf(bookId, ci + 1, vi + 1)) {
+      const words = (text.slice(t.at, t.at + t.len).match(WORD) || []).map(wordKey);
+      if (words.includes(w)) for (const n of t.nums) count.set(n, (count.get(n) || 0) + 1);
+    }
+  }));
+  return [...count.entries()].sort((a, b) => b[1] - a[1]);
+}
+
 // A web search for words, on the service chosen in Settings.
 export const SEARCH_SITES = [
   { id: 'biblegateway', name: 'Bible Gateway', url: (q) => `https://www.biblegateway.com/quicksearch/?quicksearch=${encodeURIComponent(q)}` },

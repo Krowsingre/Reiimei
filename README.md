@@ -1,8 +1,21 @@
-# Reiimei v0.18.3
+# Reiimei v0.18.4
 
 *reiimei* (ree-h-may), n. The cold, luminous stillness peculiar to a clear winter night; especially the effect of moonlight upon frost, illuminating the night without dispelling it.
 
 An offline-first notes app for Windows and iPhone, built as a Progressive Web App (PWA). No Mac, no App Store, no developer fee.
+
+## What changed in v0.18.4
+
+- **The concordance.** **Concordance** on the Bible page (or beside **Search online** after searching for one word) lists every use of a word in the translation you're reading: how many times it is used, in how many verses, a count for each book (tap one to show only that book), and every verse with the word marked. Tap a verse to read it. The letters A–Z list every word in the translation that starts with that letter, with how often each is used. Switching translation keeps the word.
+- **Strong's numbers.** Tap **Strong's** beside the chapter heading.
+  - In the **KJV**, each word that translates a Hebrew or Greek word can be tapped. It shows the original word, its transliteration and pronunciation, Strong's definition, how the KJV translates it, and every KJV verse that uses it (tap one to go there).
+  - In the **other translations**, tap a verse number to see that verse's Hebrew or Greek words (as the KJV words them), then tap one for its entry.
+  - Strong's numbers come only from the KJV, because the KJV's were matched to its words by hand. The other translations' source files have numbers matched by machine, which are often on the wrong word.
+  - In the KJV concordance, a word also lists the Hebrew and Greek words behind it.
+- The Strong's files are fetched the first time Strong's is turned on (about 5 MB, much less over the network) and kept on the device for offline use.
+- Sources: Strong's Hebrew dictionary from CrossWire (public domain), Strong's Greek dictionary from MorphGNT (CC0, no rights reserved), and the KJV's Strong's numbers from eBible.org (public domain). All are from James Strong's 1890 work.
+- Two new files: `bible-kjv-strongs.json` and `strongs.json`, so 100 files now. No Supabase changes.
+- **Upload these files** (changed since v0.18.3): `app.js`, `bible-kjv-strongs.json` (new), `bible.js`, `index.html`, `strongs.json` (new), `styles.css`, `sw.js`, `ui-bible.js`, `README.md`.
 
 ## What changed in v0.18.3
 
@@ -466,9 +479,9 @@ Then open http://localhost:8000 in Edge or Chrome. Notes work immediately, saved
 
 The iPhone needs an HTTPS address. GitHub Pages hosts the app for free. Only the app's code goes to GitHub; your notes never do.
 
-1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.18.3` folder.
+1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.18.4` folder.
 2. **Create the repository.** In Safari, sign in at github.com, tap **+** › **New repository**. Name it `reiimei`, set it to **Public** (free Pages needs a public repository), and tap **Create repository**.
-3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.18.3` folder, tap **Select**, select all 98 files, and tap **Open**. Scroll down and tap **Commit changes**.
+3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.18.4` folder, tap **Select**, select all 100 files, and tap **Open**. Scroll down and tap **Commit changes**.
    - If you don't see the upload link, tap the **aA** button in Safari's address bar › **Request Desktop Website** and try again.
 4. **Turn on Pages.** In the repository, open **Settings** › **Pages**. Under **Build and deployment**, set Source to **Deploy from a branch**, Branch to **main** and **/ (root)**, then tap **Save**.
 5. **Wait a minute or two**, then reload the Pages screen. It shows your address, which looks like `https://yourname.github.io/reiimei/`.
@@ -607,7 +620,7 @@ The service worker caches the app files. When you change any file, bump `VERSION
 - **Settings › Log** › Download gives a text log of everything the app did, including sync results and errors.
 - **"Test connection"** in Settings › Sync confirms the URL, key, sign-in, and tables are all correct.
 
-## Known limits in v0.18.3
+## Known limits in v0.18.4
 
 - Images can be linked but not attached
 - Sources belong to one note; there is no shared library yet

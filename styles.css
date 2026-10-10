@@ -1655,3 +1655,38 @@ html[data-bible="side"] #btn-focus { display: none; }
 .ch-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(52px, 1fr)); gap: 6px; }
 .ch-btn { text-align: center; }
 @media (max-width: 760px) { .bk-grid { grid-template-columns: 1fr 1fr; } }
+
+/* ---- v0.18.4: concordance and Strong's ---- */
+.bible-tip { font: 13px var(--ui); color: var(--ink-2); background: var(--paper); border-left: 3px solid var(--gold); padding: 8px 10px; margin: 0 0 12px; }
+.sw { border-bottom: 1px dotted var(--accent); cursor: pointer; }
+.sw:hover { color: var(--accent); }
+html[data-bible] .bv-n[role="button"] { cursor: pointer; color: var(--accent); }
+#bible-strongs[aria-pressed="true"] { color: var(--accent); text-decoration: underline; }
+.conc-find { display: flex; gap: 8px; margin: 0 0 10px; }
+.conc-find input { flex: 1; min-width: 0; font: 15px var(--ui); padding: 7px 10px; border: 1px solid var(--rule); border-radius: 10px; background: var(--paper); color: var(--ink); }
+.conc-letters { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 12px; }
+.conc-l { width: 30px; height: 30px; border: 1px solid var(--rule); border-radius: 6px; background: var(--paper); color: var(--ink-2); font: 600 13px var(--ui); cursor: pointer; }
+.conc-l.on, .conc-b.on { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+.conc-words { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 2px 10px; }
+.conc-w { border: 0; background: none; text-align: left; padding: 4px 2px; font: 15px var(--ui); color: var(--ink); cursor: pointer; }
+.conc-w span, .conc-b span, .sw-chip span { color: var(--ink-3); font-size: .85em; }
+.conc-books { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 10px; }
+.conc-b, .sw-chip { border: 1px solid var(--rule); border-radius: 999px; background: var(--paper); color: var(--ink-2); font: 12.5px var(--ui); padding: 3px 9px; cursor: pointer; }
+.conc-orig { font: 13px var(--ui); color: var(--ink-2); display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.strongs-panel { position: absolute; left: 0; right: 0; bottom: 0; max-height: 55%; overflow-y: auto; z-index: 2; background: var(--sheet); border-top: 1px solid var(--rule); box-shadow: 0 -8px 24px rgba(0,0,0,.12); padding: 10px 16px calc(14px + env(safe-area-inset-bottom)); font: 14.5px/1.5 var(--ui); }
+.bible-view { position: fixed; }
+.sp-head { display: flex; align-items: center; gap: 8px; }
+.sp-entry { border-top: 1px solid var(--rule); margin-top: 8px; padding-top: 8px; }
+.sp-word { margin: 0 0 4px; }
+.sp-num { font: 600 12px var(--ui); color: var(--accent); }
+.sp-orig { font-size: 1.35em; }
+.sp-tr { font-style: italic; }
+.sp-pron, .sp-lang { color: var(--ink-3); font-size: .9em; }
+.sp-mean, .sp-use { margin: 0 0 4px; }
+.sp-count { color: var(--ink-2); margin: 6px 0 4px; }
+.sp-verses { display: flex; flex-wrap: wrap; gap: 4px; }
+.sp-v { border: 1px solid var(--rule); border-radius: 6px; background: var(--paper); color: var(--ink); font: 12.5px var(--ui); padding: 2px 7px; cursor: pointer; }
+.sp-words { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.sp-wbtn { display: inline-flex; flex-direction: column; align-items: center; border: 1px solid var(--rule); border-radius: 8px; background: var(--paper); color: var(--ink); padding: 4px 8px; cursor: pointer; font: 13px var(--ui); }
+.sp-wbtn .sp-orig { font-size: 1.2em; }
+.bible-count.conc-total { display: block; }

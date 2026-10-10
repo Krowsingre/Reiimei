@@ -33,7 +33,7 @@ async function ensure(v) {
 
 // at: a passage to show ({book, c1, v1, c2, v2, whole}); side: beside the open note (computer only);
 // books: the list of books. Otherwise the Bible opens where you last read, or on the list of books.
-export async function open({ insert = false, version = null, query = '', at: go = null, side = null, books = false } = {}) {
+export async function open({ insert = false, version = null, query = '', at: go = null, side = null, books = false, conc = null } = {}) {
   const view = $('bible-view');
   view.hidden = false;
   setSide(side === null ? isSide() : side);
@@ -41,6 +41,7 @@ export async function open({ insert = false, version = null, query = '', at: go 
   const last = app.prefs().bibleAt;
   ver = version || last?.version || B.DEFAULT;
   if (!(await ensure(ver))) return;
+  if (app.prefs().bibleStrongs) await ensureStrongs();
   fillVersions();
   fillBooks();
   const hasLast = !!(last && B.book(last.book, ver));
@@ -50,7 +51,7 @@ export async function open({ insert = false, version = null, query = '', at: go 
     picked.clear();
     if (!go.whole) for (const x of B.passage(go, ver)) picked.add(key(x.book, x.c, x.v));
     showChapter(go.book, Math.min(go.c1, B.book(go.book, ver).c.length), { scroll: go.whole ? null : go.v1 });
-  } else if (query) { $('bible-search').value = query; await runSearch(); } else if (books || !hasLast) showBooks(); else showChapter(at.book, at.c, { scroll: last.v > 1 ? last.v : null });
+  } else if (conc !== null) showConcordance(conc); else if (query) { $('bible-search').value = query; await runSearch(); } else if (books || !hasLast) showBooks(); else showChapter(at.book, at.c, { scroll: last.v > 1 ? last.v : null });
   if (insert || query) $('bible-search').focus();
   app.onBible?.();
 }
@@ -108,11 +109,24 @@ function verseHtml(b, c, v, item) {
   const [text] = item;
   const k = `${c}:${v}`;
   const notes = b.f[k];
-  const lines = esc(text).replace(/\n\t/g, '<br><span class="bv-indent"></span>').replace(/\n/g, '<br>');
+  let html = esc(text);
+  if (strongsOn() && B.strongsReady()) {
+    if (ver === 'kjv') {
+      // Each word with a Strong's number can be tapped.
+      html = '';
+      let cur = 0;
+      for (const t of B.strongsOf(b.id, c, v)) {
+        html += esc(text.slice(cur, t.at)) + `<span class="sw" data-s="${t.nums.join(' ')}">${esc(text.slice(t.at, t.at + t.len))}</span>`;
+        cur = t.at + t.len;
+      }
+      html += esc(text.slice(cur));
+    }
+  }
+  const lines = html.replace(/\n\t/g, '<br><span class="bv-indent"></span>').replace(/\n/g, '<br>');
   const sel = picked.has(key(b.id, c, v)) ? ' picked' : '';
   const empty = text ? '' : ' empty';
   const hl = marks.get(key(b.id, c, v));
-  return `<span class="bv${sel}${empty}${hl ? ` hl-${hl.color}` : ''}" data-v="${v}" id="bv-${c}-${v}"><sup class="bv-n">${v}</sup>${lines}${notes ? `<button type="button" class="bv-note" data-k="${k}" aria-label="Footnote">†</button>` : ''}</span> `;
+  return `<span class="bv${sel}${empty}${hl ? ` hl-${hl.color}` : ''}" data-v="${v}" id="bv-${c}-${v}"><sup class="bv-n"${strongsOn() && ver !== 'kjv' ? ' role="button" tabindex="0" title="The Hebrew or Greek words of this verse"' : ''}>${v}</sup>${lines}${notes ? `<button type="button" class="bv-note" data-k="${k}" aria-label="Footnote">†</button>` : ''}</span> `;
 }
 
 export function showChapter(id, c, { scroll = null } = {}) {
@@ -126,7 +140,7 @@ export function showChapter(id, c, { scroll = null } = {}) {
   $('bible-chapter').value = String(c);
   const list = b.c[c - 1];
   marks = app.highlights();
-  let html = `<div class="bible-chapter-head"><h2 class="bible-chapter-title">${esc(b.name)} ${c} <span class="bible-ver">${esc(B.version(ver).short)}</span></h2><span class="bible-chapter-acts"><button type="button" class="text-btn" id="bible-chapter-mark">Bookmark</button><button type="button" class="text-btn" id="bible-chapter-notes">Take notes</button></span></div>`;
+  let html = `<div class="bible-chapter-head"><h2 class="bible-chapter-title">${esc(b.name)} ${c} <span class="bible-ver">${esc(B.version(ver).short)}</span></h2><span class="bible-chapter-acts"><button type="button" class="text-btn" id="bible-strongs" aria-pressed="${strongsOn()}" title="Show the Hebrew and Greek words (Strong's numbers)">Strong's</button><button type="button" class="text-btn" id="bible-chapter-mark">Bookmark</button><button type="button" class="text-btn" id="bible-chapter-notes">Take notes</button></span></div>`;
   let open = false;
   const closeBlock = () => { if (open) { html += '</p>'; open = false; } };
   list.forEach((item, i) => {
@@ -144,13 +158,119 @@ export function showChapter(id, c, { scroll = null } = {}) {
   const prev = c > 1 ? [id, c - 1] : bi > 0 ? [books[bi - 1].id, books[bi - 1].c.length] : null;
   const next = c < b.c.length ? [id, c + 1] : bi < books.length - 1 ? [books[bi + 1].id, 1] : null;
   html += `<nav class="bible-nav">${prev ? `<button type="button" class="btn" data-go="${prev[0]}:${prev[1]}">‹ ${esc(B.book(prev[0], ver).name)} ${prev[1]}</button>` : '<span></span>'}${next ? `<button type="button" class="btn" data-go="${next[0]}:${next[1]}">${esc(B.book(next[0], ver).name)} ${next[1]} ›</button>` : ''}</nav>`;
-  html += `<p class="bible-credit">${esc(B.version(ver).name)} (${B.version(ver).short}), public domain.</p>`;
+  if (strongsOn() && ver !== 'kjv') html = html.replace('</div>', `</div><p class="bible-tip">Strong's numbers come from the KJV: tap a verse number to see that verse's Hebrew or Greek words, or <button type="button" class="text-btn" data-to-kjv>read the KJV</button> to tap the words themselves.</p>`);
+  html += `<p class="bible-credit">${esc(B.version(ver).name)} (${B.version(ver).short}), public domain.${strongsOn() ? " Strong's dictionary (1890), public domain." : ''}</p>`;
   const body = $('bible-body');
   body.innerHTML = html;
+  closeStrongs();
   const target = scroll ? $(`bv-${c}-${scroll}`) : null;
   if (target) target.scrollIntoView({ block: 'center' }); else body.scrollTop = 0;
   renderBar();
 }
+
+// ---- Concordance: every use of a word in the translation being read -----------------------
+let concWord = '';
+let concBook = null;
+const LETTERS = 'abcdefghijklmnopqrstuvwxyz'.split('');
+const wordRe = (w) => new RegExp(`(^|[^\\p{L}\\p{N}'’])(${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})(?![\\p{L}\\p{N}]|['’]\\p{L})`, 'giu');
+export function showConcordance(word = '', letter = null) {
+  shown = 'conc';
+  if (word !== concWord) concBook = null;
+  concWord = word.trim();
+  const vs = B.version(ver).short;
+  let html = `<h2 class="bible-chapter-title">Concordance <span class="bible-ver">${esc(vs)}</span></h2>
+    <div class="conc-find"><input type="search" id="conc-word" placeholder="A word" aria-label="A word" value="${esc(concWord)}" autocomplete="off" autocapitalize="off" spellcheck="false"><button type="button" class="btn small" data-conc-go>Look up</button></div>
+    <div class="conc-letters">${LETTERS.map((l) => `<button type="button" class="conc-l${letter === l ? ' on' : ''}" data-conc-letter="${l}">${l.toUpperCase()}</button>`).join('')}</div>`;
+  if (letter) {
+    const list = B.words(letter, ver);
+    html += `<p class="bible-count">${list.length.toLocaleString()} words starting with ${letter.toUpperCase()}</p><div class="conc-words">${list.map(([w, n]) => `<button type="button" class="conc-w" data-conc="${esc(w)}">${esc(w)} <span>${n.toLocaleString()}</span></button>`).join('')}</div>`;
+  } else if (concWord) {
+    const r = B.concordance(concWord, ver);
+    if (!r.uses) html += `<p class="bible-count">"${esc(concWord)}" is not in the ${esc(vs)}.</p>`;
+    else {
+      const name = (id) => B.book(id, ver)?.name || id;
+      html += `<p class="bible-count conc-total"><b>${esc(r.word)}</b>: used ${r.uses.toLocaleString()} ${r.uses === 1 ? 'time' : 'times'} in ${r.hits.length.toLocaleString()} ${r.hits.length === 1 ? 'verse' : 'verses'}</p>`;
+      html += `<div class="conc-books">${r.books.map((x) => `<button type="button" class="conc-b${concBook === x.book ? ' on' : ''}" data-conc-book="${x.book}">${esc(name(x.book))} <span>${x.count}</span></button>`).join('')}</div>`;
+      if (ver === 'kjv' && B.strongsReady()) {
+        const nums = B.strongsForWord(concWord);
+        if (nums.length) html += `<p class="conc-orig">Hebrew and Greek words behind it: ${nums.slice(0, 12).map(([n, c]) => { const e = B.strongsEntry(n); return `<button type="button" class="sw-chip" data-sw="${n}">${n}${e ? ` ${esc(e.word)}` : ''} <span>${c}</span></button>`; }).join('')}</p>`;
+      }
+      const hits = concBook ? r.hits.filter((x) => x.book === concBook) : r.hits;
+      const re = wordRe(concWord);
+      html += hits.map((x) => {
+        const t = B.passage({ book: x.book, c1: x.c, v1: x.v, c2: x.c, v2: x.v }, ver)[0]?.text || '';
+        return `<button type="button" class="bible-hit" data-goto="${x.book}:${x.c}:${x.v}"><span class="bh-ref">${esc(name(x.book))} ${x.c}:${x.v}</span><span class="bh-text">${esc(t.replace(/\n\t?/g, ' ')).replace(re, '$1<mark>$2</mark>')}</span></button>`;
+      }).join('');
+    }
+  } else html += '<p class="bible-count">Type a word, or pick a letter to see every word used, with how often.</p>';
+  $('bible-body').innerHTML = html;
+  $('bible-body').scrollTop = 0;
+  closeStrongs();
+  renderBar();
+}
+
+// ---- Strong's: the Hebrew or Greek word behind a KJV word ------------------------------------
+const strongsOn = () => !!app.prefs().bibleStrongs;
+async function ensureStrongs() {
+  if (B.strongsReady()) return true;
+  setStatus("Getting Strong's numbers and dictionary ready… The first time, they are fetched once (about 1.5 MB), then they work offline.");
+  try {
+    await B.loadStrongs();
+    if (!B.loaded('kjv')) await B.load('kjv');
+    setStatus('');
+    return true;
+  } catch (e) {
+    setStatus(`Strong's could not be fetched. Connect to the internet once and try again. (${e.message})`);
+    return false;
+  }
+}
+async function toggleStrongs() {
+  const on = !strongsOn();
+  if (on && !(await ensureStrongs())) return;
+  app.setPrefs({ bibleStrongs: on });
+  log.info('bible', "Strong's", { on });
+  showChapter(at.book, at.c, { scroll: topVerse() });
+}
+let strongsNow = null;
+let strongsAll = false;
+function closeStrongs() { $('strongs-panel').hidden = true; strongsNow = null; strongsAll = false; }
+function entryHtml(n) {
+  const e = B.strongsEntry(n);
+  if (!e) return `<p>${esc(n)}: not in the dictionary.</p>`;
+  return `<p class="sp-word"><span class="sp-num">${esc(e.num)}</span> <span class="sp-orig" lang="${e.lang === 'Hebrew' ? 'he' : 'el'}">${esc(e.word)}</span> <span class="sp-tr">${esc(e.translit)}</span>${e.pron ? ` <span class="sp-pron">(${esc(e.pron)})</span>` : ''} <span class="sp-lang">${e.lang}</span></p>
+    <p class="sp-mean">${esc(e.meaning)}</p>${e.use ? `<p class="sp-use"><b>KJV:</b> ${esc(e.use)}</p>` : ''}`;
+}
+export async function showStrongs(nums, word = '') {
+  if (!(await ensureStrongs())) return;
+  if (!strongsNow || strongsNow.nums.join() !== nums.join()) strongsAll = false;
+  strongsNow = { nums, word };
+  const p = $('strongs-panel');
+  const name = (id) => B.book(id, ver)?.name || id;
+  let html = `<div class="sp-head"><b>${word ? `“${esc(word)}”` : "Strong's"}</b><span class="spacer"></span><button type="button" class="icon-btn" id="strongs-close" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>`;
+  for (const n of nums) {
+    const u = B.strongsUses(n);
+    const list = strongsAll ? u.verses : u.verses.slice(0, 50);
+    html += `<div class="sp-entry">${entryHtml(n)}
+      <p class="sp-count">Used in ${u.verses.length.toLocaleString()} ${u.verses.length === 1 ? 'verse' : 'verses'} of the KJV${u.words.length ? `, as ${u.words.slice(0, 8).map(([w, c]) => `<button type="button" class="text-btn" data-conc="${esc(w.split(' ').pop())}">${esc(w)}</button> (${c})`).join(', ')}` : ''}.</p>
+      <div class="sp-verses">${list.map((x) => `<button type="button" class="sp-v" data-goto="${x.book}:${x.c}:${x.v}">${esc(name(x.book))} ${x.c}:${x.v}</button>`).join('')}${list.length < u.verses.length ? `<button type="button" class="text-btn" data-more>All ${u.verses.length.toLocaleString()}</button>` : ''}</div></div>`;
+  }
+  p.innerHTML = html;
+  p.hidden = false;
+  p.scrollTop = 0;
+  log.info('bible', "Strong's shown", { nums: nums.join(' ') });
+}
+// In another translation: the KJV words of the verse, each with its Hebrew or Greek word.
+async function verseStrongs(bookId, c, v) {
+  if (!(await ensureStrongs())) return;
+  const text = B.passage({ book: bookId, c1: c, v1: v, c2: c, v2: v }, 'kjv')[0]?.text || '';
+  const tags = B.strongsOf(bookId, c, v);
+  const p = $('strongs-panel');
+  strongsNow = null;
+  p.innerHTML = `<div class="sp-head"><b>${esc(B.label({ book: bookId, c1: c, v1: v, c2: c, v2: v }, ver))}</b> <span class="sp-lang">in the ${isNTBook(bookId) ? 'Greek' : 'Hebrew'}, as the KJV words it</span><span class="spacer"></span><button type="button" class="icon-btn" id="strongs-close" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>
+    <div class="sp-words">${tags.length ? tags.map((t) => { const w = text.slice(t.at, t.at + t.len); return t.nums.map((n) => { const e = B.strongsEntry(n); return `<button type="button" class="sp-wbtn" data-num="${n}" data-word="${esc(w)}"><span class="sp-en">${esc(w)}</span><span class="sp-orig">${esc(e?.word || '')}</span><span class="sp-num">${n}</span></button>`; }).join(''); }).join('') : '<p>No Strong\u2019s numbers in this verse.</p>'}</div>`;
+  p.hidden = false;
+}
+const isNTBook = (id) => B.ORDER.indexOf(id) >= 39;
 
 // The last place read is kept (with the verse at the top) as the Bible page's "Last read".
 function keepPlace() {
@@ -196,6 +316,7 @@ export async function switchVersion(v) {
   fillBooks();
   if (shown === 'results' && lastQuery) showResults(lastQuery);
   else if (shown === 'books' || shown === 'chapters') showBooks();
+  else if (shown === 'conc') showConcordance(concWord);
   else showChapter(at.book, Math.min(at.c, B.book(at.book, ver).c.length), { scroll: keep && keep > 1 ? keep : null });
   log.info('bible', 'Translation switched', { version: v });
 }
@@ -217,7 +338,8 @@ function showResults(q) {
   const count = r.total
     ? `${r.close ? 'Nothing has all of those words. Closest: ' : ''}${r.total.toLocaleString()} ${r.total === 1 ? 'verse' : 'verses'}${r.total > r.hits.length ? ` (the first ${r.hits.length} shown)` : ''}`
     : 'No verses found';
-  const online = `<button type="button" class="btn small" id="bible-online">Search online</button>`;
+  const one = q.trim().split(/\s+/).length === 1 && !/^"/.test(q.trim());
+  const online = `${one ? `<button type="button" class="btn small" data-conc="${esc(q.trim())}">Concordance</button> ` : ''}<button type="button" class="btn small" id="bible-online">Search online</button>`;
   $('bible-body').innerHTML = `<div class="bible-count"><span>${count}${B.loadedVersions().length < B.VERSIONS.length ? ` · searched ${B.loadedVersions().map(shortOf).join(', ')}` : ''}</span>${online}</div>`
     + r.hits.map((x) => {
       // The verse in the translation being read, or in the one that matched when it is empty there.
@@ -361,6 +483,18 @@ export function init(hooks) {
   $('bible-take').addEventListener('click', takeNotes);
   $('bible-mark').addEventListener('click', bookmark);
   $('bible-books').addEventListener('click', showBooks);
+  $('strongs-panel').addEventListener('click', (e) => {
+    if (e.target.closest('#strongs-close')) { closeStrongs(); return; }
+    const n = e.target.closest('[data-num]');
+    if (n) { showStrongs([n.dataset.num], n.dataset.word || ''); return; }
+    const cw = e.target.closest('[data-conc]');
+    if (cw) { closeStrongs(); showConcordance(cw.dataset.conc); return; }
+    const more = e.target.closest('[data-more]');
+    if (more) { strongsAll = true; showStrongs(strongsNow.nums, strongsNow.word); return; }
+    const cv = e.target.closest('[data-goto]');
+    if (cv) { const [b, c, v] = cv.dataset.goto.split(':'); closeStrongs(); picked.clear(); picked.add(key(b, +c, +v)); showChapter(b, +c, { scroll: +v }); }
+  });
+  $('bible-body').addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.id === 'conc-word') { e.preventDefault(); showConcordance(e.target.value); } });
   $('bible-version').addEventListener('change', (e) => switchVersion(e.target.value));
   $('bible-book').addEventListener('change', (e) => showChapters(e.target.value));
   $('bible-chapter').addEventListener('change', (e) => showChapter(at.book, +e.target.value));
@@ -371,6 +505,24 @@ export function init(hooks) {
     if (e.target.closest('#bible-online')) { searchOnline($('bible-search').value); return; }
     if (e.target.closest('#bible-chapter-notes')) { takeNotes(); return; }
     if (e.target.closest('#bible-chapter-mark')) { bookmark(); return; }
+    if (e.target.closest('#bible-strongs')) { toggleStrongs(); return; }
+    if (e.target.closest('[data-to-kjv]')) { switchVersion('kjv'); return; }
+    const chip = e.target.closest('[data-sw]');
+    if (chip) { showStrongs([chip.dataset.sw], concWord); return; }
+    const look = e.target.closest('[data-conc-go]');
+    if (look) { showConcordance($('conc-word').value); return; }
+    const sw = e.target.closest('.sw');
+    if (sw) { e.stopPropagation(); showStrongs(sw.dataset.s.split(' '), sw.textContent); return; }
+    const vn = e.target.closest('.bv-n');
+    if (vn && strongsOn() && ver !== 'kjv' && shown === 'chapter') { e.stopPropagation(); verseStrongs(at.book, at.c, +vn.closest('.bv').dataset.v); return; }
+    const cw = e.target.closest('[data-conc]');
+    if (cw) { showConcordance(cw.dataset.conc); return; }
+    const cl = e.target.closest('[data-conc-letter]');
+    if (cl) { showConcordance('', cl.dataset.concLetter); return; }
+    const cb = e.target.closest('[data-conc-book]');
+    if (cb) { concBook = concBook === cb.dataset.concBook ? null : cb.dataset.concBook; showConcordance(concWord); return; }
+    const cv = e.target.closest('[data-goto]');
+    if (cv) { const [b, c, v] = cv.dataset.goto.split(':'); picked.clear(); picked.add(key(b, +c, +v)); showChapter(b, +c, { scroll: +v }); return; }
     if (e.target.closest('[data-books]')) { showBooks(); return; }
     const bk = e.target.closest('[data-book]');
     if (bk) { showChapters(bk.dataset.book); return; }
