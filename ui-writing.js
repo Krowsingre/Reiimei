@@ -136,6 +136,8 @@ export function renderToolbar(note) {
   else if (!$('fmt-panel').hidden) renderFormatPane();
   $('btn-text-find').hidden = code;
   $('btn-scripture').hidden = code;
+  $('btn-lookup').hidden = code;
+  $('btn-websearch').hidden = code;
   if (tf.open) { if (code || note.deleted) closeTextFind({ focus: false }); else if (lastFindNote !== note.id) { tf.cur = -1; refreshTextFind(false); } }
   lastFindNote = note.id;
   // The phone's bar shows what applies to this note.
@@ -201,6 +203,13 @@ function spacingInput() {
   applySpacing(app.note(), v);
   clearTimeout(spacingTimer);
   spacingTimer = setTimeout(() => { const n = app.note(); if (n) app.update({ meta: { ...(n.meta || {}), lh: v.lh, ls: v.ls, ws: v.ws } }); }, 300);
+}
+
+// The words selected in the note (or just before a menu took the focus), on one line.
+export function selectedWords() {
+  if (rich.active()) return (rich.selectedText() || '').replace(/\s+/g, ' ').trim().slice(0, 200);
+  const ta = $('body');
+  return ta.value.slice(ta.selectionStart, ta.selectionEnd).replace(/\s+/g, ' ').trim().slice(0, 200);
 }
 
 // A Bible passage (or any Markdown blocks) put in the note at the caret, as its own paragraphs.
@@ -1133,6 +1142,8 @@ export function init(hooks) {
   });
   initFormatDock();
   $('btn-scripture').addEventListener('click', () => app.openBible({ insert: true }));
+  $('btn-lookup').addEventListener('click', () => { const q = selectedWords(); app.openBible({ insert: true, query: q }); });
+  $('btn-websearch').addEventListener('click', () => { const q = selectedWords(); if (q) app.searchOnline(q); else app.toast('Select some words first'); });
   // The phone's bar: the everyday tools straight away, the rest under More.
   const bar = $('phone-bar');
   bar.addEventListener('pointerdown', (e) => { if (e.target.closest('button.pb') && (document.activeElement === $('body') || document.activeElement === $('rich'))) e.preventDefault(); });
@@ -1158,8 +1169,8 @@ export function init(hooks) {
   $('btn-insert-menu').addEventListener('click', (e) => {
     const sec = e.currentTarget.closest('.rb-sec');
     const items = [...sec.querySelectorAll('.tool:not(.insert-menu)')].filter((b) => !b.hidden).map((b) => ({
-      label: { quote: 'Quote', code: 'Code', link: 'Link…' }[b.dataset.tool] || (b.id === 'btn-quote' ? 'Quote a source…' : b.id === 'btn-sources' || b.id === 'btn-scripture' ? `${b.textContent.trim()}…` : b.textContent.trim()),
-      hint: b.dataset.tool === 'quote' ? 'A quoted passage' : b.dataset.tool === 'code' ? 'Code in the text' : b.id === 'btn-sources' ? 'Add sources and cite them' : b.id === 'btn-scripture' ? 'A Bible passage (WEB)' : '',
+      label: { quote: 'Quote', code: 'Code', link: 'Link…' }[b.dataset.tool] || (b.id === 'btn-quote' ? 'Quote a source…' : b.id === 'btn-sources' || b.id === 'btn-scripture' || b.id === 'btn-lookup' || b.id === 'btn-websearch' ? `${b.textContent.trim()}…` : b.textContent.trim()),
+      hint: b.dataset.tool === 'quote' ? 'A quoted passage' : b.dataset.tool === 'code' ? 'Code in the text' : b.id === 'btn-sources' ? 'Add sources and cite them' : b.id === 'btn-scripture' ? 'A Bible passage' : b.id === 'btn-lookup' ? 'The selected words, in every translation' : b.id === 'btn-websearch' ? 'The selected words, on the web' : '',
       disabled: b.disabled,
       run: () => b.click(),
     }));

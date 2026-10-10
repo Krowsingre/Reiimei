@@ -2,7 +2,7 @@
 // Bump VERSION whenever any app file changes so devices pick up the update.
 // A beta copy (a folder with "beta" in its name) keeps its own offline copy (channel.js).
 const PREFIX = /beta/.test((self.location.pathname.split('/').filter(Boolean)[0] || '').toLowerCase()) ? 'reiimei-beta-v' : 'reiimei-v';
-const VERSION = `${PREFIX}0.17.9`;
+const VERSION = `${PREFIX}0.18.0`;
 const SHELL = [
   './',
   './index.html',
@@ -126,7 +126,7 @@ self.addEventListener('fetch', (event) => {
   // Only handle our own files. Sync requests to Supabase go straight to the network.
   if (url.origin !== self.location.origin) return;
   // The Bible keeps its own copy (bible.js), so app updates do not fetch it again.
-  if (url.pathname.endsWith('/bible-web.json')) return;
+  if (/\/bible-[a-z]+\.json$/.test(url.pathname)) return;
 
   // Network first for the page itself (so updates arrive), cache as fallback.
   if (req.mode === 'navigate') {

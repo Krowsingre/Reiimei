@@ -18,9 +18,10 @@ import { noteToHtml } from './format.js';
 import { createHistory, lookOf, sameLook, LOOK_KEYS } from './history.js';
 import * as typingCheck from './typingcheck.js';
 import * as bibleUi from './ui-bible.js';
+import * as bible from './bible.js';
 import { noteTitle, noteSnippet, ownTitle, fallbackTitle, sharedFileCheck, plainText } from './share.js';
 
-export const APP_VERSION = '0.17.9';
+export const APP_VERSION = '0.18.0';
 // boot.js compares this with the page's version to catch a launch that mixes two releases.
 window.__reiimeiVersion = APP_VERSION;
 export const BUILD_DATE = '2026-10-04';
@@ -687,6 +688,13 @@ function renderSidebar() {
     fresh.addEventListener('click', () => toggleTagFilter(t));
     return fresh;
   }));
+  // The Bible: one "folder" for each translation.
+  const bibleOpen = prefs().bibleOpen !== false;
+  for (const id of ['btn-bible-toggle', 'btn-bible-chevron']) $(id).setAttribute('aria-expanded', String(bibleOpen));
+  const bl = $('bible-list');
+  bl.hidden = !bibleOpen;
+  const reading = bibleUi.isOpen() ? bibleUi.current() : null;
+  bl.innerHTML = bible.VERSIONS.map((v) => `<li class="side-item bible-item${reading === v.id ? ' active' : ''}" data-bible="${v.id}" role="button" tabindex="0" title="${esc(v.name)}"><span class="name">${esc(v.name)}</span><span class="count">${esc(v.short)}</span></li>`).join('');
   for (const id of ['btn-tags-toggle', 'btn-tags-chevron']) $(id).setAttribute('aria-expanded', String(prefs().tagsOpen !== false));
   el.tagList.hidden = prefs().tagsOpen === false;
   if (!tags.length) el.tagList.innerHTML = '<li class="side-empty">Add tags to a note</li>';
@@ -699,7 +707,7 @@ function renderSidebar() {
   const existing = document.getElementById('trash-section');
   if (existing) existing.remove();
   wrap.id = 'trash-section';
-  $('tag-section').insertAdjacentElement('beforebegin', wrap);
+  $('bible-section').insertAdjacentElement('beforebegin', wrap); // Recently Deleted stays with the folders
 
 
 }
@@ -716,8 +724,7 @@ function renderModeSwitch() {
   // The computer's drop-down: the four modes, then All modes (in place of "Show all modes").
   const sel = $('mode-select');
   sel.innerHTML = modes.MODES.map((m) => `<option value="${m.id}">${esc(m.name)} (${act.filter((n) => modes.kindOf(n) === m.id).length})</option>`).join('')
-    + `<option value="all">All modes (${act.length})</option>`
-    + '<option value="bible">Bible</option>';
+    + `<option value="all">All modes (${act.length})</option>`;
   sel.value = state.showAll ? 'all' : state.mode;
 }
 
@@ -1627,6 +1634,8 @@ function openNoteMenu() {
       { label: 'Copy…', disabled: n.deleted || n.locked, run: () => $('btn-copy').click() },
       { label: 'Find…', disabled: n.deleted || n.locked, run: () => (isCode(n.format) ? $('btn-find').click() : writing.openTextFind()) },
       { label: 'Scripture…', disabled: n.deleted || n.locked || isCode(n.format), run: () => bibleUi.open({ insert: true }) },
+      { label: 'Look up in the Bible…', disabled: n.deleted || n.locked || isCode(n.format), run: () => bibleUi.open({ insert: true, query: writing.selectedWords() }) },
+      { label: 'Search online…', disabled: n.deleted || n.locked || isCode(n.format), run: () => { const q = writing.selectedWords(); if (q) bibleUi.searchOnline(q); else toast('Select some words first'); } },
       { label: 'Note format…', disabled: n.deleted || n.locked, run: () => openFormatMenu() },
       ...phoneViews(n),
       { label: 'Duplicate', disabled: n.deleted || n.locked, run: async () => { const made = await duplicateNotes([currentNote()]); if (made[0]) await selectNote(made[0].id); } },
@@ -2050,6 +2059,7 @@ function openSettings(tab = 'sync', explicitTab = tab !== 'sync') {
   renderFontSettings();
   renderSpacingSettings();
   $('pref-counter').checked = prefs().counter !== false;
+  $('pref-search-site').value = bible.searchSite(prefs().searchSite).id;
   $('pref-brackets').checked = !!prefs().brackets;
   renderDiagnostics();
   $('log-view').textContent = log.exportText() || '(empty)';
@@ -2274,6 +2284,13 @@ function bindEvents() {
   for (const t of ['pointerup', 'pointercancel', 'pointermove', 'pointerleave']) el.noteList.addEventListener(t, () => clearTimeout(pressTimer));
   $('tag-filter').addEventListener('click', (e) => { const b = e.target.closest('[data-untag]'); if (b) toggleTagFilter(b.dataset.untag); });
   for (const id of ['btn-tags-toggle', 'btn-tags-chevron']) $(id).addEventListener('click', () => { setPrefs({ tagsOpen: prefs().tagsOpen === false }); renderSidebar(); });
+  for (const id of ['btn-bible-toggle', 'btn-bible-chevron']) $(id).addEventListener('click', () => { setPrefs({ bibleOpen: prefs().bibleOpen === false }); renderSidebar(); });
+  const openVersion = (li) => { if (!li) return; if (bibleUi.isOpen()) bibleUi.switchVersion(li.dataset.bible); else bibleUi.open({ version: li.dataset.bible }); };
+  $('bible-list').addEventListener('click', (e) => openVersion(e.target.closest('[data-bible]')));
+  $('bible-list').addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openVersion(e.target.closest('[data-bible]')); } });
+  // Settings › Formatting › Search online with
+  $('pref-search-site').innerHTML = bible.SEARCH_SITES.map((x) => `<option value="${x.id}">${esc(x.name)}</option>`).join('');
+  $('pref-search-site').addEventListener('change', (e) => setPrefs({ searchSite: e.target.value }));
   $('btn-select').addEventListener('click', () => setSelecting(!state.selecting));
   $('sel-all').addEventListener('click', () => {
     const notes = filteredNotes();
@@ -2406,8 +2423,6 @@ function bindEvents() {
   $('mode-all').addEventListener('click', toggleShowAll);
   $('mode-select').addEventListener('change', (e) => {
     const v = e.target.value;
-    // The Bible is not a mode of notes: it opens over the app, and the menu goes back to the mode.
-    if (v === 'bible') { e.target.value = state.showAll ? 'all' : state.mode; bibleUi.open(); return; }
     if (v === 'all') { if (!state.showAll) toggleShowAll(); } else setMode(v);
   });
   document.addEventListener('keydown', (e) => {
@@ -2587,6 +2602,8 @@ const hooks = {
   note: () => currentNote(),
   update: (changes) => updateCurrent(changes),
   openBible: (o) => bibleUi.open(o),
+  searchOnline: (q) => bibleUi.searchOnline(q),
+  onBible: () => renderSidebar(),
   insertBlocks: (md) => writing.insertBlocks(md),
   menu: (anchor, title, items) => openMenu(anchor, title, items),
   flushSave: () => flushSave(),

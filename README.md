@@ -1,8 +1,19 @@
-# Reiimei v0.17.9
+# Reiimei v0.18.0
 
 *reiimei* (ree-h-may), n. The cold, luminous stillness peculiar to a clear winter night; especially the effect of moonlight upon frost, illuminating the night without dispelling it.
 
 An offline-first notes app for Windows and iPhone, built as a Progressive Web App (PWA). No Mac, no App Store, no developer fee.
+
+## What changed in v0.18.0
+
+- **The Bible has its own place in the sidebar**, between Folders and Tags, with each translation as a "folder": the **World English Bible (WEB)**, the **King James Version (KJV)**, the **Berean Standard Bible (BSB)**, the **American Standard Version (ASV)** and **Young's Literal Translation (YLT)**. All are in the public domain (eBible.org), their text unchanged. (It is no longer in the mode menu.)
+- **Switch translation while reading.** The menu at the top of the reader changes translation in place, at the same book, chapter and verse; picked verses stay picked.
+- **The finder searches every translation on the device**, so the wording you remember from one finds the verse in another: "I shall not want" (the KJV's wording) finds Psalm 23:1 while you read the WEB, marked "matched the KJV wording". When no verse has all the words, the closest ones come first.
+- **Search online.** In the finder, and for words selected in a note, **Search online** opens a web search in your browser, on the service chosen in **Settings › Formatting › Search online with**: Bible Gateway (searches many translations at once), Google, DuckDuckGo, Bing, Yahoo, Brave Search, Ecosia or Startpage. Nothing is sent until you choose it.
+- **Look up in the Bible** (Insert ▾ on a computer, ⋯ on a phone) finds the words selected in a note in every translation, ready to put a passage in the note.
+- Each translation is fetched the first time it is opened on a device (about 4.4 MB each, much less over the network), then kept there for offline use.
+- Four new files, `bible-kjv.json`, `bible-bsb.json`, `bible-asv.json` and `bible-ylt.json`: 98 files now. No Supabase changes.
+- **Upload these files** (changed since v0.17.9): `app.js`, `bible-asv.json` (new), `bible-bsb.json` (new), `bible-kjv.json` (new), `bible-ylt.json` (new), `bible.js`, `index.html`, `styles.css`, `sw.js`, `ui-bible.js`, `ui-rich.js`, `ui-writing.js`, `README.md`.
 
 ## What changed in v0.17.9
 
@@ -390,7 +401,7 @@ Note: a device still on v0.7 would show the hidden cache record in Recently Dele
 | `typingcheck.js` | Settings › Log › Typing check: records what a phone's keyboard does, for fixing typing problems |
 | `bible.js` | The Bible (WEB): fetching it once, references and word search |
 | `ui-bible.js` | The Bible reader, and putting passages in notes |
-| `bible-web.json` | The text of the World English Bible (public domain), fetched when the Bible is first opened |
+| `bible-web.json`, `bible-kjv.json`, `bible-bsb.json`, `bible-asv.json`, `bible-ylt.json` | The text of each translation (all public domain), fetched the first time it is opened |
 | `history.js` | One Undo and Redo for every change to a note: text, formatting, fonts, spacing and Brackets |
 | `versions.js` | Versions: earlier copies of each note, kept on this device, with Restore |
 | `channel.js` | Tells the live app from a beta copy, so each keeps its own notes and settings on a device |
@@ -423,9 +434,9 @@ Then open http://localhost:8000 in Edge or Chrome. Notes work immediately, saved
 
 The iPhone needs an HTTPS address. GitHub Pages hosts the app for free. Only the app's code goes to GitHub; your notes never do.
 
-1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.17.9` folder.
+1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.18.0` folder.
 2. **Create the repository.** In Safari, sign in at github.com, tap **+** › **New repository**. Name it `reiimei`, set it to **Public** (free Pages needs a public repository), and tap **Create repository**.
-3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.17.9` folder, tap **Select**, select all 94 files, and tap **Open**. Scroll down and tap **Commit changes**.
+3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.18.0` folder, tap **Select**, select all 98 files, and tap **Open**. Scroll down and tap **Commit changes**.
    - If you don't see the upload link, tap the **aA** button in Safari's address bar › **Request Desktop Website** and try again.
 4. **Turn on Pages.** In the repository, open **Settings** › **Pages**. Under **Build and deployment**, set Source to **Deploy from a branch**, Branch to **main** and **/ (root)**, then tap **Save**.
 5. **Wait a minute or two**, then reload the Pages screen. It shows your address, which looks like `https://yourname.github.io/reiimei/`.
@@ -564,7 +575,7 @@ The service worker caches the app files. When you change any file, bump `VERSION
 - **Settings › Log** › Download gives a text log of everything the app did, including sync results and errors.
 - **"Test connection"** in Settings › Sync confirms the URL, key, sign-in, and tables are all correct.
 
-## Known limits in v0.17.9
+## Known limits in v0.18.0
 
 - Images can be linked but not attached
 - Sources belong to one note; there is no shared library yet

@@ -1572,3 +1572,10 @@ input.switch:disabled { opacity: .5; cursor: default; }
   .bible-head input { min-width: 110px; font-size: 16px; }
   .bible-body { padding-left: 18px; padding-right: 18px; }
 }
+
+/* ---- v0.18.0: the Bible in the sidebar, several translations ---- */
+.bible-item .count { font: 600 11px var(--ui); letter-spacing: .06em; color: var(--ink-3); }
+.bible-ver { font: 600 12px var(--ui); letter-spacing: .08em; color: var(--ink-3); vertical-align: middle; margin-left: 6px; }
+.bible-count { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.bh-in { display: block; font: 12px var(--ui); color: var(--gold); margin-bottom: 2px; }
+.bible-head #bible-version { max-width: 84px; }

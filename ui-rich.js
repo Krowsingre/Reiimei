@@ -1028,6 +1028,11 @@ export function insertBlocks(md) {
   keepCaretVisible();
   return true;
 }
+export function selectedText() {
+  const s = sel();
+  if (s.rangeCount && inBox(s.anchorNode) && !s.isCollapsed) return s.toString();
+  return savedRange && inBox(savedRange.startContainer) && !savedRange.collapsed ? savedRange.toString() : '';
+}
 export function resume() { quiet = false; restoreCaret(); keepCaretVisible(); }
 export function setCaretOffsets(pair) {
   if (!active() || !pair) return false;
