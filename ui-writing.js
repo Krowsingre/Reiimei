@@ -132,8 +132,8 @@ export function renderToolbar(note) {
   $('note-spacing-row').hidden = code;
   $('note-brackets').checked = !!note.meta?.brackets;
   $('fmt-dock').hidden = code || ro;
-  if (code || ro) setFormatOpen(false);
-  else if (!$('fmt-panel').hidden) renderFormatPane();
+  if (code || ro) { if (!$('fmt-panel').hidden) closeFormatPane({ keyboard: false }); } else if (!$('fmt-panel').hidden) renderFormatPane();
+  else paintStyleState();
   $('btn-text-find').hidden = code;
   $('btn-scripture').hidden = code;
   $('btn-lookup').hidden = code;
@@ -253,14 +253,18 @@ export function renderCount() {
   if (el.textContent !== text) el.textContent = text;
 }
 
-// ---- The phone's Format button -------------------------------------------------------------
-// One button; its strip of five icons sits above the keyboard. An icon opens its panel in the
-// keyboard's place (the keyboard goes away), and ⌄ brings the keyboard back.
+// ---- The phone's formatting: quick row and deck -------------------------------------------
+// A row of quick styles (Bold, Italic, Underline, Highlight) sits at the bottom of the note, above
+// the keyboard. Aa opens the deck in the keyboard's place (the keyboard goes away), with three
+// tabs: Text, Structure and Tools. Aa again (or the note itself) brings the keyboard back.
 let kbHeight = 0;
-export function openFormatPane(name) {
+let paneNow = 'text';
+export function openFormatPane(name = paneNow) {
   const dock = $('fmt-dock');
   const note = app.note();
   if (!note || note.deleted || isCodeNote(note)) return;
+  if (!['text', 'structure', 'tools'].includes(name)) name = 'text';
+  paneNow = name;
   const vv = window.visualViewport;
   const kb = vv ? window.innerHeight - vv.height : 0;
   if (kb > 120) kbHeight = kb;
@@ -268,76 +272,130 @@ export function openFormatPane(name) {
   rich.setQuiet(true);
   if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
   dock.dataset.pane = name;
+  dock.dataset.open = 'true';
   for (const p of dock.querySelectorAll('.fmt-pane')) p.hidden = p.dataset.pane !== name;
-  for (const b of dock.querySelectorAll('.fmt-icon')) b.setAttribute('aria-pressed', String(b.dataset.pane === name));
+  for (const t of dock.querySelectorAll('.fmt-tab')) t.setAttribute('aria-selected', String(t.dataset.pane === name));
   const panel = $('fmt-panel');
-  panel.style.setProperty('--kb', `${Math.max(220, Math.min(kbHeight || 300, Math.round(window.innerHeight * 0.5)))}px`);
+  panel.style.setProperty('--kb', `${Math.max(260, Math.min(kbHeight || 320, Math.round(window.innerHeight * 0.55)))}px`);
   panel.hidden = false;
+  $('btn-fmt').setAttribute('aria-expanded', 'true');
   renderFormatPane();
 }
 export function closeFormatPane({ keyboard = true } = {}) {
   const dock = $('fmt-dock');
   $('fmt-panel').hidden = true;
   delete dock.dataset.pane;
-  for (const b of dock.querySelectorAll('.fmt-icon')) b.setAttribute('aria-pressed', 'false');
+  dock.dataset.open = 'false';
+  $('btn-fmt').setAttribute('aria-expanded', 'false');
   rich.setQuiet(false);
   if (keyboard) { if (rich.active()) rich.resume(); else $('body').focus(); }
 }
-function setFormatOpen(open) {
-  const dock = $('fmt-dock');
-  dock.dataset.open = String(open);
-  $('fmt-strip').hidden = !open;
-  $('btn-fmt').setAttribute('aria-expanded', String(open));
-  if (!open && !$('fmt-panel').hidden) closeFormatPane({ keyboard: false });
+const deckOpen = () => !$('fmt-panel').hidden;
+// Which styles the words at the caret (or the selection) already have.
+function styleState() {
+  const on = new Set();
+  if (!rich.active()) return on;
+  const s = getSelection();
+  let n = s.rangeCount && $('rich').contains(s.anchorNode) ? s.anchorNode : null;
+  if (!n) n = rich.caretNode?.() || null;
+  const el = n && (n.nodeType === 3 ? n.parentElement : n);
+  if (!el || !$('rich').contains(el)) return on;
+  if (el.closest('strong, b')) on.add('b');
+  if (el.closest('em, i')) on.add('i');
+  if (el.closest('u')) on.add('u');
+  if (el.closest('s, strike, del')) on.add('s');
+  if (el.closest('mark')) on.add('mark');
+  return on;
+}
+function paintStyleState() {
+  const on = styleState();
+  for (const b of $('fmt-dock').querySelectorAll('.fq[data-do], .fmt-pane[data-pane="text"] .fp[data-do]')) b.setAttribute('aria-pressed', String(on.has(b.dataset.do)));
 }
 function renderFormatPane() {
   const note = app.note();
   if (!note) return;
-  const box = $('fp-fonts');
-  const current = fonts.fontId(note.meta?.font);
-  box.innerHTML = fonts.shownFonts(app.prefs().hiddenFonts || []).map((f) => `<button type="button" class="fp-font" role="option" data-font="${f.id}" aria-selected="${f.id === current}">${f.name}</button>`).join('');
+  fonts.fillFontSelect($('fp-font'), { hidden: app.prefs().hiddenFonts || [], current: fonts.fontId(note.meta?.font) });
   const s = spacingOf(note);
   $('fp-lh').value = String(s.lh);
-  $('fp-lh-v').textContent = fmt.lh(s.lh);
+  $('fp-lh-v').textContent = `${Number(s.lh).toFixed(2)}×`;
   const dock = $('fmt-dock');
-  dock.querySelector('[data-do="brackets"]').setAttribute('aria-pressed', String(!!note.meta?.brackets));
-  const copyBtn = dock.querySelector('[data-do="bracketcopy"]');
-  copyBtn.hidden = !note.meta?.brackets;
-  copyBtn.setAttribute('aria-pressed', String(app.prefs().bracketCopy !== false));
+  dock.querySelector('[data-do="brackets"]').setAttribute('aria-checked', String(!!note.meta?.brackets));
+  dock.querySelector('[data-do="bracketcopy"]').setAttribute('aria-pressed', String(app.prefs().bracketCopy !== false));
   const ids = new Set(F.TOOLBAR[fmtOf(note)].map((t) => t.id));
-  for (const b of dock.querySelectorAll('.fp[data-do]')) {
+  for (const b of dock.querySelectorAll('[data-do]')) {
     const d = b.dataset.do;
-    if (['b', 'i', 'u', 's', 'mark', 'ul', 'ol', 'task', 'quote', 'indent', 'outdent'].includes(d)) b.hidden = !ids.has(d);
-    else if (/^h[123]$|^p$|^hr$/.test(d)) b.hidden = !rich.active();
+    if (['b', 'i', 'u', 's', 'mark', 'ul', 'ol', 'task', 'quote', 'indent', 'outdent', 'link'].includes(d)) b.hidden = !ids.has(d);
+    else if (['h', 'p', 'hr', 'clear', 'unlink'].includes(d)) b.hidden = !rich.active();
+  }
+  paintStyleState();
+}
+// The words selected in the note, as they would be copied (labels left out when asked).
+function selectionForCopy() {
+  let text = '';
+  if (rich.active()) text = rich.selectedText() || '';
+  else { const ta = $('body'); text = ta.value.slice(ta.selectionStart, ta.selectionEnd); }
+  const note = app.note();
+  if (text && note?.meta?.brackets && app.prefs().bracketCopy === false) text = brackets.stripLabels(text, { markdown: note.format === 'markdown' });
+  return text;
+}
+async function deckTool(d) {
+  const note = app.note();
+  if (!note || note.deleted || note.locked) return;
+  switch (d) {
+    case 'brackets': $('note-brackets').click(); break;
+    case 'bracketcopy': { const c = $('note-brackets-copy'); c.checked = !c.checked; c.dispatchEvent(new Event('change', { bubbles: true })); break; }
+    case 'case': await changeCase(); break;
+    case 'clear': if (!rich.clearFormatting()) app.toast('Select some words first'); break;
+    case 'unlink': if (!rich.removeLink()) app.toast('Select a link first'); break;
+    case 'copy': {
+      const text = selectionForCopy();
+      if (!text) { app.toast('Select some words first'); break; }
+      try { await navigator.clipboard.writeText(text); app.toast('Copied'); } catch { app.toast('Could not copy here'); }
+      break;
+    }
+    case 'paste': {
+      let text = '';
+      try { text = await navigator.clipboard.readText(); } catch { app.toast('Paste is not allowed here. Use the keyboard’s Paste.'); break; }
+      if (!text) { app.toast('Nothing to paste'); break; }
+      closeFormatPane();
+      if (rich.active()) document.execCommand('insertText', false, text);
+      else { const ta = $('body'); ta.setRangeText(text, ta.selectionStart, ta.selectionEnd, 'end'); ta.dispatchEvent(new Event('input', { bubbles: true })); }
+      break;
+    }
+    case 'selectall': {
+      closeFormatPane();
+      if (rich.active()) { const r = document.createRange(); r.selectNodeContents($('rich')); getSelection().removeAllRanges(); getSelection().addRange(r); rich.saveCaret(); } else $('body').select();
+      break;
+    }
+    case 'find': closeFormatPane({ keyboard: false }); openTextFind(); break;
+    default:
+      if (rich.active()) await rich.apply(d);
+      else applyToolById(d);
   }
 }
 function initFormatDock() {
   const dock = $('fmt-dock');
-  // Nothing in the dock takes the focus from the note (the keyboard stays up for the strip).
+  // Nothing in the dock takes the focus from the note (the keyboard stays up for the quick row).
   for (const t of ['pointerdown', 'mousedown']) dock.addEventListener(t, (e) => { if (e.target.closest('button') && (document.activeElement === $('rich') || document.activeElement === $('body'))) e.preventDefault(); });
-  $('btn-fmt').addEventListener('click', () => setFormatOpen(dock.dataset.open !== 'true'));
-  $('fmt-strip').addEventListener('click', (e) => {
-    const b = e.target.closest('.fmt-icon');
-    if (!b) return;
-    if (dock.dataset.pane === b.dataset.pane) closeFormatPane(); else openFormatPane(b.dataset.pane);
-  });
-  $('fmt-close').addEventListener('click', () => closeFormatPane());
-  $('fmt-panel').addEventListener('click', async (e) => {
-    const b = e.target.closest('.fp[data-do]');
-    const f = e.target.closest('.fp-font');
-    if (f) { const s = $('note-font'); s.value = f.dataset.font; s.dispatchEvent(new Event('change', { bubbles: true })); setTimeout(renderFormatPane, 50); return; }
+  $('btn-fmt').addEventListener('click', () => { if (deckOpen()) closeFormatPane(); else openFormatPane(); });
+  $('fmt-quick').addEventListener('click', async (e) => {
+    const b = e.target.closest('.fq[data-do]');
     if (!b || b.disabled) return;
-    const d = b.dataset.do;
-    if (d === 'brackets') $('note-brackets').click();
-    else if (d === 'bracketcopy') { const c = $('note-brackets-copy'); c.checked = !c.checked; c.dispatchEvent(new Event('change', { bubbles: true })); }
-    else if (d === 'case') await changeCase();
-    else if (rich.active()) await rich.apply(d);
-    else applyToolById(d);
-    // Putting the selection back can hand the note the focus (and a phone its keyboard): give it
-    // back while the panel is open.
-    if (!$('fmt-panel').hidden && (document.activeElement === $('rich') || document.activeElement === $('body'))) document.activeElement.blur();
-    setTimeout(renderFormatPane, 50);
+    if (rich.active()) await rich.apply(b.dataset.do); else applyToolById(b.dataset.do);
+    if (deckOpen() && (document.activeElement === $('rich') || document.activeElement === $('body'))) document.activeElement.blur();
+    setTimeout(deckOpen() ? renderFormatPane : paintStyleState, 50);
   });
+  dock.querySelector('.fmt-tabs').addEventListener('click', (e) => { const t = e.target.closest('.fmt-tab'); if (t) openFormatPane(t.dataset.pane); });
+  $('fmt-panel').addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-do]');
+    if (!b || b.disabled || b.closest('.fmt-quick')) return;
+    await deckTool(b.dataset.do);
+    // Putting the selection back can hand the note the focus (and a phone its keyboard): give it
+    // back while the deck is open.
+    if (deckOpen() && (document.activeElement === $('rich') || document.activeElement === $('body'))) document.activeElement.blur();
+    if (deckOpen()) setTimeout(renderFormatPane, 50);
+  });
+  $('fp-font').addEventListener('change', (e) => { const s = $('note-font'); s.value = e.target.value; s.dispatchEvent(new Event('change', { bubbles: true })); setTimeout(renderFormatPane, 50); });
   $('fp-lh').addEventListener('input', (e) => {
     const n = app.note();
     if (!n) return;
@@ -345,11 +403,13 @@ function initFormatDock() {
     $('sp-lh').value = e.target.value;
     $('sp-ls').value = String(s.ls);
     $('sp-ws').value = String(s.ws);
-    $('fp-lh-v').textContent = fmt.lh(Number(e.target.value));
+    $('fp-lh-v').textContent = `${Number(e.target.value).toFixed(2)}×`;
     spacingInput();
   });
-  // Leaving the note folds the strip away.
-  $('rich').addEventListener('blur', () => { if ($('fmt-panel').hidden && !document.activeElement?.closest?.('#fmt-dock')) setTimeout(() => { if (document.activeElement !== $('rich') && $('fmt-panel').hidden) setFormatOpen(false); }, 200); });
+  // The quick row shows which styles the caret is in.
+  document.addEventListener('selectionchange', () => { if (!dock.hidden && isPhone()) paintStyleState(); });
+  // Tapping the note brings the keyboard back in place of the deck.
+  for (const id of ['rich', 'body']) $(id).addEventListener('pointerdown', () => { if (deckOpen()) closeFormatPane({ keyboard: false }); });
 }
 
 // ---- Find and replace (Text, Markdown and Populi notes) --------------------------------------

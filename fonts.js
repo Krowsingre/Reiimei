@@ -18,6 +18,8 @@ export const FONTS = [
   { id: 'earthshine', pack: 'ilunir', name: 'Ilunir Earthshine', group: 'Ilunir fonts' },
   { id: 'phaseline', pack: 'ilunir', name: 'Ilunir Phase Line', group: 'Ilunir fonts' },
   { id: 'codex-caps', pack: 'ilunir', name: 'Ilunir Codex Capitals', group: 'Ilunir fonts' },
+  { id: 'ampulla', pack: 'ampulla', name: 'Ampulla', group: 'Ampulla fonts' },
+  { id: 'ampulla-petite', pack: 'ampulla', name: 'Ampulla Petite', group: 'Ampulla fonts' },
   { id: 'serif', pack: 'device', name: 'System serif', group: 'Device fonts' },
   { id: 'sans', pack: 'device', name: 'System sans-serif', group: 'Device fonts' },
 ];
@@ -26,6 +28,7 @@ export const FONT_IDS = FONTS.map((f) => f.id);
 export const PACKS = [
   { id: 'reiimei', name: 'Reiimei' },
   { id: 'ilunir', name: 'Ilunir' },
+  { id: 'ampulla', name: 'Ampulla' },
   { id: 'device', name: 'This device' },
 ];
 export const DEFAULT_FONT = 'display';      // notes

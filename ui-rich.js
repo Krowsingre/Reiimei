@@ -614,6 +614,60 @@ export function applyFont(id, noteFont) {
   return true;
 }
 
+// Take a text node out of the element around it, splitting the element there.
+function liftOut(t) {
+  const run = t.parentElement;
+  const after = run.cloneNode(false);
+  let n = t.nextSibling;
+  while (n) { const next = n.nextSibling; after.appendChild(n); n = next; }
+  run.after(t);
+  if (after.childNodes.length) t.after(after);
+  if (!run.childNodes.length) run.remove();
+}
+const STYLE_SEL = 'strong, b, em, i, u, s, strike, del, mark, sup, sub, code, span.f-run, span.z-run';
+// Clear formatting: the selected words lose bold, italic, highlight, fonts, sizes and the rest.
+export function clearFormatting() {
+  if (!active() || box.contentEditable !== 'true') return false;
+  restoreCaret();
+  if (!sel().rangeCount || sel().isCollapsed) return false;
+  const texts = textsIn(sel().getRangeAt(0));
+  if (!texts.length) return false;
+  for (const t of texts) while (t.parentElement !== box && t.parentElement.matches(STYLE_SEL)) liftOut(t);
+  selectTexts(texts);
+  saveCaret();
+  pushToBody();
+  return true;
+}
+// Remove link: the selected words (or the link the caret is in) stop being a link.
+export function removeLink() {
+  if (!active() || box.contentEditable !== 'true') return false;
+  restoreCaret();
+  if (!sel().rangeCount) return false;
+  const r = sel().getRangeAt(0);
+  if (r.collapsed) {
+    const n = r.startContainer;
+    const a = (n.nodeType === 3 ? n.parentElement : n)?.closest?.('a');
+    if (!a || !box.contains(a)) return false;
+    a.replaceWith(...a.childNodes);
+  } else {
+    const texts = textsIn(r);
+    let any = false;
+    for (const t of texts) {
+      const a = t.parentElement.closest('a');
+      if (!a || !box.contains(a)) continue;
+      any = true;
+      // Lift the text out of everything up to and including the link.
+      while (t.parentElement !== a) liftOut(t);
+      liftOut(t);
+    }
+    if (!any) return false;
+  }
+  box.normalize();
+  saveCaret();
+  pushToBody();
+  return true;
+}
+
 // A size on the selected words, as the Font menu does with a font ('m' is the note's own size).
 const sizeRun = (z) => { const el = document.createElement('span'); el.className = 'z-run'; el.dataset.size = z; return el; };
 export function applySize(z, noteSize = 'm') {

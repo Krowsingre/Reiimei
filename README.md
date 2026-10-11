@@ -1,8 +1,50 @@
-# Reiimei v0.18.4
+# Reiimei v0.19.1
 
 *reiimei* (ree-h-may), n. The cold, luminous stillness peculiar to a clear winter night; especially the effect of moonlight upon frost, illuminating the night without dispelling it.
 
 An offline-first notes app for Windows and iPhone, built as a Progressive Web App (PWA). No Mac, no App Store, no developer fee.
+
+## What changed in v0.19.1
+
+- **The phone's note screen follows the concept exactly.**
+  - The top row is back, **reiimei** and ⋯.
+  - Under it, in the note, sit a small eyebrow (for example "NOTE / SATURDAY": the kind of note and the day it was started) and the title in large type.
+  - **Undo** and **Redo** moved from the top row to the start of the ⋯ menu.
+- **The deck uses the concept's wording and rows.**
+  - Labels: Character styling, Writing font, Line spacing (shown as 1.50×), Paragraph, Lists and indentation, Labels and transformations, Additional editor tools.
+  - The Text tab has the writing font only. The size menu added in v0.19.0 is gone; the computer's Size menu still sizes text.
+  - **Copy with labels** is always listed, as a row you tap to turn on and off.
+  - The helper text under each tool matches the concept.
+- **Ampulla's licence** now matches the other Krowsingre fonts: "Copyright 2026 Krowsingre Publishing LLC. All rights reserved." It is recorded inside both font files, with Krowsingre Publishing LLC as the maker.
+- Still 102 files. No Supabase changes.
+- **Upload these files** (changed since v0.19.0): `Ampulla-Regular.ttf`, `AmpullaPetite-Regular.ttf`, `app.js`, `index.html`, `styles.css`, `sw.js`, `ui-writing.js`, `README.md`.
+
+## What changed in v0.19.0
+
+- **New phone formatting** (the Integrated Deck design).
+  - **Quick row.** A row sits at the bottom of a note, above the keyboard: **Bold**, **Italic**, **Underline** and **Highlight**, which light up when the cursor is in text with that style, and **Aa**.
+  - **Aa** opens the deck in the keyboard's place, with three tabs. **Aa** again, or tapping the note, brings the keyboard back.
+  - **Text:** Bold, Italic, Underline, Strike and Highlight; the writing font and text size; and a line-spacing slider.
+  - **Structure:** Normal, Heading (each tap steps through Heading 1, 2, 3), Quote and Divider; then Bullets, Numbers, Checklist, Outdent and Indent.
+  - **Tools:**
+    - **Brackets** (a switch).
+    - **Change case.**
+    - **Copy with labels** (a switch, shown when Brackets is on).
+    - **Clear formatting** (new): takes bold, italic, highlight, fonts and sizes off the selected words.
+    - **Insert link.**
+    - **Remove link** (new).
+    - **Copy**, **Paste**, **Select all** and **Find**.
+  - This replaces the Format button and its strip of five icons.
+- **The Reiimei icon pack** (64 icons) is now used across the app:
+  - the sidebar (All notes, This device with a phone or computer icon, folders, tags, Recently Deleted)
+  - the note list (new note, share, the ⋯ menus, duplicate, delete, pin)
+  - the note header (back, close, focus, undo, redo)
+  - the computer's formatting buttons (bold, italic, underline, strikethrough, highlight, heading, superscript, subscript, lists, indents, Insert)
+  - every close and back button, Settings and the sidebar fold
+  The icons follow light and dark mode. Sort and the Bible's Books button keep their own icons, as the pack has none for them.
+- **Ampulla** and **Ampulla Petite**, an original font family (v0.1), are in every Font menu and in Settings › Fonts as the Ampulla pack. They cover a–z, A–Z, 0–9 and common punctuation; other characters (accented letters, @ # $ % & and so on) show in Reiimei Display.
+- Two new files, `Ampulla-Regular.ttf` and `AmpullaPetite-Regular.ttf`, so 102 files now. No Supabase changes.
+- **Upload these files** (changed since v0.18.4): `Ampulla-Regular.ttf` (new), `AmpullaPetite-Regular.ttf` (new), `app.js`, `fonts.js`, `index.html`, `styles.css`, `sw.js`, `ui-rich.js`, `ui-writing.js`, `README.md`.
 
 ## What changed in v0.18.4
 
@@ -441,6 +483,7 @@ Note: a device still on v0.7 would show the hidden cache record in Recently Dele
 | `Echolume-VF.woff2`, `Echolume-Italic-VF.woff2` | Echolume font (variable weight), © Krowsingre Publishing LLC |
 | `ReiimeiDisplay-*.woff` | Reiimei Display font (six styles), © Krowsingre Publishing LLC |
 | `Ilunir*.woff` | Ilunir fonts (41 files), © Krowsingre Publishing LLC |
+| `Ampulla-Regular.ttf`, `AmpullaPetite-Regular.ttf` | Ampulla fonts (v0.1), © Krowsingre Publishing LLC. All rights reserved. |
 | `fonts.js` | The list of fonts for the Font menu and the interface font setting |
 | `capitals.js` | The Aa button: capitals at the start of lines and sentences, or all lowercase |
 | `typingcheck.js` | Settings › Log › Typing check: records what a phone's keyboard does, for fixing typing problems |
@@ -479,9 +522,9 @@ Then open http://localhost:8000 in Edge or Chrome. Notes work immediately, saved
 
 The iPhone needs an HTTPS address. GitHub Pages hosts the app for free. Only the app's code goes to GitHub; your notes never do.
 
-1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.18.4` folder.
+1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.19.1` folder.
 2. **Create the repository.** In Safari, sign in at github.com, tap **+** › **New repository**. Name it `reiimei`, set it to **Public** (free Pages needs a public repository), and tap **Create repository**.
-3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.18.4` folder, tap **Select**, select all 100 files, and tap **Open**. Scroll down and tap **Commit changes**.
+3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.19.1` folder, tap **Select**, select all 102 files, and tap **Open**. Scroll down and tap **Commit changes**.
    - If you don't see the upload link, tap the **aA** button in Safari's address bar › **Request Desktop Website** and try again.
 4. **Turn on Pages.** In the repository, open **Settings** › **Pages**. Under **Build and deployment**, set Source to **Deploy from a branch**, Branch to **main** and **/ (root)**, then tap **Save**.
 5. **Wait a minute or two**, then reload the Pages screen. It shows your address, which looks like `https://yourname.github.io/reiimei/`.
@@ -620,7 +663,7 @@ The service worker caches the app files. When you change any file, bump `VERSION
 - **Settings › Log** › Download gives a text log of everything the app did, including sync results and errors.
 - **"Test connection"** in Settings › Sync confirms the URL, key, sign-in, and tables are all correct.
 
-## Known limits in v0.18.4
+## Known limits in v0.19.1
 
 - Images can be linked but not attached
 - Sources belong to one note; there is no shared library yet

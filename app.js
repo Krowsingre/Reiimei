@@ -21,7 +21,7 @@ import * as bibleUi from './ui-bible.js';
 import * as bible from './bible.js';
 import { noteTitle, noteSnippet, ownTitle, fallbackTitle, sharedFileCheck, plainText } from './share.js';
 
-export const APP_VERSION = '0.18.4';
+export const APP_VERSION = '0.19.1';
 // boot.js compares this with the page's version to catch a launch that mixes two releases.
 window.__reiimeiVersion = APP_VERSION;
 export const BUILD_DATE = '2026-10-04';
@@ -580,17 +580,19 @@ function ask({ title, text = '', value = null, placeholder = '', okText = 'OK', 
 }
 
 // ---- Rendering ---------------------------------------------------------
+// Icons from the Reiimei icon pack (the sprite in index.html).
+const ri = (name) => `<svg class="ri" aria-hidden="true"><use href="#ri-${name}"/></svg>`;
 const ICONS = {
-  all: '<svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h8M8 17h5"/></svg>',
-  none: '<svg viewBox="0 0 24 24"><path d="M14 3H6v18h12V7z"/><path d="M14 3v4h4"/></svg>',
-  device: '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="12" rx="1.5"/><path d="M2 20h20"/></svg>',
-  folder: '<svg viewBox="0 0 24 24"><path d="M3 6h6l2 2h10v11H3z"/></svg>',
-  tag: '<svg viewBox="0 0 24 24"><path d="M20 12l-8 8-9-9V3h8z"/><circle cx="7.5" cy="7.5" r="1.2"/></svg>',
-  trash: '<svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>',
-  more: '<svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg>',
-  pin: '<svg viewBox="0 0 24 24"><path d="M12 17v5"/><path d="M9 10.8V4h6v6.8l3 3.2H6z"/></svg>',
-  bnote: '<svg viewBox="0 0 24 24"><path d="M5 4h11l3 3v13H5z"/><path d="M12 8v8M9 11h6"/></svg>',
-  highlight: '<svg viewBox="0 0 24 24"><path d="M14 4l6 6-8 8H6v-6z"/><path d="M4 21h9"/></svg>',
+  all: ri('all-notes'),
+  none: ri('unfiled'),
+  get device() { return ri(isPhone() ? 'device-mobile' : 'device-computer'); },
+  folder: ri('folder'),
+  tag: ri('tag'),
+  trash: ri('trash'),
+  more: ri('more-options'),
+  pin: ri('pin'),
+  bnote: ri('filed-note'),
+  highlight: ri('highlight'),
 };
 
 const MAX_TAGS = 5;
@@ -674,7 +676,7 @@ function renderSidebar() {
       t.className = 'sub-toggle';
       t.setAttribute('aria-expanded', String(open));
       t.setAttribute('aria-label', `${open ? 'Hide' : 'Show'} the subfolders of ${modes.projectName(f)}`);
-      t.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
+      t.innerHTML = ri('dropdown');
       t.addEventListener('click', () => { setPrefs({ closedFolders: open ? [...closed, f.id] : closed.filter((x) => x !== f.id) }); renderSidebar(); });
       li.prepend(t);
       li.classList.add('has-sub');
@@ -838,6 +840,9 @@ function noteRow(n, multi) {
     </li>`;
 }
 
+// The phone's eyebrow over the title: what kind of note it is, and the day it was started.
+const EYEBROW = { notes: 'Note', research: 'Research', coding: 'Code', storyboard: 'Story', bible: 'Bible note' };
+
 function renderEditor() {
   const n = currentNote();
   const show = !!n;
@@ -871,6 +876,7 @@ function renderEditor() {
   el.folderBtn.title = n.deleted ? where : `${where}: change where this note is kept`;
   el.folderBtn.setAttribute('aria-label', `${where}: ${folderLabel(n)}`);
   $('editor').dataset.kind = modes.kindOf(n);
+  $('note-eyebrow').textContent = `${EYEBROW[modes.kindOf(n)] || 'Note'} / ${new Date(n.created_at || n.updated_at).toLocaleDateString([], { weekday: 'long' })}`;
   const pass = modes.kindOf(n) === modes.BIBLE ? n.meta?.passage : null;
   $('passage-bar').hidden = !pass;
   if (pass) $('btn-passage').textContent = `${pass.label || 'Passage'}${pass.version ? ` (${bible.version(pass.version).short})` : ''}`;
@@ -1482,7 +1488,7 @@ function highlightCards(groups) {
     const color = bible.hlColor(first.color);
     return `<li class="hl-item hl-${color}" data-ids="${ids}" data-ref="${esc(first.book)}:${first.c}:${first.v}:${last.v}" data-version="${esc(first.version || '')}">
       <div class="hl-head"><button type="button" class="hl-ref" data-hl="open">${esc(ref)}</button><span class="hl-ver">${esc(bible.version(first.version).short)}</span><span class="spacer"></span>
-      <button type="button" class="icon-btn hl-remove" data-hl="remove" aria-label="Remove this highlight" title="Remove this highlight"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>
+      <button type="button" class="icon-btn hl-remove" data-hl="remove" aria-label="Remove this highlight" title="Remove this highlight">${ri('close')}</button></div>
       <p class="hl-text">${esc(text)}</p>
       <div class="hl-palette" role="group" aria-label="Colour">${bible.highlightPalette(color, 'data-hl="color" ')}</div>
     </li>`;
@@ -1513,7 +1519,7 @@ function renderBibleHome(notes) {
   const marks = liveBookmarks();
   const groups = highlightGroups();
   const multi = knownDevices().length > 1;
-  const x = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>';
+  const x = ri('close');
   el.noteList.innerHTML = `
     <li class="bh-sec" id="bh-bible">
       <div class="bh-read"><button type="button" class="btn primary" id="bh-open">${last ? 'Continue reading' : 'Open the Bible'}</button><button type="button" class="btn" id="bh-books">Books</button><button type="button" class="btn" id="bh-conc">Concordance</button></div>
@@ -1812,6 +1818,8 @@ function openNoteMenu() {
   if (!n) return;
   if (isPhone()) {
     openMenu(el.noteMenu, 'Note', [
+      { label: 'Undo', disabled: $('btn-undo').disabled, run: () => stepHistory(-1) },
+      { label: 'Redo', disabled: $('btn-redo').disabled, run: () => stepHistory(1) },
       { label: 'Share…', run: async () => { await flushSave(); const x = currentNote(); if (x) shareUi.open([x], { single: true }); } },
       { label: 'Tags…', disabled: n.deleted || n.locked, run: openTagsSheet },
       { label: n.pinned ? 'Unpin' : 'Pin to top', disabled: n.deleted, run: () => { const x = currentNote(); if (x) updateCurrent({ pinned: !x.pinned }); } },
@@ -2493,12 +2501,11 @@ function bindEvents() {
   // The Tags sheet (phone): the note's tag row, shown on its own.
   $('btn-tags-done').addEventListener('click', () => $('tags-dialog').close());
   $('tags-dialog').addEventListener('close', () => { const row = $('tag-row'); const top = $('ed-top'); if (row.parentElement !== top) top.insertBefore(row, $('toolbar')); });
-  // The phone's top row: back, the title, Undo and Redo, ⋯ (the title moves up beside them).
+  // The title stays at the top of the note (on a phone, under its eyebrow; the top row is back,
+  // reiimei and ⋯). A version before v0.19.1 moved it into the top row on a phone.
   const placeTitle = () => {
     const row = $('title-row');
-    const head = document.querySelector('.editor-head');
-    if (isPhone()) { if (row.parentElement !== head) head.insertBefore(row, head.querySelector('.spacer')); }
-    else if (row.parentElement !== $('ed-top')) $('ed-top').insertBefore(row, $('ed-top').firstChild);
+    if (row.parentElement !== $('ed-top')) $('ed-top').insertBefore(row, $('note-eyebrow').nextSibling);
   };
   window.matchMedia('(max-width: 760px)').addEventListener('change', placeTitle);
   placeTitle();

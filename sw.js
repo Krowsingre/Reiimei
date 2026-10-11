@@ -2,7 +2,7 @@
 // Bump VERSION whenever any app file changes so devices pick up the update.
 // A beta copy (a folder with "beta" in its name) keeps its own offline copy (channel.js).
 const PREFIX = /beta/.test((self.location.pathname.split('/').filter(Boolean)[0] || '').toLowerCase()) ? 'reiimei-beta-v' : 'reiimei-v';
-const VERSION = `${PREFIX}0.18.4`;
+const VERSION = `${PREFIX}0.19.1`;
 const SHELL = [
   './',
   './index.html',
@@ -43,6 +43,8 @@ const SHELL = [
   './render.html',
   './render.js',
   './Echolume-VF.woff2',
+  './Ampulla-Regular.ttf',
+  './AmpullaPetite-Regular.ttf',
   './ReiimeiDisplay-Light.woff',
   './ReiimeiDisplay-LightItalic.woff',
   './ReiimeiDisplay-Regular.woff',
