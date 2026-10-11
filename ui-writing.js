@@ -242,10 +242,16 @@ export function renderCount() {
   if (el.hidden === on) el.hidden = !on;
   if (!on) return;
   let all;
-  try { all = isCodeNote(note) ? $('body').value : (rich.active() ? $('rich').innerText : S.plainText({ ...note, body: $('body').value, meta: note.meta || {} }, {})); } catch { all = $('body').value; }
-  const total = countOf(all);
+  const stored = () => { try { return S.plainText({ ...note, body: $('body').value, meta: note.meta || {} }, {}); } catch { return $('body').value; } };
+  try { all = isCodeNote(note) ? $('body').value : (rich.active() ? $('rich').innerText : stored()); } catch { all = $('body').value; }
+  let total = countOf(all);
+  if (!total.chars && !isCodeNote(note) && $('body').value.trim()) total = countOf(stored());
   let part = null;
-  if (rich.active()) { const s = getSelection(); if (s.rangeCount && !s.isCollapsed && $('rich').contains(s.anchorNode)) part = countOf(s.toString()); }
+  if (rich.active()) {
+    const s = getSelection();
+    const text = s.rangeCount && !s.isCollapsed && $('rich').contains(s.anchorNode) ? s.toString() : '';
+    if (text.trim()) part = countOf(text);
+  }
   else { const ta = $('body'); if (document.activeElement === ta && ta.selectionEnd > ta.selectionStart) part = countOf(ta.value.slice(ta.selectionStart, ta.selectionEnd)); }
   const w = (n) => `${fmtN(n)} ${n === 1 ? 'word' : 'words'}`;
   const c = (n) => `${fmtN(n)} ${n === 1 ? 'character' : 'characters'}`;
@@ -259,11 +265,13 @@ export function renderCount() {
 // tabs: Text, Structure and Tools. Aa again (or the note itself) brings the keyboard back.
 let kbHeight = 0;
 let paneNow = 'text';
+let deckFromTyping = false; // the keyboard was up when the deck opened
 export function openFormatPane(name = paneNow) {
   const dock = $('fmt-dock');
   const note = app.note();
   if (!note || note.deleted || isCodeNote(note)) return;
   if (!['text', 'structure', 'tools'].includes(name)) name = 'text';
+  if ($('fmt-panel').hidden) deckFromTyping = document.activeElement === $('rich') || document.activeElement === $('body');
   paneNow = name;
   const vv = window.visualViewport;
   const kb = vv ? window.innerHeight - vv.height : 0;
@@ -377,7 +385,7 @@ function initFormatDock() {
   const dock = $('fmt-dock');
   // Nothing in the dock takes the focus from the note (the keyboard stays up for the quick row).
   for (const t of ['pointerdown', 'mousedown']) dock.addEventListener(t, (e) => { if (e.target.closest('button') && (document.activeElement === $('rich') || document.activeElement === $('body'))) e.preventDefault(); });
-  $('btn-fmt').addEventListener('click', () => { if (deckOpen()) closeFormatPane(); else openFormatPane(); });
+  $('btn-fmt').addEventListener('click', () => { if (deckOpen()) closeFormatPane({ keyboard: deckFromTyping }); else openFormatPane(); });
   $('fmt-quick').addEventListener('click', async (e) => {
     const b = e.target.closest('.fq[data-do]');
     if (!b || b.disabled) return;
@@ -1326,6 +1334,8 @@ export function init(hooks) {
   let countTimer = null;
   const recount = () => { clearTimeout(countTimer); countTimer = setTimeout(renderCount, 120); };
   $('body').addEventListener('input', recount);
+  // Typing, dictation and the keyboard coming and going recount straight away too.
+  for (const t of ['input', 'focus', 'blur', 'compositionend']) $('rich').addEventListener(t, recount);
   document.addEventListener('selectionchange', () => { if (!$('word-count').hidden) recount(); });
   $('note-font').addEventListener('change', async (e) => {
     const note = app.note();

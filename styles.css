@@ -1718,3 +1718,8 @@ html[data-bible] .bv-n[role="button"] { cursor: pointer; color: var(--accent); }
   .rich, #body { padding-left: 25px; padding-right: 25px; }
 }
 @media (max-width: 760px) { .fmt-row[aria-pressed="true"] { background: var(--accent-soft); border-radius: 8px; } }
+
+/* ---- v0.19.2: with the keyboard down, the quick row clears the iPhone's home bar ---- */
+@media (max-width: 760px) {
+  :root:not([data-kb="open"]) .fmt-dock[data-open="false"] .fmt-quick { height: auto; min-height: 53px; padding-bottom: calc(6px + env(safe-area-inset-bottom)); }
+}

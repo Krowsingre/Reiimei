@@ -21,7 +21,7 @@ import * as bibleUi from './ui-bible.js';
 import * as bible from './bible.js';
 import { noteTitle, noteSnippet, ownTitle, fallbackTitle, sharedFileCheck, plainText } from './share.js';
 
-export const APP_VERSION = '0.19.1';
+export const APP_VERSION = '0.19.2';
 // boot.js compares this with the page's version to catch a launch that mixes two releases.
 window.__reiimeiVersion = APP_VERSION;
 export const BUILD_DATE = '2026-10-04';
