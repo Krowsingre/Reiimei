@@ -19,9 +19,10 @@ import { createHistory, lookOf, sameLook, LOOK_KEYS } from './history.js';
 import * as typingCheck from './typingcheck.js';
 import * as bibleUi from './ui-bible.js';
 import * as bible from './bible.js';
+import * as speech from './speak.js';
 import { noteTitle, noteSnippet, ownTitle, fallbackTitle, sharedFileCheck, plainText } from './share.js';
 
-export const APP_VERSION = '0.19.2';
+export const APP_VERSION = '0.19.3';
 // boot.js compares this with the page's version to catch a launch that mixes two releases.
 window.__reiimeiVersion = APP_VERSION;
 export const BUILD_DATE = '2026-10-04';
@@ -1038,7 +1039,7 @@ async function selectNote(id) {
   await flushSave();
   const prev = state.currentId;
   if (prev && prev !== id) keepVersion(prev, 'left'); // in the background: opening the next note does not wait
-  if (prev !== id) writing.closeTextFind({ focus: false });
+  if (prev !== id) { writing.closeTextFind({ focus: false }); writing.stopReading(); }
   if (prev && prev !== id) await discardIfBlank(prev);
   state.currentId = id;
   setSaveState('');
@@ -1833,6 +1834,7 @@ function openNoteMenu() {
       ...phoneViews(n),
       { label: 'Duplicate', disabled: n.deleted || n.locked, run: async () => { const made = await duplicateNotes([currentNote()]); if (made[0]) await selectNote(made[0].id); } },
       { label: 'Versions…', disabled: n.deleted || n.locked, run: openVersions },
+      { label: 'Read aloud', disabled: n.locked, run: () => writing.readAloud() },
       { label: n.deleted ? 'In Recently Deleted' : 'Delete', danger: !n.deleted, disabled: n.deleted, run: deleteCurrent },
     ]);
     return;
@@ -1841,6 +1843,7 @@ function openNoteMenu() {
     { label: 'Share…', run: async () => { await flushSave(); const x = currentNote(); if (x) shareUi.open([x], { single: true }); } },
     { label: n.pinned ? 'Unpin' : 'Pin to top', disabled: n.deleted, run: () => { const x = currentNote(); if (x) updateCurrent({ pinned: !x.pinned }); } },
     { label: 'Versions…', disabled: n.deleted || n.locked, run: openVersions },
+    { label: 'Read aloud', disabled: n.locked, run: () => writing.readAloud() },
     { label: n.deleted ? 'In Recently Deleted' : 'Delete', danger: !n.deleted, disabled: n.deleted, run: deleteCurrent },
   ]);
 }
@@ -2252,6 +2255,10 @@ function openSettings(tab = 'sync', explicitTab = tab !== 'sync') {
   renderFontSettings();
   renderSpacingSettings();
   $('pref-counter').checked = prefs().counter !== false;
+  $('pref-pages').checked = prefs().pageCount !== false;
+  $('pref-speak-time').checked = prefs().speakTime !== false;
+  $('pref-wpm').innerHTML = speech.WPM_CHOICES.map((w) => `<option value="${w}">${w} words a minute${w === speech.WPM_DEFAULT ? ' (average)' : ''}</option>`).join('');
+  $('pref-wpm').value = String(Number(prefs().speakWpm) >= 60 ? prefs().speakWpm : speech.WPM_DEFAULT);
   $('pref-search-site').value = bible.searchSite(prefs().searchSite).id;
   $('pref-brackets').checked = !!prefs().brackets;
   renderDiagnostics();
@@ -2427,6 +2434,9 @@ function bindEvents() {
   $('pref-spacing-reset').addEventListener('click', () => { setPrefs({ lh: null, ls: null, ws: null }); renderSpacingSettings(); writing.applySpacing(currentNote()); });
   $('pref-brackets').addEventListener('change', (e) => setPrefs({ brackets: e.target.checked }));
   $('pref-counter').addEventListener('change', (e) => { setPrefs({ counter: e.target.checked }); writing.renderCount(); });
+  $('pref-pages').addEventListener('change', (e) => { setPrefs({ pageCount: e.target.checked }); writing.renderCount(); });
+  $('pref-speak-time').addEventListener('change', (e) => { setPrefs({ speakTime: e.target.checked }); writing.renderCount(); });
+  $('pref-wpm').addEventListener('change', (e) => { setPrefs({ speakWpm: Number(e.target.value) }); speech.setSpeed(Number(e.target.value)); writing.renderCount(); });
   $('pref-note-font').addEventListener('change', (e) => { setPrefs({ noteFont: e.target.value }); log.info('prefs', 'Font for new notes changed', { font: e.target.value }); });
   $('font-packs').addEventListener('change', (e) => { const id = e.target.dataset?.font; if (id) setFontShown([id], e.target.checked); });
   $('font-packs').addEventListener('click', (e) => {

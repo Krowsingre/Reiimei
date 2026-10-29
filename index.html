@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-version="0.19.2">
+<html lang="en" data-version="0.19.3">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -305,6 +305,13 @@
           </div>
         </div>
       </div>
+      </div>
+      <div class="speak-bar" id="speak-bar" role="region" aria-label="Read aloud" hidden>
+        <span class="speak-label">Reading aloud</span>
+        <button type="button" class="text-btn" id="speak-play">Pause</button>
+        <button type="button" class="text-btn" id="speak-stop">Stop</button>
+        <label class="speak-speed">Speed <select id="speak-speed" aria-label="Reading speed, words a minute"></select></label>
+        <span class="speak-left" id="speak-left"></span>
       </div>
       <div class="passage-bar" id="passage-bar" hidden>
         <span class="passage-label">Bible note on</span>
@@ -624,6 +631,21 @@
           <label for="pref-counter">Word count</label>
           <span><input type="checkbox" class="switch" id="pref-counter" role="switch"></span>
           <p class="set-help">Show the number of words and characters in the bottom-left corner of a note. With text selected, it counts the selection.</p>
+        </div>
+        <div class="set-row">
+          <label for="pref-pages">Page count</label>
+          <span><input type="checkbox" class="switch" id="pref-pages" role="switch"></span>
+          <p class="set-help">Also show about how many pages the note comes to when printed, with its page style beside it. Tap the figure to choose the note's style (Standard, APA 7, MLA 9, Single spaced or Custom) and whether a cover page counts. Standard is US Letter, 1 inch margins, 12 pt, double spaced, no cover page.</p>
+        </div>
+        <div class="set-row">
+          <label for="pref-speak-time">Speaking time</label>
+          <span><input type="checkbox" class="switch" id="pref-speak-time" role="switch"></span>
+          <p class="set-help">Also show how long the note takes to say aloud, at the reading speed below.</p>
+        </div>
+        <div class="set-row">
+          <label for="pref-wpm">Reading speed</label>
+          <span><select id="pref-wpm"></select></span>
+          <p class="set-help">Words a minute, for the speaking time and for ⋯ › Read aloud. 150 is an average speaking pace.</p>
         </div>
         <div class="set-row">
           <label for="pref-brackets">Brackets</label>
@@ -1182,5 +1204,17 @@
 
   <script type="module" src="app.js"></script>
   <script defer src="boot.js"></script>
+  <dialog id="pages-dialog" class="dialog" aria-labelledby="pages-title">
+    <form id="pages-form">
+      <h3 id="pages-title">Custom pages</h3>
+      <p class="hint">US Letter paper, in Times New Roman.</p>
+      <label>Type size (pt)<input id="pc-size" type="number" min="8" max="24" step="0.5" inputmode="decimal"></label>
+      <label>Line spacing (1 single, 2 double)<input id="pc-lh" type="number" min="1" max="3" step="0.05" inputmode="decimal"></label>
+      <label>Margins (inches)<input id="pc-margin" type="number" min="0.25" max="2" step="0.25" inputmode="decimal"></label>
+      <menu><button type="button" class="btn" id="pc-cancel">Cancel</button><button type="submit" class="btn primary">Use these</button></menu>
+    </form>
+  </dialog>
+  <!-- The page count measures the note here, laid out as a paper (out of sight). -->
+  <div class="paper page-measure" id="page-measure" aria-hidden="true"></div>
 </body>
 </html>

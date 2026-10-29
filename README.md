@@ -1,8 +1,29 @@
-# Reiimei v0.19.2
+# Reiimei v0.19.3
 
 *reiimei* (ree-h-may), n. The cold, luminous stillness peculiar to a clear winter night; especially the effect of moonlight upon frost, illuminating the night without dispelling it.
 
 An offline-first notes app for Windows and iPhone, built as a Progressive Web App (PWA). No Mac, no App Store, no developer fee.
+
+## What changed in v0.19.3
+
+- **About how many pages, beside the word count.** The corner of a note reads like "1,180 words · 6,512 characters · about 5 pages · Standard · 8 min to speak".
+  - **Standard** is the default: US Letter, 1-inch margins, 12 pt Times New Roman, double spaced, no cover page.
+  - **Tap the page figure** to choose this note's style:
+    - **Standard**
+    - **APA 7** and **MLA 9**, laid out exactly as Tools › Paper prints them
+    - **Single spaced**
+    - **Custom…**, with your own type size, line spacing and margins
+  - **Count a cover page** is a switch, off unless you turn it on. For APA it is the title page; for the others it adds a page.
+  - Each note keeps its own style (it syncs with the note).
+  - The figure is worked out a moment after you stop typing. The APA and MLA counts were checked against Chrome's own printout, page for page.
+  - **Settings › Formatting › Page count** shows or hides it.
+- **Speaking time.** How long the note (or the selected words) takes to say aloud, at the **Reading speed** in Settings › Formatting. The default is 150 words a minute, an average speaking pace. **Speaking time** switches it off and on.
+- **Read aloud** (in ⋯, on a computer and a phone) reads the selected words, or the whole note, in the device's own voice.
+  - A bar at the top of the note shows the time left, with **Pause** / **Resume**, **Stop** and the speed in words a minute (changing it changes Settings too).
+  - Nothing leaves the device.
+- Code notes have no page count or speaking time.
+- One new file, `speak.js`, so 103 files now. No Supabase changes.
+- **Upload these files** (changed since v0.19.2): `app.js`, `index.html`, `speak.js` (new), `styles.css`, `sw.js`, `ui-writing.js`, `README.md`.
 
 ## What changed in v0.19.2
 
@@ -533,9 +554,9 @@ Then open http://localhost:8000 in Edge or Chrome. Notes work immediately, saved
 
 The iPhone needs an HTTPS address. GitHub Pages hosts the app for free. Only the app's code goes to GitHub; your notes never do.
 
-1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.19.2` folder.
+1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.19.3` folder.
 2. **Create the repository.** In Safari, sign in at github.com, tap **+** › **New repository**. Name it `reiimei`, set it to **Public** (free Pages needs a public repository), and tap **Create repository**.
-3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.19.2` folder, tap **Select**, select all 102 files, and tap **Open**. Scroll down and tap **Commit changes**.
+3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.19.3` folder, tap **Select**, select all 103 files, and tap **Open**. Scroll down and tap **Commit changes**.
    - If you don't see the upload link, tap the **aA** button in Safari's address bar › **Request Desktop Website** and try again.
 4. **Turn on Pages.** In the repository, open **Settings** › **Pages**. Under **Build and deployment**, set Source to **Deploy from a branch**, Branch to **main** and **/ (root)**, then tap **Save**.
 5. **Wait a minute or two**, then reload the Pages screen. It shows your address, which looks like `https://yourname.github.io/reiimei/`.
@@ -674,7 +695,7 @@ The service worker caches the app files. When you change any file, bump `VERSION
 - **Settings › Log** › Download gives a text log of everything the app did, including sync results and errors.
 - **"Test connection"** in Settings › Sync confirms the URL, key, sign-in, and tables are all correct.
 
-## Known limits in v0.19.2
+## Known limits in v0.19.3
 
 - Images can be linked but not attached
 - Sources belong to one note; there is no shared library yet

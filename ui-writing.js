@@ -16,6 +16,7 @@ import * as rich from './ui-rich.js';
 import * as fonts from './fonts.js';
 import * as brackets from './brackets.js';
 import * as capitals from './capitals.js';
+import * as speech from './speak.js';
 
 const $ = (id) => document.getElementById(id);
 let app = null; // hooks supplied by app.js
@@ -256,7 +257,167 @@ export function renderCount() {
   const w = (n) => `${fmtN(n)} ${n === 1 ? 'word' : 'words'}`;
   const c = (n) => `${fmtN(n)} ${n === 1 ? 'character' : 'characters'}`;
   const text = part ? `${fmtN(part.words)} of ${w(total.words)} · ${fmtN(part.chars)} of ${c(total.chars)}` : `${w(total.words)} · ${c(total.chars)}`;
-  if (el.textContent !== text) el.textContent = text;
+  let html = `<span class="wc-words">${escH(text)}</span>`;
+  const pages = pageCountText(note);
+  if (pages) html += ` · <button type="button" class="wc-pages" id="wc-pages" aria-haspopup="dialog" title="How pages are counted for this note">${escH(pages)}</button>`;
+  if (app.prefs().speakTime !== false && !isCodeNote(note)) {
+    const n = (part || total).words;
+    if (n) html += ` · <span class="wc-speak">${escH(speech.speakingTime(n, wpmOf()))} to speak</span>`;
+  }
+  if (el.dataset.html !== html) { el.innerHTML = html; el.dataset.html = html; }
+}
+
+const escH = (t) => String(t).replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+
+// ---- Read aloud ----------------------------------------------------------------------------
+// The selected words, or the whole note, read by the device's voice (⋯ › Read aloud). A bar at
+// the top of the note pauses, stops and changes the speed (words a minute; 150 is average).
+export function readAloud() {
+  const note = app.note();
+  if (!note) return;
+  if (!speech.supported()) { app.toast('Reading aloud is not available in this browser'); return; }
+  let text = selectedWords() && rich.active() ? rich.selectedText() : '';
+  if (!text) { try { text = isCodeNote(note) ? $('body').value : S.plainText({ ...note, body: $('body').value, meta: note.meta || {} }, {}); } catch { text = $('body').value; } }
+  if (!text.trim()) { app.toast('Nothing to read'); return; }
+  fillSpeeds();
+  if (!speech.start(text, { speed: wpmOf(), changed: paintSpeakBar })) { app.toast('Nothing to read'); return; }
+  log.info('speak', 'Read aloud', { words: countOf(text).words, wpm: wpmOf() });
+}
+function fillSpeeds() {
+  const sel = $('speak-speed');
+  const list = speech.WPM_CHOICES.includes(wpmOf()) ? speech.WPM_CHOICES : [...speech.WPM_CHOICES, wpmOf()].sort((a, b) => a - b);
+  sel.innerHTML = list.map((w) => `<option value="${w}">${w}${w === speech.WPM_DEFAULT ? ' (average)' : ''}</option>`).join('');
+  sel.value = String(wpmOf());
+}
+function paintSpeakBar(st) {
+  const bar = $('speak-bar');
+  bar.hidden = st.state === 'idle';
+  const play = $('speak-play');
+  play.textContent = st.state === 'paused' ? 'Resume' : 'Pause';
+  $('speak-left').textContent = st.left ? `${speech.speakingTime(st.left, st.wpm)} left` : '';
+}
+export const stopReading = () => speech.stop();
+
+// ---- The page count -----------------------------------------------------------------------
+// About how many pages the note comes to when printed, with the page style named beside it. Each
+// note keeps its own style (meta.pages), chosen by tapping the figure:
+// - Standard (the default): US Letter, 1 inch margins, 12 pt Times New Roman, double spaced.
+// - APA 7 and MLA 9: laid out exactly as Tools › Paper prints them.
+// - Single spaced: as Standard, single spaced.
+// - Custom: your own type size, line spacing and margins.
+// A cover page is counted only when its switch is on (APA's title page; one page in the others).
+// The note is laid out out of sight and measured page by page, a moment after you stop typing.
+export const PAGE_STYLES = [
+  { id: 'standard', name: 'Standard', hint: 'Letter, 1 in margins, 12 pt, double spaced' },
+  { id: 'apa', name: 'APA 7', hint: 'As Tools › Paper prints it' },
+  { id: 'mla', name: 'MLA 9', hint: 'As Tools › Paper prints it' },
+  { id: 'single', name: 'Single spaced', hint: 'Letter, 1 in margins, 12 pt, single spaced' },
+  { id: 'custom', name: 'Custom', hint: 'Your own size, spacing and margins' },
+];
+export const CUSTOM_DEFAULT = { size: 12, lh: 2, margin: 1 };
+export function pageSetOf(note) {
+  const p = note?.meta?.pages || {};
+  const style = PAGE_STYLES.some((x) => x.id === p.style) ? p.style : 'standard';
+  const c = p.custom || {};
+  const num = (v, d, lo, hi) => (Number.isFinite(Number(v)) ? Math.max(lo, Math.min(hi, Number(v))) : d);
+  return { style, cover: !!p.cover, custom: { size: num(c.size, 12, 8, 24), lh: num(c.lh, 2, 1, 3), margin: num(c.margin, 1, 0.25, 2) } };
+}
+const wpmOf = () => (Number(app.prefs().speakWpm) >= 60 ? Number(app.prefs().speakWpm) : speech.WPM_DEFAULT);
+let pageCache = { key: '', text: '' };
+let pageTimer = null;
+function pageKey(note) {
+  return `${note.id}|${note.updated_at}|${$('body').value.length}|${$('body').value.slice(-40)}|${JSON.stringify(pageSetOf(note))}|${JSON.stringify(note.meta?.paper || {})}|${(note.meta?.sources || []).length}`;
+}
+export function countPages(note, set = pageSetOf(note)) {
+  const { style, cover } = set;
+  const paperStyle = style === 'apa' ? 'apa' : 'mla';
+  const layout = P.layoutPaper({ ...note, body: $('body').value, meta: { ...(note.meta || {}), style: paperStyle } });
+  let blocks = layout.blocks;
+  let extra = 0;
+  if (style === 'apa') {
+    // APA's title page: everything before the title repeated at the top of the text.
+    if (!cover) {
+      const at = blocks.findIndex((b) => b.pageBreak);
+      if (at > 0) blocks = [{ ...blocks[at], pageBreak: false }, ...blocks.slice(at + 1)];
+    }
+  } else {
+    // Standard, single spaced and custom pages: the title and the text, without a paper's name,
+    // course and date lines. A cover page adds one page.
+    if (style !== 'mla') blocks = blocks.filter((b) => b.k !== 'left');
+    if (cover) extra = 1;
+  }
+  const fixed = style === 'apa' || style === 'mla' || style === 'standard';
+  const t = style === 'single' ? { size: 12, lh: 1.15, margin: 1 } : style === 'custom' ? set.custom : { size: 12, lh: 2, margin: 1 };
+  const box = $('page-measure');
+  box.style.setProperty('--pm-size', `${t.size}pt`);
+  box.style.setProperty('--pm-lh', String(t.lh));
+  box.style.setProperty('--pm-margin', `${t.margin}in`);
+  box.classList.toggle('pm-own', !fixed);
+  box.innerHTML = P.paperToHtml({ ...layout, blocks });
+  const pageH = (11 - 2 * t.margin) * 96;           // the writing area of a Letter page, in CSS pixels
+  const line = t.size * t.lh * 96 / 72;             // one line of text
+  let pages = 1;
+  let used = 0;
+  for (const el of box.children) {
+    if (el.classList.contains('pb') && used > 0) { pages++; used = 0; }
+    let h = el.offsetHeight;
+    while (used + h > pageH + 1) {
+      // The block runs on to the next page (whole lines stay together).
+      const fits = Math.max(0, Math.floor((pageH - used) / line) * line);
+      h -= fits;
+      pages++;
+      used = 0;
+    }
+    used += h;
+  }
+  box.innerHTML = '';
+  return { pages: pages + extra, style, cover };
+}
+function pageCountText(note) {
+  if (!note || isCodeNote(note) || app.prefs().pageCount === false || !$('body').value.trim()) return '';
+  const key = pageKey(note);
+  if (pageCache.key !== key) {
+    clearTimeout(pageTimer);
+    pageTimer = setTimeout(() => {
+      const n = app.note();
+      if (!n || n.id !== note.id) return;
+      try {
+        const { pages, style, cover } = countPages(n);
+        pageCache = { key: pageKey(n), text: `about ${fmtN(pages)} ${pages === 1 ? 'page' : 'pages'} · ${PAGE_STYLES.find((x) => x.id === style).name}${cover ? ' with cover' : ''}` };
+      } catch (e) {
+        pageCache = { key: pageKey(n), text: '' };
+        log.warn('count', 'Pages could not be counted', { error: e.message });
+      }
+      renderCount();
+    }, pageCache.text && pageCache.key.split('|')[0] === note.id ? 900 : 50);
+  }
+  return pageCache.key.split('|')[0] === note.id ? pageCache.text : '';
+}
+// Tapping the figure: the note's page style, and its cover page switch.
+async function setPageSet(changes) {
+  const note = app.note();
+  if (!note) return;
+  const cur = note.meta?.pages || {};
+  await app.updateNote(note, { meta: { ...(note.meta || {}), pages: { ...cur, ...changes } } });
+  log.info('count', 'Page style', { ...pageSetOf(app.note()) });
+  renderCount();
+}
+function openPageMenu(anchor) {
+  const note = app.note();
+  if (!note) return;
+  const set = pageSetOf(note);
+  app.menu(anchor, 'Page count', [
+    ...PAGE_STYLES.map((x) => ({ label: x.id === 'custom' ? 'Custom…' : x.name, hint: x.id === 'custom' && set.style === 'custom' ? `${set.custom.size} pt, ${set.custom.lh}× spacing, ${set.custom.margin} in margins` : x.hint, checked: set.style === x.id, run: () => (x.id === 'custom' ? openCustomPages() : setPageSet({ style: x.id })) })),
+    { heading: 'Cover page' },
+    { label: 'Count a cover page', hint: set.cover ? 'On' : 'Off', checked: set.cover, run: () => setPageSet({ cover: !set.cover }) },
+  ]);
+}
+function openCustomPages() {
+  const set = pageSetOf(app.note());
+  $('pc-size').value = String(set.custom.size);
+  $('pc-lh').value = String(set.custom.lh);
+  $('pc-margin').value = String(set.custom.margin);
+  $('pages-dialog').showModal();
 }
 
 // ---- The phone's formatting: quick row and deck -------------------------------------------
@@ -1330,6 +1491,19 @@ export function init(hooks) {
     await app.update({ meta });
     log.info('format', 'Note size changed', { size: z });
   });
+  // The page count's figure opens its menu; Custom has its own small dialog.
+  $('word-count').addEventListener('click', (e) => { const b = e.target.closest('#wc-pages'); if (b) openPageMenu(b); });
+  $('pages-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const v = (id, d) => (Number.isFinite(parseFloat($(id).value)) ? parseFloat($(id).value) : d);
+    $('pages-dialog').close();
+    setPageSet({ style: 'custom', custom: { size: v('pc-size', 12), lh: v('pc-lh', 2), margin: v('pc-margin', 1) } });
+  });
+  $('pc-cancel').addEventListener('click', () => $('pages-dialog').close());
+  // Read aloud: the bar's buttons and speed.
+  $('speak-play').addEventListener('click', () => { const st = speech.status(); if (st.state === 'paused') speech.resume(); else speech.pause(); });
+  $('speak-stop').addEventListener('click', () => speech.stop());
+  $('speak-speed').addEventListener('change', (e) => { app.setPrefs({ speakWpm: Number(e.target.value) }); speech.setSpeed(Number(e.target.value)); renderCount(); });
   // The word and character count.
   let countTimer = null;
   const recount = () => { clearTimeout(countTimer); countTimer = setTimeout(renderCount, 120); };
