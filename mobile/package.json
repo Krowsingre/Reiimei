@@ -1,0 +1,22 @@
+{
+  "name": "reiimei-app",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.js",
+  "scripts": {
+    "start": "expo start",
+    "ios": "expo run:ios",
+    "prebuild": "expo prebuild --platform ios"
+  },
+  "dependencies": {
+    "expo": "~58.0.21",
+    "expo-sqlite": "~58.0.14",
+    "expo-status-bar": "~58.0.4",
+    "react": "19.3.0",
+    "react-native": "0.88.1",
+    "react-native-safe-area-context": "~5.10.1"
+  },
+  "devDependencies": {
+    "babel-preset-expo": "~58.0.22"
+  }
+}
