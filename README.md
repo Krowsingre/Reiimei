@@ -1,8 +1,18 @@
-# Reiimei v0.19.3
+# Reiimei v0.19.4
 
 *reiimei* (ree-h-may), n. The cold, luminous stillness peculiar to a clear winter night; especially the effect of moonlight upon frost, illuminating the night without dispelling it.
 
 An offline-first notes app for Windows and iPhone, built as a Progressive Web App (PWA). No Mac, no App Store, no developer fee.
+
+## What changed in v0.19.4
+
+- **Ready for the Reiimei app.** Version history and each device's settings used to stay on that device only. They are now also copied to your cloud (Supabase), so that moving your notes into the Reiimei app later brings them too.
+  - They travel as hidden records, the way highlights do: one for each note's version history and one for each device's settings.
+  - They are sealed like notes when encryption is on.
+  - They never show in lists, search, counts or Recently Deleted.
+  - A device running an older copy of Reiimei for a moment may show one as a note starting "Reiimei backup". Leave it, and it disappears once that device updates.
+- Nothing else changes. The web app stays on Supabase. No Supabase SQL changes.
+- Changed files: `app.js`, `db.js`, `index.html`, `sw.js`, `versions.js`, `README.md`.
 
 ## What changed in v0.19.3
 
@@ -554,9 +564,9 @@ Then open http://localhost:8000 in Edge or Chrome. Notes work immediately, saved
 
 The iPhone needs an HTTPS address. GitHub Pages hosts the app for free. Only the app's code goes to GitHub; your notes never do.
 
-1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.19.3` folder.
+1. **Unzip on the iPhone.** Save the zip to the Files app, then tap it. Files creates a `Reiimei v0.19.4` folder.
 2. **Create the repository.** In Safari, sign in at github.com, tap **+** › **New repository**. Name it `reiimei`, set it to **Public** (free Pages needs a public repository), and tap **Create repository**.
-3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.19.3` folder, tap **Select**, select all 103 files, and tap **Open**. Scroll down and tap **Commit changes**.
+3. **Upload the files.** On the new repository's page, tap **uploading an existing file**. Tap **choose your files**, then **Browse**, open the `Reiimei v0.19.4` folder, tap **Select**, select all 103 files, and tap **Open**. Scroll down and tap **Commit changes**.
    - If you don't see the upload link, tap the **aA** button in Safari's address bar › **Request Desktop Website** and try again.
 4. **Turn on Pages.** In the repository, open **Settings** › **Pages**. Under **Build and deployment**, set Source to **Deploy from a branch**, Branch to **main** and **/ (root)**, then tap **Save**.
 5. **Wait a minute or two**, then reload the Pages screen. It shows your address, which looks like `https://yourname.github.io/reiimei/`.
@@ -695,7 +705,7 @@ The service worker caches the app files. When you change any file, bump `VERSION
 - **Settings › Log** › Download gives a text log of everything the app did, including sync results and errors.
 - **"Test connection"** in Settings › Sync confirms the URL, key, sign-in, and tables are all correct.
 
-## Known limits in v0.19.3
+## Known limits in v0.19.4
 
 - Images can be linked but not attached
 - Sources belong to one note; there is no shared library yet

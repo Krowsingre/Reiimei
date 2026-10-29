@@ -187,6 +187,10 @@ export async function setVersions(id, list) {
   return setMeta(versionsKey(id), vault.isEnabled() ? { sealed: await vault.seal({ list }) } : { list });
 }
 export const removeVersions = (id) => remove('meta', versionsKey(id));
+// Every note with versions kept on this device.
+export async function versionIds() {
+  return (await rawGetAll('meta')).map((r) => r.key).filter((k) => typeof k === 'string' && k.startsWith('versions:')).map((k) => k.slice(9));
+}
 
 const now = () => new Date().toISOString();
 

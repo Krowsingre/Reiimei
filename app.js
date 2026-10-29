@@ -22,7 +22,7 @@ import * as bible from './bible.js';
 import * as speech from './speak.js';
 import { noteTitle, noteSnippet, ownTitle, fallbackTitle, sharedFileCheck, plainText } from './share.js';
 
-export const APP_VERSION = '0.19.3';
+export const APP_VERSION = '0.19.4';
 // boot.js compares this with the page's version to catch a launch that mixes two releases.
 window.__reiimeiVersion = APP_VERSION;
 export const BUILD_DATE = '2026-10-04';
@@ -80,6 +80,7 @@ function prefs() {
 const fontOf = (n) => fonts.fontId(n?.meta?.font);
 function setPrefs(patch) {
   try { localStorage.setItem(PREFS_KEY, JSON.stringify({ ...prefs(), ...patch })); } catch { /* storage blocked */ }
+  try { backupSettingsSoon(); } catch { /* before start-up */ }
 }
 
 const view = () => ({ ...VIEW_DEFAULT, ...(prefs().view || {}) });
@@ -140,7 +141,7 @@ const isRegistry = (n) => !!(n.meta && n.meta.registry);
 const isHighlight = (n) => !!(n.meta && n.meta.highlight);
 // A Bible bookmark is one too (meta.bookmark); bookmarks are listed on the Bible page.
 const isBookmark = (n) => !!(n.meta && n.meta.bookmark);
-const isHidden = (n) => isRegistry(n) || isHighlight(n) || isBookmark(n);
+const isHidden = (n) => isRegistry(n) || isHighlight(n) || isBookmark(n) || isBackup(n);
 const activeNotes = () => state.notes.filter((n) => !n.deleted && !isHidden(n));
 // A permanently deleted note is a blank deleted stub (kept only so other devices wipe it too).
 const isPurged = (n) => n.deleted && !n.locked && !(n.body || '').trim() && !ownTitle(n) && !(n.tags || []).length;
@@ -244,6 +245,58 @@ async function recoverDraft() {
 }
 
 // ---- Versions ------------------------------------------------------------
+// ---- Backups of what stays on each device (v0.19.4) -------------------------------------------
+// Version history and this device's settings are kept on the device only. So that the Reiimei
+// app can bring them in when you move your notes, each is also copied to the cloud as a hidden
+// record (meta.backup), the way highlights travel: one per note's version history, one per
+// device's settings. They are sealed like notes when encryption is on, never listed, and only
+// ever replaced by the device that wrote them. The text says what they are, in case an older copy
+// of Reiimei ever shows one.
+const isBackup = (n) => !!(n.meta && n.meta.backup);
+const BACKUP_BODY = 'Reiimei backup: kept for moving your notes to the Reiimei app. Please leave it as it is.';
+const backupOf = (type, key) => state.notes.find((n) => !n.deleted && !n.locked && isBackup(n) && n.meta.backup.type === type && n.meta.backup.key === key);
+async function putBackup(type, key, data) {
+  const old = backupOf(type, key);
+  if (old && JSON.stringify(old.meta.backup.data) === JSON.stringify(data)) return false;
+  const meta = { backup: { type, key, device: device().id, name: device().name, at: new Date().toISOString(), data } };
+  replaceNote(old ? await db.saveNote(old, { meta, body: BACKUP_BODY }) : await db.createNote({ body: BACKUP_BODY, meta }));
+  return true;
+}
+const backupTimers = new Map();
+// The version history of one note, a few seconds after it changed.
+function backupVersionsSoon(id) {
+  clearTimeout(backupTimers.get(id));
+  backupTimers.set(id, setTimeout(async () => {
+    backupTimers.delete(id);
+    try {
+      const list = await db.getVersions(id);
+      if (list === null || !list.length) return;   // sealed and not opened, or nothing kept
+      if (await putBackup('versions', id, list)) scheduleSync();
+    } catch (e) { log.warn('backup', 'Version history not backed up', { error: e.message }); }
+  }, 4000));
+}
+// This device's settings, a little after they change.
+let settingsTimer = null;
+function backupSettingsSoon() {
+  clearTimeout(settingsTimer);
+  settingsTimer = setTimeout(async () => {
+    try { if (await putBackup('settings', device().id, { prefs: prefs() })) scheduleSync(); } catch (e) { log.warn('backup', 'Settings not backed up', { error: e.message }); }
+  }, 8000);
+}
+// Everything at once, after the app starts (only what changed is written).
+async function backupAll() {
+  if (vault.isEnabled() && !vault.isUnlocked()) return;
+  let n = 0;
+  for (const id of await db.versionIds()) {
+    try {
+      const list = await db.getVersions(id);
+      if (list && list.length && await putBackup('versions', id, list)) n++;
+    } catch { /* tried again next start */ }
+  }
+  if (await putBackup('settings', device().id, { prefs: prefs() })) n++;
+  if (n) { log.info('backup', 'Backed up to the cloud', { records: n }); scheduleSync(); }
+}
+
 async function keepVersion(id, reason) {
   const n = state.notes.find((x) => x.id === id);
   try { await versions.keep(n, { reason, force: true }); } catch (e) { log.warn('versions', 'Could not keep a version', { error: e.message }); }
@@ -2919,6 +2972,8 @@ async function boot() {
   }
   await registerServiceWorker();
   await runDiagnostics();
+  versions.setOnKept((id) => backupVersionsSoon(id));
+  setTimeout(() => backupAll().catch((e) => log.warn('backup', 'Backup failed', { error: e.message })), 5000);
   if (sync.isConfigured()) runSync('startup');
 }
 

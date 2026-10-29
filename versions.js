@@ -2,10 +2,14 @@
 // long after Undo has forgotten it (or after a sync replaced the text). A copy is kept at most
 // every few minutes while you write, when you leave a note, before a sync replaces its text and
 // before an older version is restored. The newest 30 copies of each note are kept. They are
-// sealed like the notes when encryption is on, and they are not synced.
+// sealed like the notes when encryption is on. Since v0.19.4 each note's list is also copied to the
+// cloud as a hidden backup record (app.js), so the Reiimei app can bring it in later.
 import * as db from './db.js';
 
 export const KEEP = 30;
+// Told each time a note's list changes (the backup copy in the cloud follows it).
+let onKept = null;
+export const setOnKept = (fn) => { onKept = fn; };
 const EVERY_MS = 3 * 60 * 1000;
 
 const copyOf = (note, reason, at) => ({ at, reason, body: note.body || '', title: note.meta?.title || '', format: note.format || 'markdown' });
@@ -29,6 +33,7 @@ async function keepNow(note, { reason = 'editing', force = false, now = Date.now
   list.push(copyOf(note, reason, now));
   while (list.length > KEEP) list.shift();
   await db.setVersions(note.id, list);
+  try { onKept?.(note.id); } catch { /* the backup catches up next start */ }
   return true;
 }
 
